@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kaixuan/llm-gateway-go/audit"
 	"github.com/kaixuan/llm-gateway-go/circuit"
 	"github.com/kaixuan/llm-gateway-go/identity"
 	"github.com/kaixuan/llm-gateway-go/limiter"
@@ -63,10 +64,14 @@ type ChatHandler struct {
 	matrix   *transform.Matrix
 	pools    *pool.PoolManager
 	resolver *resolve.Resolver
+	auditor  audit.Sink
 }
 
-func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.Matrix, pools *pool.PoolManager, resolver *resolve.Resolver) *ChatHandler {
-	return &ChatHandler{circuit: cm, limiter: l, matrix: matrix, pools: pools, resolver: resolver}
+func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.Matrix, pools *pool.PoolManager, resolver *resolve.Resolver, auditor audit.Sink) *ChatHandler {
+	if auditor == nil {
+		auditor = &audit.LogSink{}
+	}
+	return &ChatHandler{circuit: cm, limiter: l, matrix: matrix, pools: pools, resolver: resolver, auditor: auditor}
 }
 
 // ServeHTTP handles /v1/chat/completions and /v1/completions.
@@ -97,8 +102,8 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Read and buffer body ───────────────────────────────────────────
-	bodyBytes, err := io.ReadAll(r.Body)
+	// ── Read and buffer body (capped at 32 MiB) ──────────────────────
+	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 32<<20))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
 			"error": map[string]string{
@@ -168,6 +173,29 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		bodyBytes = replaceModelInRequestBody(bodyBytes, explicitOutbound)
 	}
 
+	// ── Audit event builder ────────────────────────────────────────────
+	auditBuilder := audit.NewEvent().
+		ClientModel(clientModel).
+		OutboundModel(explicitOutbound).
+		IdentityHash(identityHash).
+		ClientProfile(clientID.Fingerprint.ClientProfile).
+		Stream(isStream).
+		Provider(svc.ProviderID).
+		Credential(svc.CredentialID).
+		RequestChecksum(bodyBytes)
+	if modelResolution != nil {
+		auditBuilder.ResolutionPath(modelResolution.ResolutionPath)
+		if modelResolution.CanonicalName != nil {
+			auditBuilder.CanonicalName(*modelResolution.CanonicalName)
+		}
+	}
+	if txResult != nil {
+		auditBuilder.TransformRule(txResult.MatchedRule)
+	}
+	defer func() {
+		h.auditor.Emit(r.Context(), auditBuilder.Build())
+	}()
+
 	// ── Concurrency limiter ────────────────────────────────────────────
 	release, err := h.limiter.AcquireAll(r.Context(), svc.ProviderID, svc.CredentialID, identityHash)
 	if err != nil {
@@ -222,6 +250,7 @@ func ChatCompletionsPhase3(
 	pools *pool.PoolManager,
 	release limiter.ReleaseFunc,
 ) {
+	var released bool
 	defer func() {
 		if rec := recover(); rec != nil {
 			slog.Error("panic in chat handler", "panic", rec)
@@ -232,7 +261,10 @@ func ChatCompletionsPhase3(
 					"code":    "panic",
 				},
 			})
-			release()
+			if !released {
+				release()
+				released = true
+			}
 			cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
 		}
 	}()
@@ -258,13 +290,15 @@ func ChatCompletionsPhase3(
 				"code":    "upstream_error",
 			},
 		})
+		released = true
 		release()
 		cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
 		return
 	}
 
-	// Copy headers
-	upstreamReq.Header = r.Header.Clone()
+	// Copy only safe headers (H4: strip hop-by-hop and auth headers)
+	safeHeaders := copySafeHeaders(r.Header)
+	upstreamReq.Header = safeHeaders
 	upstreamReq.Header.Set("X-Request-Id", rid)
 	upstreamReq.Header.Set("Content-Type", "application/json")
 
@@ -316,6 +350,7 @@ func ChatCompletionsPhase3(
 				"code":    string(errKind),
 			},
 		})
+		released = true
 		release()
 		if errKind == "" {
 			cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
@@ -344,6 +379,7 @@ func ChatCompletionsPhase3(
 			w.Write(body[:n])
 		}
 
+		released = true
 		release()
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 &&
 			resp.StatusCode != 429 && resp.StatusCode != 401 &&
@@ -360,12 +396,14 @@ func ChatCompletionsPhase3(
 
 	// ── Success — proxy the response ───────────────────────────────────
 	if isStream {
+		defer resp.Body.Close()
 		StreamChat(w, resp, clientModel, explicitOutbound)
+		released = true
 		release()
 		cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
 	} else {
 		defer resp.Body.Close()
-		respBody, err := io.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 		if err != nil {
 			slog.Error("failed to read upstream response", "error", err)
 			writeJSON(w, http.StatusBadGateway, map[string]any{
@@ -375,25 +413,27 @@ func ChatCompletionsPhase3(
 					"code":    "read_error",
 				},
 			})
-			release()
-			cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
-			return
-		}
-
-		// Replace model in non-streaming response
-		if clientModel != "" {
-			respBody = replaceModelInResponseBody(respBody, clientModel)
-		}
-
-		for k, vs := range resp.Header {
-			for _, v := range vs {
-				w.Header().Add(k, v)
-			}
-		}
-		w.WriteHeader(resp.StatusCode)
-		w.Write(respBody)
 		release()
-		cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
+		released = true
+		cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
+		return
+	}
+
+	// Replace model in non-streaming response
+	if clientModel != "" {
+		respBody = replaceModelInResponseBody(respBody, clientModel)
+	}
+
+	for k, vs := range resp.Header {
+		for _, v := range vs {
+			w.Header().Add(k, v)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	w.Write(respBody)
+	released = true
+	release()
+	cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
 	}
 }
 
@@ -660,4 +700,29 @@ func StreamChatFromResponse(w http.ResponseWriter, resp *http.Response, clientMo
 			break
 		}
 	}
+}
+
+var hopByHopHeaders = map[string]bool{
+	"Connection":          true,
+	"Keep-Alive":          true,
+	"Proxy-Authenticate":  true,
+	"Proxy-Authorization": true,
+	"TE":                  true,
+	"Trailers":            true,
+	"Transfer-Encoding":   true,
+	"Upgrade":             true,
+	"Authorization":       true,
+	"Cookie":              true,
+	"Host":                true,
+}
+
+func copySafeHeaders(src http.Header) http.Header {
+	dst := make(http.Header, len(src))
+	for k, vs := range src {
+		if hopByHopHeaders[http.CanonicalHeaderKey(k)] {
+			continue
+		}
+		dst[k] = append([]string(nil), vs...)
+	}
+	return dst
 }

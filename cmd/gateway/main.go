@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kaixuan/llm-gateway-go/audit"
 	"github.com/kaixuan/llm-gateway-go/circuit"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/middleware"
@@ -58,9 +59,14 @@ func main() {
 	pythonEndpoint := os.Getenv("LLM_GATEWAY_PYTHON_ENDPOINT")
 	resolver := resolve.NewResolver(pythonEndpoint, 120*time.Second)
 
+	auditSink := audit.NewMultiSink(
+		&audit.LogSink{},
+		audit.NewJSONSink(10000),
+	)
+
 	pools := pool.NewPoolManager()
 
-	chatHandler := relay.NewChatHandler(cm, lim, matrix, pools, resolver)
+	chatHandler := relay.NewChatHandler(cm, lim, matrix, pools, resolver, auditSink)
 	healthHandler := relay.NewHealthHandler(cm, lim)
 
 	// ── Listen address ────────────────────────────────────────────────────
@@ -101,6 +107,7 @@ func main() {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 300 * time.Second,
 		IdleTimeout:  60 * time.Second,
+		MaxHeaderBytes: 1 << 20,
 	}
 
 	// ── Graceful shutdown ─────────────────────────────────────────────────

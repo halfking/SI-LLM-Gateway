@@ -268,7 +268,7 @@ func TestStreamingModelReplacementE2E(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim, nil, nil, nil)
+	handler := NewChatHandler(cm, lim, nil, nil, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -333,7 +333,7 @@ func TestNonStreamingModelReplacementE2E(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim, nil, nil, nil)
+	handler := NewChatHandler(cm, lim, nil, nil, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -395,7 +395,7 @@ func TestStreamingToolCallsE2E(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim, nil, nil, nil)
+	handler := NewChatHandler(cm, lim, nil, nil, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -451,7 +451,7 @@ func TestStreamingSSEEmptyLineHandling(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim, nil, nil, nil)
+	handler := NewChatHandler(cm, lim, nil, nil, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -498,7 +498,7 @@ func TestStreamingWithUsageChunk(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim, nil, nil, nil)
+	handler := NewChatHandler(cm, lim, nil, nil, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 

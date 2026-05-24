@@ -1,0 +1,259 @@
+package audit
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"sync"
+	"time"
+)
+
+type Event struct {
+	RequestID      string    `json:"request_id"`
+	Timestamp      time.Time `json:"ts"`
+	TenantID       string    `json:"tenant_id"`
+	ApplicationID  int       `json:"application_id"`
+	APIKeyID       int       `json:"api_key_id"`
+	ClientModel    string    `json:"client_model"`
+	OutboundModel  string    `json:"outbound_model"`
+	ResolutionPath string    `json:"resolution_path,omitempty"`
+	CanonicalName  string    `json:"canonical_name,omitempty"`
+	IdentityHash   string    `json:"identity_hash"`
+	ClientProfile  string    `json:"client_profile,omitempty"`
+	Stream         bool      `json:"stream"`
+	ProviderID     int       `json:"provider_id"`
+	CredentialID   int       `json:"credential_id"`
+	LatencyMs      int       `json:"latency_ms"`
+	Success        bool      `json:"success"`
+	ErrorKind      string    `json:"error_kind,omitempty"`
+	FailureStage   string    `json:"failure_stage,omitempty"`
+	PromptTokens   int       `json:"prompt_tokens,omitempty"`
+	CompletionToken int      `json:"completion_tokens,omitempty"`
+	CostUSD        float64   `json:"cost_usd,omitempty"`
+	TransformRule  string    `json:"transform_rule,omitempty"`
+	RequestChecksum string   `json:"request_checksum,omitempty"`
+	StreamChunkCount int     `json:"stream_chunk_count,omitempty"`
+	StreamTTFBMs   int       `json:"stream_ttfb_ms,omitempty"`
+	StreamDone     bool      `json:"stream_done,omitempty"`
+	StreamInterrupted bool   `json:"stream_interrupted,omitempty"`
+}
+
+type StreamCapture struct {
+	mu            sync.Mutex
+	startTime     time.Time
+	chunkCount    int
+	firstChunkMs  int
+	doneReceived  bool
+	interrupted   bool
+	checksum      [32]byte
+	finalFinish   string
+}
+
+func NewStreamCapture() *StreamCapture {
+	return &StreamCapture{
+		startTime: time.Now(),
+	}
+}
+
+func (sc *StreamCapture) RecordChunk(payload []byte) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.chunkCount++
+	elapsed := int(time.Since(sc.startTime).Milliseconds())
+	if sc.firstChunkMs == 0 {
+		sc.firstChunkMs = elapsed
+	}
+	sc.checksum = sha256.Sum256(append(sc.checksum[:], payload...))
+}
+
+func (sc *StreamCapture) RecordDone() {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.doneReceived = true
+}
+
+func (sc *StreamCapture) MarkInterrupted() {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.interrupted = true
+}
+
+func (sc *StreamCapture) Snapshot() (chunkCount, ttfbMs int, done, interrupted bool, checksum string) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	return sc.chunkCount, sc.firstChunkMs, sc.doneReceived, sc.interrupted, hex.EncodeToString(sc.checksum[:])
+}
+
+type EventBuilder struct {
+	event Event
+}
+
+func NewEvent() *EventBuilder {
+	now := time.Now()
+	return &EventBuilder{
+		event: Event{
+			RequestID: fmt.Sprintf("go-%d-%s", now.UnixMilli(), randomHex(8)),
+			Timestamp: now,
+		},
+	}
+}
+
+func (b *EventBuilder) RequestID(id string) *EventBuilder      { b.event.RequestID = id; return b }
+func (b *EventBuilder) ClientModel(m string) *EventBuilder     { b.event.ClientModel = m; return b }
+func (b *EventBuilder) OutboundModel(m string) *EventBuilder   { b.event.OutboundModel = m; return b }
+func (b *EventBuilder) ResolutionPath(p string) *EventBuilder  { b.event.ResolutionPath = p; return b }
+func (b *EventBuilder) CanonicalName(n string) *EventBuilder   { b.event.CanonicalName = n; return b }
+func (b *EventBuilder) IdentityHash(h string) *EventBuilder    { b.event.IdentityHash = h; return b }
+func (b *EventBuilder) ClientProfile(p string) *EventBuilder   { b.event.ClientProfile = p; return b }
+func (b *EventBuilder) Stream(s bool) *EventBuilder            { b.event.Stream = s; return b }
+func (b *EventBuilder) Provider(id int) *EventBuilder          { b.event.ProviderID = id; return b }
+func (b *EventBuilder) Credential(id int) *EventBuilder        { b.event.CredentialID = id; return b }
+func (b *EventBuilder) Success(s bool) *EventBuilder           { b.event.Success = s; return b }
+func (b *EventBuilder) ErrorKind(k string) *EventBuilder       { b.event.ErrorKind = k; return b }
+func (b *EventBuilder) FailureStage(s string) *EventBuilder    { b.event.FailureStage = s; return b }
+func (b *EventBuilder) Tokens(p, c int) *EventBuilder          { b.event.PromptTokens = p; b.event.CompletionToken = c; return b }
+func (b *EventBuilder) Cost(usd float64) *EventBuilder         { b.event.CostUSD = usd; return b }
+func (b *EventBuilder) TransformRule(r string) *EventBuilder   { b.event.TransformRule = r; return b }
+func (b *EventBuilder) TenantID(id string) *EventBuilder       { b.event.TenantID = id; return b }
+func (b *EventBuilder) ApplicationID(id int) *EventBuilder     { b.event.ApplicationID = id; return b }
+func (b *EventBuilder) APIKeyID(id int) *EventBuilder          { b.event.APIKeyID = id; return b }
+
+func (b *EventBuilder) Latency(d time.Duration) *EventBuilder {
+	b.event.LatencyMs = int(d.Milliseconds())
+	return b
+}
+
+func (b *EventBuilder) RequestChecksum(body []byte) *EventBuilder {
+	h := sha256.Sum256(body)
+	b.event.RequestChecksum = hex.EncodeToString(h[:])
+	return b
+}
+
+func (b *EventBuilder) StreamMetrics(sc *StreamCapture) *EventBuilder {
+	if sc == nil {
+		return b
+	}
+	count, ttfb, done, interrupted, _ := sc.Snapshot()
+	b.event.StreamChunkCount = count
+	b.event.StreamTTFBMs = ttfb
+	b.event.StreamDone = done
+	b.event.StreamInterrupted = interrupted
+	return b
+}
+
+func (b *EventBuilder) Build() Event {
+	if b.event.LatencyMs == 0 {
+		b.event.LatencyMs = int(time.Since(b.event.Timestamp).Milliseconds())
+	}
+	return b.event
+}
+
+type Sink interface {
+	Emit(ctx context.Context, event Event)
+}
+
+type LogSink struct{}
+
+func (s *LogSink) Emit(_ context.Context, event Event) {
+	attrs := []any{
+		"audit", "request",
+		"request_id", event.RequestID,
+		"model", event.ClientModel,
+		"outbound", event.OutboundModel,
+		"provider", event.ProviderID,
+		"credential", event.CredentialID,
+		"latency_ms", event.LatencyMs,
+		"success", event.Success,
+	}
+	if event.ErrorKind != "" {
+		attrs = append(attrs, "error_kind", event.ErrorKind)
+	}
+	if event.Stream {
+		attrs = append(attrs, "stream_chunks", event.StreamChunkCount, "stream_ttfb_ms", event.StreamTTFBMs)
+	}
+	if event.PromptTokens > 0 || event.CompletionToken > 0 {
+		attrs = append(attrs, "prompt_tokens", event.PromptTokens, "completion_tokens", event.CompletionToken)
+	}
+	slog.Info("audit: request completed", attrs...)
+}
+
+type MultiSink struct {
+	sinks []Sink
+}
+
+func NewMultiSink(sinks ...Sink) *MultiSink {
+	return &MultiSink{sinks: sinks}
+}
+
+func (m *MultiSink) Emit(ctx context.Context, event Event) {
+	for _, s := range m.sinks {
+		s.Emit(ctx, event)
+	}
+}
+
+type JSONSink struct {
+	mu     sync.Mutex
+	lastN  []Event
+	maxLen int
+}
+
+func NewJSONSink(maxLen int) *JSONSink {
+	if maxLen <= 0 {
+		maxLen = 1000
+	}
+	return &JSONSink{maxLen: maxLen}
+}
+
+func (j *JSONSink) Emit(_ context.Context, event Event) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.lastN = append(j.lastN, event)
+	if len(j.lastN) > j.maxLen {
+		j.lastN = j.lastN[len(j.lastN)-j.maxLen:]
+	}
+}
+
+func (j *JSONSink) Recent(n int) []Event {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if n > len(j.lastN) {
+		n = len(j.lastN)
+	}
+	out := make([]Event, n)
+	copy(out, j.lastN[len(j.lastN)-n:])
+	return out
+}
+
+func (j *JSONSink) RecentJSON(n int) []byte {
+	events := j.Recent(n)
+	data, err := json.Marshal(events)
+	if err != nil {
+		return []byte(`[]`)
+	}
+	return data
+}
+
+func (j *JSONSink) Count() int {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return len(j.lastN)
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = byte(time.Now().UnixNano() % 256)
+		time.Sleep(0)
+	}
+	return hex.EncodeToString(b)
+}
+
+func ComputeRequestChecksum(model string, body []byte) string {
+	h := sha256.New()
+	h.Write([]byte(model))
+	h.Write(body)
+	return hex.EncodeToString(h.Sum(nil))
+}

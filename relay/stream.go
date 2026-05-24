@@ -26,6 +26,8 @@ func StreamChat(
 	clientModel string,
 	_ string,
 ) {
+	defer resp.Body.Close()
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
@@ -45,72 +47,61 @@ func StreamChat(
 		ctx = context.Background()
 	}
 	reader := bufio.NewReaderSize(resp.Body, streamBufSize)
-	done := make(chan struct{})
+	discoveredUpstream := ""
 
-	go func() {
-		defer close(done)
-		discoveredUpstream := ""
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 
-			chunkCtx, cancel := context.WithTimeout(ctx, streamChunkTimeout)
-			chunkDone := make(chan string, 1)
-			chunkErr := make(chan error, 1)
-
-			go func() {
-				line, err := reader.ReadString('\n')
-				if err != nil {
-					chunkErr <- err
-					return
-				}
-				chunkDone <- line
-			}()
-
-			var line string
-			var err error
-			select {
-			case line = <-chunkDone:
-			case err = <-chunkErr:
-			case <-chunkCtx.Done():
-				cancel()
+		line, err := readLineWithTimeout(ctx, reader)
+		if err != nil {
+			if err == io.EOF || strings.Contains(err.Error(), "EOF") {
+				safeWriteSSE(w, "data: [DONE]\n\n")
+				safeFlush(flusher)
+			} else if strings.Contains(err.Error(), "context canceled") {
+				slog.Debug("stream cancelled by client")
+			} else if strings.Contains(err.Error(), "timeout") {
 				slog.Warn("stream read timeout, sending error chunk")
 				safeWriteSSE(w, "data: {\"error\":{\"message\":\"upstream read timeout\",\"type\":\"timeout\",\"code\":\"stream_timeout\"}}\n\n")
 				safeFlush(flusher)
-				return
+			} else {
+				slog.Warn("stream read error", "error", err)
 			}
-			cancel()
-
-			if err != nil {
-				if err == io.EOF || strings.Contains(err.Error(), "EOF") {
-					safeWriteSSE(w, "data: [DONE]\n\n")
-					safeFlush(flusher)
-				} else if strings.Contains(err.Error(), "context canceled") {
-					slog.Debug("stream cancelled by client")
-				} else {
-					slog.Warn("stream read error", "error", err)
-				}
-				return
-			}
-
-			if clientModel != "" {
-				if discoveredUpstream == "" {
-					discoveredUpstream = extractModelFromChunk(line)
-				}
-				line = replaceModelInChunk(line, clientModel, discoveredUpstream)
-			}
-			safeWriteSSE(w, line)
-			safeFlush(flusher)
+			return
 		}
+
+		if clientModel != "" {
+			if discoveredUpstream == "" {
+				discoveredUpstream = extractModelFromChunk(line)
+			}
+			line = replaceModelInChunk(line, clientModel, discoveredUpstream)
+		}
+		safeWriteSSE(w, line)
+		safeFlush(flusher)
+	}
+}
+
+func readLineWithTimeout(ctx context.Context, reader *bufio.Reader) (string, error) {
+	type result struct {
+		line string
+		err  error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		line, err := reader.ReadString('\n')
+		ch <- result{line, err}
 	}()
 
 	select {
+	case r := <-ch:
+		return r.line, r.err
 	case <-ctx.Done():
-		slog.Debug("client disconnected, cancelling upstream")
-	case <-done:
+		return "", ctx.Err()
+	case <-time.After(streamChunkTimeout):
+		return "", fmt.Errorf("stream read timeout")
 	}
 }
 
@@ -192,7 +183,7 @@ func replaceModelInChunk(line, clientModel, discoveredUpstream string) string {
 	if err != nil {
 		return line
 	}
-	return "data: " + string(newJSON) + "\n\n"
+	return "data: " + string(newJSON) + "\n"
 }
 
 func isTimeoutError(err error) bool {
