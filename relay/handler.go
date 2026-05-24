@@ -140,16 +140,16 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.matrix != nil {
 		txResult = h.matrix.Resolve(tCtx)
 	}
-	outboundModel := clientModel
+	explicitOutbound := ""
 	if txResult != nil && txResult.OutboundModel != "" {
-		outboundModel = transform.RenderOutboundModel(
+		explicitOutbound = transform.RenderOutboundModel(
 			txResult.OutboundModel, txResult.OutboundModel, clientModel, "",
 		)
 	}
 
 	// ── Replace model in request body if transformed ───────────────────
-	if outboundModel != clientModel && clientModel != "" {
-		bodyBytes = replaceModelInRequestBody(bodyBytes, outboundModel)
+	if explicitOutbound != "" && explicitOutbound != clientModel {
+		bodyBytes = replaceModelInRequestBody(bodyBytes, explicitOutbound)
 	}
 
 	// ── Concurrency limiter ────────────────────────────────────────────
@@ -166,7 +166,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Build upstream request ─────────────────────────────────────────
-	ChatCompletionsPhase3(w, r, bodyBytes, isStream, clientModel, outboundModel, clientID, txResult, svc, h.circuit, h.limiter, h.pools, release)
+	ChatCompletionsPhase3(w, r, bodyBytes, isStream, clientModel, explicitOutbound, clientID, txResult, svc, h.circuit, h.limiter, h.pools, release)
 }
 
 // identityHashFromRequest extracts a consistent identity hash from the request.
@@ -197,7 +197,7 @@ func ChatCompletionsPhase3(
 	bodyBytes []byte,
 	isStream bool,
 	clientModel string,
-	outboundModel string,
+	explicitOutbound string,
 	clientID identity.ClientIdentity,
 	txResult *transform.TransformResult,
 	svc ServiceID,
@@ -225,7 +225,7 @@ func ChatCompletionsPhase3(
 	slog.Info("chat completions",
 		"request_id", rid,
 		"client_model", clientModel,
-		"outbound_model", outboundModel,
+		"outbound_model", explicitOutbound,
 		"stream", isStream,
 		"identity", clientID.ShortID(),
 		"upstream", upstream.String(),
@@ -344,7 +344,7 @@ func ChatCompletionsPhase3(
 
 	// ── Success — proxy the response ───────────────────────────────────
 	if isStream {
-		StreamChat(w, resp, clientModel, outboundModel)
+		StreamChat(w, resp, clientModel, explicitOutbound)
 		release()
 		cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
 	} else {
@@ -365,8 +365,8 @@ func ChatCompletionsPhase3(
 		}
 
 		// Replace model in non-streaming response
-		if clientModel != "" && outboundModel != "" && clientModel != outboundModel {
-			respBody = replaceModelInResponse(respBody, clientModel, outboundModel)
+		if clientModel != "" {
+			respBody = replaceModelInResponseBody(respBody, clientModel)
 		}
 
 		for k, vs := range resp.Header {
@@ -398,22 +398,17 @@ func replaceModelInRequestBody(body []byte, newModel string) []byte {
 	return body
 }
 
-// replaceModelInResponse replaces the outbound model with the client model in a non-streaming response.
-func replaceModelInResponse(body []byte, clientModel, outboundModel string) []byte {
+// replaceModelInResponseBody replaces whatever model is in the response with clientModel.
+func replaceModelInResponseBody(body []byte, clientModel string) []byte {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(body, &obj); err != nil {
 		return body
 	}
-	if modelRaw, ok := obj["model"]; ok {
-		var modelStr string
-		if err := json.Unmarshal(modelRaw, &modelStr); err == nil {
-			if modelStr == outboundModel {
-				obj["model"], _ = json.Marshal(clientModel)
-				newBody, err := json.Marshal(obj)
-				if err == nil {
-					return newBody
-				}
-			}
+	if _, ok := obj["model"]; ok {
+		obj["model"], _ = json.Marshal(clientModel)
+		newBody, err := json.Marshal(obj)
+		if err == nil {
+			return newBody
 		}
 	}
 	return body

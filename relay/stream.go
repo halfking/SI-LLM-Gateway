@@ -18,12 +18,13 @@ const (
 )
 
 // StreamChat forwards a streaming chat completion from the upstream to the client.
-// It reads SSE chunks, replaces model names, and writes to the client response.
+// It reads SSE chunks, discovers the upstream model name from the first chunk,
+// and replaces it with clientModel in all subsequent chunks.
 func StreamChat(
 	w http.ResponseWriter,
 	resp *http.Response,
 	clientModel string,
-	outboundModel string,
+	_ string,
 ) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -48,6 +49,7 @@ func StreamChat(
 
 	go func() {
 		defer close(done)
+		discoveredUpstream := ""
 		for {
 			select {
 			case <-ctx.Done():
@@ -94,7 +96,12 @@ func StreamChat(
 				return
 			}
 
-			line = replaceModelInChunk(line, clientModel, outboundModel)
+			if clientModel != "" {
+				if discoveredUpstream == "" {
+					discoveredUpstream = extractModelFromChunk(line)
+				}
+				line = replaceModelInChunk(line, clientModel, discoveredUpstream)
+			}
 			safeWriteSSE(w, line)
 			safeFlush(flusher)
 		}
@@ -105,6 +112,25 @@ func StreamChat(
 		slog.Debug("client disconnected, cancelling upstream")
 	case <-done:
 	}
+}
+
+func extractModelFromChunk(line string) string {
+	if !strings.HasPrefix(line, "data: ") || strings.HasPrefix(line, "data: [DONE") {
+		return ""
+	}
+	jsonStr := strings.TrimPrefix(line, "data: ")
+	jsonStr = strings.TrimSpace(jsonStr)
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonStr), &obj); err != nil {
+		return ""
+	}
+	if modelRaw, ok := obj["model"]; ok {
+		var modelStr string
+		if err := json.Unmarshal(modelRaw, &modelStr); err == nil {
+			return modelStr
+		}
+	}
+	return ""
 }
 
 func safeFlush(flusher http.Flusher) {
@@ -130,34 +156,43 @@ func writeSSE(w io.Writer, line string) {
 	_, _ = io.WriteString(w, line)
 }
 
-// replaceModelInChunk replaces the model field in SSE data chunks using JSON parsing.
-func replaceModelInChunk(line, clientModel, outboundModel string) string {
-	if !strings.HasPrefix(line, "data: ") || clientModel == "" || outboundModel == "" {
+// replaceModelInChunk replaces the model field in SSE data chunks.
+// Uses JSON parsing for robust replacement. If outboundModel is known (non-empty),
+// only replaces exact matches. Otherwise replaces any model field with clientModel.
+func replaceModelInChunk(line, clientModel, discoveredUpstream string) string {
+	if !strings.HasPrefix(line, "data: ") || clientModel == "" {
 		return line
 	}
-	if strings.HasPrefix(line, "data: [DONE]") {
+	if strings.HasPrefix(line, "data: [DONE") {
 		return line
 	}
 	jsonStr := strings.TrimPrefix(line, "data: ")
-	jsonStr = strings.TrimRight(jsonStr, "\n")
+	jsonStr = strings.TrimSpace(jsonStr)
 
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(jsonStr), &obj); err != nil {
 		return line
 	}
-	if modelRaw, ok := obj["model"]; ok {
-		var modelStr string
-		if err := json.Unmarshal(modelRaw, &modelStr); err == nil {
-			if modelStr == outboundModel {
-				obj["model"], _ = json.Marshal(clientModel)
-				newJSON, err := json.Marshal(obj)
-				if err == nil {
-					return "data: " + string(newJSON) + "\n\n"
-				}
-			}
-		}
+	modelRaw, ok := obj["model"]
+	if !ok {
+		return line
 	}
-	return line
+	var modelStr string
+	if err := json.Unmarshal(modelRaw, &modelStr); err != nil {
+		return line
+	}
+	if modelStr == clientModel {
+		return line
+	}
+	if discoveredUpstream != "" && modelStr != discoveredUpstream {
+		return line
+	}
+	obj["model"], _ = json.Marshal(clientModel)
+	newJSON, err := json.Marshal(obj)
+	if err != nil {
+		return line
+	}
+	return "data: " + string(newJSON) + "\n\n"
 }
 
 func isTimeoutError(err error) bool {
