@@ -1,18 +1,16 @@
 // Command gateway is the LLM Gateway Go data-plane entry point.
 //
-// It provides a high-performance HTTP reverse proxy for OpenAI-compatible
-// chat/completions endpoints, with identity tunnel, request transform,
-// connection pooling, streaming relay, concurrency control, and audit.
-//
 // Usage:
 //
 //	LLM_GATEWAY_LISTEN=:8781 LLM_GATEWAY_API_KEY=... go run ./cmd/gateway
 //
 // Environment variables:
 //
-//	LLM_GATEWAY_LISTEN      TCP listen address (default ":8781")
-//	LLM_GATEWAY_API_KEY     Gateway API key for client auth (empty = disabled)
-//	LLM_GATEWAY_LOG_LEVEL   Log level: debug, info, warn, error (default "info")
+//	LLM_GATEWAY_LISTEN             TCP listen address (default ":8781")
+//	LLM_GATEWAY_API_KEY            Gateway API key for client auth (empty = disabled)
+//	LLM_GATEWAY_LOG_LEVEL          Log level: debug, info, warn, error (default "info")
+//	LLM_GATEWAY_DEFAULT_PROVIDER   Default provider ID (default "1")
+//	LLM_GATEWAY_DEFAULT_CREDENTIAL Default credential ID (default "1")
 package main
 
 import (
@@ -24,6 +22,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kaixuan/llm-gateway-go/circuit"
+	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/middleware"
 	"github.com/kaixuan/llm-gateway-go/relay"
 )
@@ -45,6 +45,13 @@ func main() {
 		Level: level,
 	})))
 
+	// ── Dependencies ──────────────────────────────────────────────────────
+	cm := circuit.NewManager()
+	lim := limiter.New()
+
+	chatHandler := relay.NewChatHandler(cm, lim)
+	healthHandler := relay.NewHealthHandler(cm, lim)
+
 	// ── Listen address ────────────────────────────────────────────────────
 	listen := os.Getenv("LLM_GATEWAY_LISTEN")
 	if listen == "" {
@@ -54,16 +61,23 @@ func main() {
 	// ── Router ────────────────────────────────────────────────────────────
 	mux := http.NewServeMux()
 
-	// Health check
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok","version":"0.1.0"}`))
-	})
+	// Health
+	mux.Handle("/healthz", healthHandler)
 
-	// Chat completions (streaming + non-streaming)
-	mux.HandleFunc("/v1/chat/completions", relay.ChatCompletions)
-	mux.HandleFunc("/v1/completions", relay.ChatCompletions)
+	// Chat completions
+	mux.Handle("/v1/chat/completions", chatHandler)
+	mux.Handle("/v1/completions", chatHandler)
+
+	// Legacy health endpoint
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"service":"llm-gateway-go","version":"0.2.0"}`))
+			return
+		}
+		http.NotFound(w, r)
+	})
 
 	// ── Middleware stack ──────────────────────────────────────────────────
 	handler := middleware.APIKeyAuth(mux)
@@ -74,7 +88,7 @@ func main() {
 		Addr:         listen,
 		Handler:      handler,
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 300 * time.Second, // Long timeout for streaming
+		WriteTimeout: 300 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
@@ -95,6 +109,9 @@ func main() {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+
+	// Stop background loops
+	lim.Stop()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("gateway shutdown error", "error", err)
