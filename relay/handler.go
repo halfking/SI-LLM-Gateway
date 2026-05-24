@@ -17,6 +17,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/identity"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/pool"
+	"github.com/kaixuan/llm-gateway-go/resolve"
 	"github.com/kaixuan/llm-gateway-go/transform"
 )
 
@@ -57,15 +58,15 @@ type chatResponseBody struct {
 
 // ChatHandler handles chat completions with circuit breaker and concurrency control.
 type ChatHandler struct {
-	circuit *circuit.Manager
-	limiter *limiter.Limiter
-	matrix  *transform.Matrix
-	pools   *pool.PoolManager
+	circuit  *circuit.Manager
+	limiter  *limiter.Limiter
+	matrix   *transform.Matrix
+	pools    *pool.PoolManager
+	resolver *resolve.Resolver
 }
 
-// NewChatHandler creates a new chat handler with the given dependencies.
-func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.Matrix, pools *pool.PoolManager) *ChatHandler {
-	return &ChatHandler{circuit: cm, limiter: l, matrix: matrix, pools: pools}
+func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.Matrix, pools *pool.PoolManager, resolver *resolve.Resolver) *ChatHandler {
+	return &ChatHandler{circuit: cm, limiter: l, matrix: matrix, pools: pools, resolver: resolver}
 }
 
 // ServeHTTP handles /v1/chat/completions and /v1/completions.
@@ -130,11 +131,26 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	clientID := identity.BuildIdentityFromRequest(r, "default", nil, nil, "")
 	identityHash := clientID.ShortID()
 
+	// ── Resolve model name via control plane ──────────────────────────
+	var modelResolution *resolve.Resolution
+	if h.resolver != nil {
+		modelResolution = h.resolver.Resolve(r.Context(), clientModel, clientID.Fingerprint.ClientProfile)
+		slog.Debug("model resolved",
+			"client_model", clientModel,
+			"resolution_path", modelResolution.ResolutionPath,
+			"raw_models", modelResolution.RawModels,
+			"canonical", modelResolution.CanonicalName,
+		)
+	}
+
 	// ── Resolve transform rules ────────────────────────────────────────
 	tCtx := &transform.TransformContext{
 		RequestMode:   "chat",
 		ClientProfile: clientID.Fingerprint.ClientProfile,
 		ClientModel:   clientModel,
+	}
+	if modelResolution != nil && modelResolution.CanonicalName != nil {
+		tCtx.CanonicalName = *modelResolution.CanonicalName
 	}
 	var txResult *transform.TransformResult
 	if h.matrix != nil {

@@ -139,7 +139,7 @@ func TestMultiTurnChatNonStreaming(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim, nil, nil)
+	handler := NewChatHandler(cm, lim, nil, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -203,7 +203,7 @@ func TestMultiTurnChatStreaming(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim, nil, nil)
+	handler := NewChatHandler(cm, lim, nil, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -273,7 +273,7 @@ func TestCircuitBreakerBlocksAfterFailures(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim, nil, nil)
+	handler := NewChatHandler(cm, lim, nil, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -320,7 +320,7 @@ func TestConcurrencyLimiterRejectsWhenSaturated(t *testing.T) {
 	lim := limiter.NewWithLimits(2, 2, 1, 1)
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim, nil, nil)
+	handler := NewChatHandler(cm, lim, nil, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 

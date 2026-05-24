@@ -27,6 +27,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/middleware"
 	"github.com/kaixuan/llm-gateway-go/pool"
 	"github.com/kaixuan/llm-gateway-go/relay"
+	"github.com/kaixuan/llm-gateway-go/resolve"
 	"github.com/kaixuan/llm-gateway-go/transform"
 )
 
@@ -54,9 +55,12 @@ func main() {
 	matrixPath := transform.DefaultMatrixPath()
 	matrix := transform.New(matrixPath)
 
+	pythonEndpoint := os.Getenv("LLM_GATEWAY_PYTHON_ENDPOINT")
+	resolver := resolve.NewResolver(pythonEndpoint, 120*time.Second)
+
 	pools := pool.NewPoolManager()
 
-	chatHandler := relay.NewChatHandler(cm, lim, matrix, pools)
+	chatHandler := relay.NewChatHandler(cm, lim, matrix, pools, resolver)
 	healthHandler := relay.NewHealthHandler(cm, lim)
 
 	// ── Listen address ────────────────────────────────────────────────────
