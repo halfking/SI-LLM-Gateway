@@ -3,6 +3,7 @@ package relay
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -99,9 +100,11 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		release()
 		if success {
 			h.circuit.RecordSuccess(svc.ProviderID, svc.CredentialID)
+		} else if errKind == "" {
+			// Client-side error (e.g. context canceled, 4xx) —
+			// don't open the circuit breaker.
 		} else {
 			h.circuit.RecordFailure(svc.ProviderID, svc.CredentialID, errKind)
-			// Shrink on rate-limit events
 			if errKind == circuit.KindRateLimit {
 				h.limiter.Shrink(svc.ProviderID, svc.CredentialID)
 			}
@@ -196,7 +199,9 @@ func ChatCompletionsWithHooks(
 				"code":    string(errKind),
 			},
 		})
-		done(false, errKind)
+		// Empty errorKind = client-side error (e.g. context canceled)
+		// Record as success to avoid opening the circuit breaker.
+		done(errKind == "", errKind)
 		return
 	}
 
@@ -206,17 +211,25 @@ func ChatCompletionsWithHooks(
 		n, _ := resp.Body.Read(body)
 		errKind := classifyError(nil, resp)
 
-		w.WriteHeader(resp.StatusCode)
 		for k, vs := range resp.Header {
 			for _, v := range vs {
 				w.Header().Add(k, v)
 			}
 		}
+		w.WriteHeader(resp.StatusCode)
 		if n > 0 {
 			w.Write(body[:n])
 		}
 
-		done(false, errKind)
+		// 4xx client errors (400, 422, etc.) are the client's fault —
+		// don't open the circuit breaker. Only 429/401/403/402 affect it.
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 &&
+			resp.StatusCode != 429 && resp.StatusCode != 401 &&
+			resp.StatusCode != 403 && resp.StatusCode != 402 {
+			done(true, "")
+		} else {
+			done(false, errKind)
+		}
 		return
 	}
 
@@ -263,8 +276,13 @@ func isStreamRequest(r *http.Request) bool {
 }
 
 // classifyError maps HTTP status / Go errors to circuit.ErrorKind.
+// Client errors (4xx) are mapped to a non-circuit-breaking kind.
 func classifyError(err error, resp *http.Response) circuit.ErrorKind {
 	if err != nil {
+		// Client context cancellation is NOT an upstream fault.
+		if errors.Is(err, context.Canceled) {
+			return ""
+		}
 		msg := err.Error()
 		if strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline") {
 			return circuit.KindTimeout

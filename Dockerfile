@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Multi-stage build for llm-gateway-go data plane
 # Build with: docker build --platform linux/amd64 -t kx-llm-gateway-go:latest .
 

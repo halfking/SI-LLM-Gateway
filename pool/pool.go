@@ -145,13 +145,23 @@ func (p *Pool) Close() {
 }
 
 func (p *Pool) healthLoop() {
-	ticker := time.NewTicker(healthCheckInterval)
+	interval := healthCheckInterval
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
 			p.probe()
+			// Speed up probing when degraded: check every 10s instead of 30s
+			newInterval := healthCheckInterval
+			if p.State() == PoolDegraded {
+				newInterval = 10 * time.Second
+			}
+			if newInterval != interval {
+				interval = newInterval
+				ticker.Reset(interval)
+			}
 		case <-p.stopCh:
 			return
 		}
