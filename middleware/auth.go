@@ -23,6 +23,11 @@ func APIKeyAuth(next http.Handler) http.Handler {
 			return
 		}
 
+		if r.URL.Path == "/healthz" || r.URL.Path == "/" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		auth := r.Header.Get("Authorization")
 		if len(auth) < 7 || auth[:7] != "Bearer " {
 			writeUnauthorized(w, "Missing or malformed Authorization header")

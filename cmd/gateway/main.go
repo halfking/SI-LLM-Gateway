@@ -25,7 +25,9 @@ import (
 	"github.com/kaixuan/llm-gateway-go/circuit"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/middleware"
+	"github.com/kaixuan/llm-gateway-go/pool"
 	"github.com/kaixuan/llm-gateway-go/relay"
+	"github.com/kaixuan/llm-gateway-go/transform"
 )
 
 func main() {
@@ -49,7 +51,12 @@ func main() {
 	cm := circuit.NewManager()
 	lim := limiter.New()
 
-	chatHandler := relay.NewChatHandler(cm, lim)
+	matrixPath := transform.DefaultMatrixPath()
+	matrix := transform.New(matrixPath)
+
+	pools := pool.NewPoolManager()
+
+	chatHandler := relay.NewChatHandler(cm, lim, matrix, pools)
 	healthHandler := relay.NewHealthHandler(cm, lim)
 
 	// ── Listen address ────────────────────────────────────────────────────
@@ -112,6 +119,7 @@ func main() {
 
 	// Stop background loops
 	lim.Stop()
+	pools.CloseAll()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("gateway shutdown error", "error", err)

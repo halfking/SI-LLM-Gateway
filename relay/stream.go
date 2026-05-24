@@ -3,6 +3,7 @@ package relay
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -36,7 +37,12 @@ func StreamChat(
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	ctx := resp.Request.Context()
+	var ctx context.Context
+	if resp.Request != nil {
+		ctx = resp.Request.Context()
+	} else {
+		ctx = context.Background()
+	}
 	reader := bufio.NewReaderSize(resp.Body, streamBufSize)
 	done := make(chan struct{})
 
@@ -49,7 +55,6 @@ func StreamChat(
 			default:
 			}
 
-			// Use a per-chunk timeout via context
 			chunkCtx, cancel := context.WithTimeout(ctx, streamChunkTimeout)
 			chunkDone := make(chan string, 1)
 			chunkErr := make(chan error, 1)
@@ -71,16 +76,16 @@ func StreamChat(
 			case <-chunkCtx.Done():
 				cancel()
 				slog.Warn("stream read timeout, sending error chunk")
-				writeSSE(w, "data: {\"error\":{\"message\":\"upstream read timeout\",\"type\":\"timeout\",\"code\":\"stream_timeout\"}}\n\n")
-				flusher.Flush()
+				safeWriteSSE(w, "data: {\"error\":{\"message\":\"upstream read timeout\",\"type\":\"timeout\",\"code\":\"stream_timeout\"}}\n\n")
+				safeFlush(flusher)
 				return
 			}
 			cancel()
 
 			if err != nil {
 				if err == io.EOF || strings.Contains(err.Error(), "EOF") {
-					writeSSE(w, "data: [DONE]\n\n")
-					flusher.Flush()
+					safeWriteSSE(w, "data: [DONE]\n\n")
+					safeFlush(flusher)
 				} else if strings.Contains(err.Error(), "context canceled") {
 					slog.Debug("stream cancelled by client")
 				} else {
@@ -90,8 +95,8 @@ func StreamChat(
 			}
 
 			line = replaceModelInChunk(line, clientModel, outboundModel)
-			writeSSE(w, line)
-			flusher.Flush()
+			safeWriteSSE(w, line)
+			safeFlush(flusher)
 		}
 	}()
 
@@ -102,21 +107,55 @@ func StreamChat(
 	}
 }
 
+func safeFlush(flusher http.Flusher) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Debug("flush after close", "recover", r)
+		}
+	}()
+	flusher.Flush()
+}
+
+func safeWriteSSE(w io.Writer, line string) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Debug("write after close", "recover", r)
+		}
+	}()
+	io.WriteString(w, line)
+}
+
 // writeSSE writes a single SSE line to the response writer.
 func writeSSE(w io.Writer, line string) {
 	_, _ = io.WriteString(w, line)
 }
 
-// replaceModelInChunk replaces the model field in SSE data chunks.
-// Handles both "model":"model-name" and "model": "model-name" patterns.
+// replaceModelInChunk replaces the model field in SSE data chunks using JSON parsing.
 func replaceModelInChunk(line, clientModel, outboundModel string) string {
-	if !strings.HasPrefix(line, "data: ") {
+	if !strings.HasPrefix(line, "data: ") || clientModel == "" || outboundModel == "" {
 		return line
 	}
-	// Restore client-facing model name in response
-	if clientModel != "" && outboundModel != "" {
-		line = strings.ReplaceAll(line, `"model":"`+outboundModel+`"`, `"model":"`+clientModel+`"`)
-		line = strings.ReplaceAll(line, `"model": "`+outboundModel+`"`, `"model": "`+clientModel+`"`)
+	if strings.HasPrefix(line, "data: [DONE]") {
+		return line
+	}
+	jsonStr := strings.TrimPrefix(line, "data: ")
+	jsonStr = strings.TrimRight(jsonStr, "\n")
+
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonStr), &obj); err != nil {
+		return line
+	}
+	if modelRaw, ok := obj["model"]; ok {
+		var modelStr string
+		if err := json.Unmarshal(modelRaw, &modelStr); err == nil {
+			if modelStr == outboundModel {
+				obj["model"], _ = json.Marshal(clientModel)
+				newJSON, err := json.Marshal(obj)
+				if err == nil {
+					return "data: " + string(newJSON) + "\n\n"
+				}
+			}
+		}
 	}
 	return line
 }

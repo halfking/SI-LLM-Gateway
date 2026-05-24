@@ -1,9 +1,11 @@
 package relay
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,7 +14,10 @@ import (
 	"time"
 
 	"github.com/kaixuan/llm-gateway-go/circuit"
+	"github.com/kaixuan/llm-gateway-go/identity"
 	"github.com/kaixuan/llm-gateway-go/limiter"
+	"github.com/kaixuan/llm-gateway-go/pool"
+	"github.com/kaixuan/llm-gateway-go/transform"
 )
 
 // ServiceID maps an API key to a (providerID, credentialID) pair.
@@ -36,6 +41,16 @@ func defaultService() ServiceID {
 	return ServiceID{ProviderID: pid, CredentialID: cid}
 }
 
+type chatRequestBody struct {
+	Model    string          `json:"model"`
+	Stream   bool            `json:"stream"`
+	Messages json.RawMessage `json:"messages,omitempty"`
+}
+
+type chatResponseBody struct {
+	Model string `json:"model"`
+}
+
 //-----------------------------------------------------------------------------
 // Chat handler — integrates circuit breaker + concurrency limiter
 //-----------------------------------------------------------------------------
@@ -44,11 +59,13 @@ func defaultService() ServiceID {
 type ChatHandler struct {
 	circuit *circuit.Manager
 	limiter *limiter.Limiter
+	matrix  *transform.Matrix
+	pools   *pool.PoolManager
 }
 
 // NewChatHandler creates a new chat handler with the given dependencies.
-func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter) *ChatHandler {
-	return &ChatHandler{circuit: cm, limiter: l}
+func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.Matrix, pools *pool.PoolManager) *ChatHandler {
+	return &ChatHandler{circuit: cm, limiter: l, matrix: matrix, pools: pools}
 }
 
 // ServeHTTP handles /v1/chat/completions and /v1/completions.
@@ -79,10 +96,63 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Extract identity from request ──────────────────────────────────
-	identityHash := identityHashFromRequest(r)
+	// ── Read and buffer body ───────────────────────────────────────────
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]string{
+				"message": "failed to read request body",
+				"type":    "invalid_request",
+				"code":    "body_read_error",
+			},
+		})
+		return
+	}
+	r.Body.Close()
 
-	// ── Concurrency limiter ──────────────────────────────────────────
+	// ── Parse request body for model + stream ──────────────────────────
+	var reqBody chatRequestBody
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]string{
+				"message": "invalid JSON in request body",
+				"type":    "invalid_request",
+				"code":    "json_parse_error",
+			},
+		})
+		return
+	}
+
+	clientModel := reqBody.Model
+	isStream := reqBody.Stream
+
+	// ── Build identity from request ────────────────────────────────────
+	clientID := identity.BuildIdentityFromRequest(r, "default", nil, nil, "")
+	identityHash := clientID.ShortID()
+
+	// ── Resolve transform rules ────────────────────────────────────────
+	tCtx := &transform.TransformContext{
+		RequestMode:   "chat",
+		ClientProfile: clientID.Fingerprint.ClientProfile,
+		ClientModel:   clientModel,
+	}
+	var txResult *transform.TransformResult
+	if h.matrix != nil {
+		txResult = h.matrix.Resolve(tCtx)
+	}
+	outboundModel := clientModel
+	if txResult != nil && txResult.OutboundModel != "" {
+		outboundModel = transform.RenderOutboundModel(
+			txResult.OutboundModel, txResult.OutboundModel, clientModel, "",
+		)
+	}
+
+	// ── Replace model in request body if transformed ───────────────────
+	if outboundModel != clientModel && clientModel != "" {
+		bodyBytes = replaceModelInRequestBody(bodyBytes, outboundModel)
+	}
+
+	// ── Concurrency limiter ────────────────────────────────────────────
 	release, err := h.limiter.AcquireAll(r.Context(), svc.ProviderID, svc.CredentialID, identityHash)
 	if err != nil {
 		writeJSON(w, http.StatusTooManyRequests, map[string]any{
@@ -95,21 +165,8 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Proxy the request ──────────────────────────────────────────────
-	ChatCompletionsWithHooks(w, r, func(success bool, errKind circuit.ErrorKind) {
-		release()
-		if success {
-			h.circuit.RecordSuccess(svc.ProviderID, svc.CredentialID)
-		} else if errKind == "" {
-			// Client-side error (e.g. context canceled, 4xx) —
-			// don't open the circuit breaker.
-		} else {
-			h.circuit.RecordFailure(svc.ProviderID, svc.CredentialID, errKind)
-			if errKind == circuit.KindRateLimit {
-				h.limiter.Shrink(svc.ProviderID, svc.CredentialID)
-			}
-		}
-	})
+	// ── Build upstream request ─────────────────────────────────────────
+	ChatCompletionsPhase3(w, r, bodyBytes, isStream, clientModel, outboundModel, clientID, txResult, svc, h.circuit, h.limiter, h.pools, release)
 }
 
 // identityHashFromRequest extracts a consistent identity hash from the request.
@@ -131,11 +188,240 @@ func identityHashFromRequest(r *http.Request) string {
 }
 
 //-----------------------------------------------------------------------------
-// ChatCompletionsWithHooks — proxy with success/failure callback
+// ChatCompletionsPhase3 — full pipeline with transform, pool, streaming
 //-----------------------------------------------------------------------------
+
+func ChatCompletionsPhase3(
+	w http.ResponseWriter,
+	r *http.Request,
+	bodyBytes []byte,
+	isStream bool,
+	clientModel string,
+	outboundModel string,
+	clientID identity.ClientIdentity,
+	txResult *transform.TransformResult,
+	svc ServiceID,
+	cm *circuit.Manager,
+	lim *limiter.Limiter,
+	pools *pool.PoolManager,
+	release limiter.ReleaseFunc,
+) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			slog.Error("panic in chat handler", "panic", rec)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"error": map[string]string{
+					"message": "internal server error",
+					"type":    "server_error",
+					"code":    "panic",
+				},
+			})
+			release()
+			cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
+		}
+	}()
+
+	rid := r.Header.Get("X-Request-Id")
+	slog.Info("chat completions",
+		"request_id", rid,
+		"client_model", clientModel,
+		"outbound_model", outboundModel,
+		"stream", isStream,
+		"identity", clientID.ShortID(),
+		"upstream", upstream.String(),
+	)
+
+	// ── Build upstream request ─────────────────────────────────────────
+	upstreamReq, err := http.NewRequestWithContext(r.Context(), r.Method, upstream.String()+r.URL.Path, bytes.NewReader(bodyBytes))
+	if err != nil {
+		slog.Error("failed to create upstream request", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"error": map[string]string{
+				"message": "failed to create upstream request",
+				"type":    "server_error",
+				"code":    "upstream_error",
+			},
+		})
+		release()
+		cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
+		return
+	}
+
+	// Copy headers
+	upstreamReq.Header = r.Header.Clone()
+	upstreamReq.Header.Set("X-Request-Id", rid)
+	upstreamReq.Header.Set("Content-Type", "application/json")
+
+	// ── Inject identity headers ────────────────────────────────────────
+	upstreamReq.Header.Set("X-Virtual-Client-Id", clientID.VirtualClientID)
+	upstreamReq.Header.Set("X-Virtual-IP", clientID.VirtualIP)
+	upstreamReq.Header.Set("X-Virtual-MAC", clientID.VirtualMAC)
+
+	// ── Apply transform header rules ───────────────────────────────────
+	if txResult != nil {
+		for _, h := range txResult.StripHeaders {
+			upstreamReq.Header.Del(h)
+		}
+		for k, v := range txResult.InjectHeaders {
+			upstreamReq.Header.Set(k, v)
+		}
+	}
+
+	// ── Get HTTP client (identity-bound pool or default) ───────────────
+	var httpClient *http.Client
+	if pools != nil {
+		poolKey := pool.PoolKey{
+			IdentityHash: clientID.IdentityHash,
+			ProviderID:   svc.ProviderID,
+			CredentialID: svc.CredentialID,
+		}
+		p := pools.Get(poolKey)
+		if p != nil && p.State() == pool.PoolActive {
+			httpClient = p.Client()
+		}
+	}
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+
+	// ── Send the request ───────────────────────────────────────────────
+	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+	defer cancel()
+	upstreamReq = upstreamReq.WithContext(ctx)
+
+	resp, err := httpClient.Do(upstreamReq)
+	if err != nil {
+		slog.Error("upstream request failed", "error", err)
+		errKind := classifyError(err, nil)
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"error": map[string]string{
+				"message": "upstream request failed: " + err.Error(),
+				"type":    "upstream_error",
+				"code":    string(errKind),
+			},
+		})
+		release()
+		if errKind == "" {
+			cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
+		} else {
+			cm.RecordFailure(svc.ProviderID, svc.CredentialID, errKind)
+			if errKind == circuit.KindRateLimit {
+				lim.Shrink(svc.ProviderID, svc.CredentialID)
+			}
+		}
+		return
+	}
+
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		body := make([]byte, 4096)
+		n, _ := resp.Body.Read(body)
+		errKind := classifyError(nil, resp)
+
+		for k, vs := range resp.Header {
+			for _, v := range vs {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		if n > 0 {
+			w.Write(body[:n])
+		}
+
+		release()
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 &&
+			resp.StatusCode != 429 && resp.StatusCode != 401 &&
+			resp.StatusCode != 403 && resp.StatusCode != 402 {
+			cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
+		} else {
+			cm.RecordFailure(svc.ProviderID, svc.CredentialID, errKind)
+			if errKind == circuit.KindRateLimit {
+				lim.Shrink(svc.ProviderID, svc.CredentialID)
+			}
+		}
+		return
+	}
+
+	// ── Success — proxy the response ───────────────────────────────────
+	if isStream {
+		StreamChat(w, resp, clientModel, outboundModel)
+		release()
+		cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
+	} else {
+		defer resp.Body.Close()
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			slog.Error("failed to read upstream response", "error", err)
+			writeJSON(w, http.StatusBadGateway, map[string]any{
+				"error": map[string]string{
+					"message": "failed to read upstream response",
+					"type":    "upstream_error",
+					"code":    "read_error",
+				},
+			})
+			release()
+			cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
+			return
+		}
+
+		// Replace model in non-streaming response
+		if clientModel != "" && outboundModel != "" && clientModel != outboundModel {
+			respBody = replaceModelInResponse(respBody, clientModel, outboundModel)
+		}
+
+		for k, vs := range resp.Header {
+			for _, v := range vs {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		w.Write(respBody)
+		release()
+		cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
+	}
+}
+
+// replaceModelInRequestBody replaces the "model" field in a JSON body.
+func replaceModelInRequestBody(body []byte, newModel string) []byte {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return body
+	}
+	if _, ok := obj["model"]; ok {
+		obj["model"], _ = json.Marshal(newModel)
+		newBody, err := json.Marshal(obj)
+		if err != nil {
+			return body
+		}
+		return newBody
+	}
+	return body
+}
+
+// replaceModelInResponse replaces the outbound model with the client model in a non-streaming response.
+func replaceModelInResponse(body []byte, clientModel, outboundModel string) []byte {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return body
+	}
+	if modelRaw, ok := obj["model"]; ok {
+		var modelStr string
+		if err := json.Unmarshal(modelRaw, &modelStr); err == nil {
+			if modelStr == outboundModel {
+				obj["model"], _ = json.Marshal(clientModel)
+				newBody, err := json.Marshal(obj)
+				if err == nil {
+					return newBody
+				}
+			}
+		}
+	}
+	return body
+}
 
 // ChatCompletionsWithHooks proxies a chat completion request and calls the
 // done callback with success/failure after the request completes.
+// Deprecated: Use ChatCompletionsPhase3 instead.
 func ChatCompletionsWithHooks(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -161,10 +447,8 @@ func ChatCompletionsWithHooks(
 		"upstream", upstream.String(),
 	)
 
-	// Check if streaming is requested
 	isStream := isStreamRequest(r)
 
-	// Clone the request for upstream
 	upstreamReq, err := http.NewRequestWithContext(r.Context(), r.Method, upstream.String()+r.URL.Path, r.Body)
 	if err != nil {
 		slog.Error("failed to create upstream request", "error", err)
@@ -179,11 +463,9 @@ func ChatCompletionsWithHooks(
 		return
 	}
 
-	// Copy headers
 	upstreamReq.Header = r.Header.Clone()
 	upstreamReq.Header.Set("X-Request-Id", rid)
 
-	// Send the request
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 	upstreamReq = upstreamReq.WithContext(ctx)
@@ -199,8 +481,6 @@ func ChatCompletionsWithHooks(
 				"code":    string(errKind),
 			},
 		})
-		// Empty errorKind = client-side error (e.g. context canceled)
-		// Record as success to avoid opening the circuit breaker.
 		done(errKind == "", errKind)
 		return
 	}
@@ -221,8 +501,6 @@ func ChatCompletionsWithHooks(
 			w.Write(body[:n])
 		}
 
-		// 4xx client errors (400, 422, etc.) are the client's fault —
-		// don't open the circuit breaker. Only 429/401/403/402 affect it.
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 &&
 			resp.StatusCode != 429 && resp.StatusCode != 401 &&
 			resp.StatusCode != 403 && resp.StatusCode != 402 {
@@ -233,14 +511,12 @@ func ChatCompletionsWithHooks(
 		return
 	}
 
-	// Success — proxy the response
 	if isStream {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 		w.WriteHeader(http.StatusOK)
 
-		// Stream the response with model name substitution
 		StreamChatFromResponse(w, resp, "", "")
 		done(true, "")
 	} else {
@@ -266,13 +542,9 @@ func ChatCompletionsWithHooks(
 	}
 }
 
-// isStreamRequest checks if the client requested streaming.
+// isStreamRequest checks if the client requested streaming via Accept header.
 func isStreamRequest(r *http.Request) bool {
-	if r.Header.Get("Accept") == "text/event-stream" {
-		return true
-	}
-	// Check the request body for stream: true
-	return false // full check requires body parsing which we do in the stream handler
+	return r.Header.Get("Accept") == "text/event-stream"
 }
 
 // classifyError maps HTTP status / Go errors to circuit.ErrorKind.
@@ -356,7 +628,8 @@ func (h *HealthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// StreamChatFromResponse streams a chat response as SSE.
+// StreamChatFromResponse streams a chat response as SSE without model replacement.
+// Deprecated: Use StreamChat from stream.go for proper SSE parsing and model replacement.
 func StreamChatFromResponse(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {

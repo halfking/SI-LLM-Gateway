@@ -139,7 +139,7 @@ func TestMultiTurnChatNonStreaming(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim)
+	handler := NewChatHandler(cm, lim, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -203,7 +203,7 @@ func TestMultiTurnChatStreaming(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim)
+	handler := NewChatHandler(cm, lim, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -273,14 +273,14 @@ func TestCircuitBreakerBlocksAfterFailures(t *testing.T) {
 	lim := limiter.New()
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim)
+	handler := NewChatHandler(cm, lim, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	client := server.Client()
 	body := `{"model":"test","messages":[{"role":"user","content":"hello"}]}`
 
-	// Send enough requests to trip the breaker (all return 500 → upstream_down)
+	// Send enough requests to trip the breaker
 	for i := 0; i < 15; i++ {
 		req, _ := http.NewRequest("POST", server.URL+"/v1/chat/completions", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -320,7 +320,7 @@ func TestConcurrencyLimiterRejectsWhenSaturated(t *testing.T) {
 	lim := limiter.NewWithLimits(2, 2, 1, 1)
 	defer lim.Stop()
 
-	handler := NewChatHandler(cm, lim)
+	handler := NewChatHandler(cm, lim, nil, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
