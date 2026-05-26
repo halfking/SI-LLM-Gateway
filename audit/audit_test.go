@@ -118,6 +118,86 @@ func TestEventBuilder_StreamMetricsNil(t *testing.T) {
 	}
 }
 
+func TestStreamCapture_ObservePayload(t *testing.T) {
+	sc := NewStreamCapture()
+	sc.ObservePayload(`{"delta":"hel"}`, "", false)
+	sc.ObservePayload(`{"delta":"lo"}`, "stop", false)
+	sc.ObservePayload("[DONE]", "", true)
+
+	m := sc.SummaryAsMap()
+	if m["stream_chunk_count"].(int) != 2 {
+		t.Errorf("expected 2 chunks, got %v", m["stream_chunk_count"])
+	}
+	if m["stream_done_received"].(bool) != true {
+		t.Error("expected done_received=true")
+	}
+	if m["stream_interrupted"].(bool) != false {
+		t.Error("expected interrupted=false")
+	}
+	if m["failure_detail_code"].(string) != "stop" {
+		t.Errorf("expected finish_reason=stop, got %v", m["failure_detail_code"])
+	}
+	if _, ok := m["stream_first_chunk_ms"]; !ok {
+		t.Error("expected first_chunk_ms to be set")
+	}
+	if _, ok := m["response_checksum"]; !ok {
+		t.Error("expected checksum to be set")
+	}
+}
+
+func TestStreamCapture_ObserveUsage(t *testing.T) {
+	sc := NewStreamCapture()
+	pt := 100
+	ct := 50
+	cr := 80
+	cw := 20
+	sc.ObserveUsage(&pt, &ct, &cr, &cw)
+
+	m := sc.SummaryAsMap()
+	if m["prompt_tokens"].(int) != 100 {
+		t.Errorf("expected prompt_tokens=100, got %v", m["prompt_tokens"])
+	}
+	if m["completion_tokens"].(int) != 50 {
+		t.Errorf("expected completion_tokens=50, got %v", m["completion_tokens"])
+	}
+	if m["cache_read_tokens"].(int) != 80 {
+		t.Errorf("expected cache_read_tokens=80, got %v", m["cache_read_tokens"])
+	}
+	if m["cache_write_tokens"].(int) != 20 {
+		t.Errorf("expected cache_write_tokens=20, got %v", m["cache_write_tokens"])
+	}
+}
+
+func TestStreamCapture_MarkInterruptedWithReason(t *testing.T) {
+	sc := NewStreamCapture()
+	sc.ObservePayload("data", "", false)
+	sc.MarkInterruptedWithReason("stream_timeout")
+
+	m := sc.SummaryAsMap()
+	if m["stream_interrupted"].(bool) != true {
+		t.Error("expected interrupted=true")
+	}
+	if m["failure_detail_code"].(string) != "stream_timeout" {
+		t.Errorf("expected reason=stream_timeout, got %v", m["failure_detail_code"])
+	}
+}
+
+func TestStreamCapture_PreviewTruncation(t *testing.T) {
+	sc := NewStreamCapture()
+	longPayload := ""
+	for i := 0; i < 300; i++ {
+		longPayload += "x"
+	}
+	for i := 0; i < 10; i++ {
+		sc.ObservePayload(longPayload, "", false)
+	}
+	m := sc.SummaryAsMap()
+	preview := m["response_preview"].(string)
+	if len(preview) > 2048 {
+		t.Errorf("preview should be capped at 2048, got %d", len(preview))
+	}
+}
+
 func TestLogSink(t *testing.T) {
 	sink := &LogSink{}
 	e := NewEvent().ClientModel("test").Success(true).Build()

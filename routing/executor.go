@@ -26,7 +26,7 @@ const maxBodySize = 32 << 20
 
 type NormalizerFunc func(chunk []byte, isStream bool) []byte
 
-type StreamHandler func(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string, norm NormalizerFunc)
+type StreamHandler func(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string, norm NormalizerFunc, capture *audit.StreamCapture)
 
 type Executor struct {
 	Router      *Router
@@ -85,6 +85,7 @@ type ExecParams struct {
 	Candidates    []provider.Candidate
 	Policy        *provider.Policy
 	AuditBuilder  *audit.EventBuilder
+	Capture       *audit.StreamCapture
 }
 
 type ExecuteResult struct {
@@ -181,6 +182,9 @@ func (e *Executor) tryCandidate(
 	bodyBytes := params.BodyBytes
 	if outboundModel != params.ClientModel {
 		bodyBytes = replaceModelInRequestBody(bodyBytes, outboundModel)
+	}
+	if params.IsStream {
+		bodyBytes = injectStreamOptions(bodyBytes)
 	}
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -322,7 +326,7 @@ func (e *Executor) tryCandidate(
 
 		if params.IsStream {
 			if e.StreamChat != nil {
-				e.StreamChat(params.W, resp, params.ClientModel, outboundModel, e.Normalize)
+				e.StreamChat(params.W, resp, params.ClientModel, outboundModel, e.Normalize, params.Capture)
 			}
 		} else {
 			defer resp.Body.Close()
@@ -413,4 +417,33 @@ func replaceModelInResponseBody(body []byte, clientModel string) []byte {
 		}
 	}
 	return body
+}
+
+func injectStreamOptions(body []byte) []byte {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return body
+	}
+
+	var streamOpts map[string]json.RawMessage
+	if raw, ok := obj["stream_options"]; ok {
+		if err := json.Unmarshal(raw, &streamOpts); err != nil {
+			streamOpts = make(map[string]json.RawMessage)
+		}
+	} else {
+		streamOpts = make(map[string]json.RawMessage)
+	}
+	streamOpts["include_usage"], _ = json.Marshal(true)
+	obj["stream_options"] = executorMustMarshal(streamOpts)
+
+	result, err := json.Marshal(obj)
+	if err != nil {
+		return body
+	}
+	return result
+}
+
+func executorMustMarshal(v any) json.RawMessage {
+	b, _ := json.Marshal(v)
+	return b
 }

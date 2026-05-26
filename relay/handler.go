@@ -141,7 +141,15 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 		ClientProfile(clientID.Fingerprint.ClientProfile).
 		Stream(isStream).
 		RequestChecksum(bodyBytes)
+
+	var streamCapture *audit.StreamCapture
+	if isStream {
+		streamCapture = audit.NewStreamCapture()
+	}
 	defer func() {
+		if streamCapture != nil {
+			auditBuilder.StreamMetrics(streamCapture)
+		}
 		h.auditor.Emit(r.Context(), auditBuilder.Build())
 	}()
 
@@ -208,6 +216,7 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 		Candidates:    candidates,
 		Policy:        policy,
 		AuditBuilder:  auditBuilder,
+		Capture:       streamCapture,
 	})
 
 	if execErr != nil {
@@ -755,6 +764,3 @@ func envDuration(key string, def time.Duration) time.Duration {
 	}
 	return def
 }
-
-func StreamTimeout() time.Duration     { return envDuration("LLM_GATEWAY_STREAM_TIMEOUT", 900*time.Second) }
-func UpstreamTimeout() time.Duration   { return envDuration("LLM_GATEWAY_UPSTREAM_TIMEOUT", 120*time.Second) }

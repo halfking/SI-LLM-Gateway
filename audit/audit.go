@@ -43,14 +43,19 @@ type Event struct {
 }
 
 type StreamCapture struct {
-	mu            sync.Mutex
-	startTime     time.Time
-	chunkCount    int
-	firstChunkMs  int
-	doneReceived  bool
-	interrupted   bool
-	checksum      [32]byte
-	finalFinish   string
+	mu               sync.Mutex
+	startTime        time.Time
+	chunkCount       int
+	firstChunkMs     int
+	doneReceived     bool
+	interrupted      bool
+	checksum         [32]byte
+	finalFinish      string
+	preview          []byte
+	promptTokens     *int
+	completionTokens *int
+	cacheReadTokens  *int
+	cacheWriteTokens *int
 }
 
 func NewStreamCapture() *StreamCapture {
@@ -86,6 +91,106 @@ func (sc *StreamCapture) Snapshot() (chunkCount, ttfbMs int, done, interrupted b
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 	return sc.chunkCount, sc.firstChunkMs, sc.doneReceived, sc.interrupted, hex.EncodeToString(sc.checksum[:])
+}
+
+func (sc *StreamCapture) ObservePayload(payload string, finishReason string, done bool) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	if done && payload == "[DONE]" {
+		if finishReason != "" {
+			sc.finalFinish = finishReason
+		}
+		sc.doneReceived = true
+		return
+	}
+	if payload == "" {
+		if finishReason != "" {
+			sc.finalFinish = finishReason
+		}
+		if done {
+			sc.doneReceived = true
+		}
+		return
+	}
+	sc.chunkCount++
+	elapsed := int(time.Since(sc.startTime).Milliseconds())
+	if sc.firstChunkMs == 0 {
+		sc.firstChunkMs = elapsed
+	}
+	sc.checksum = sha256.Sum256(append(sc.checksum[:], []byte(payload)...))
+	if len(sc.preview) < 2048 {
+		remaining := 2048 - len(sc.preview)
+		if len(payload) > remaining {
+			payload = payload[:remaining]
+		}
+		sc.preview = append(sc.preview, payload...)
+	}
+	if finishReason != "" {
+		sc.finalFinish = finishReason
+	}
+	if done {
+		sc.doneReceived = true
+	}
+}
+
+func (sc *StreamCapture) ObserveUsage(promptTokens, completionTokens, cacheRead, cacheWrite *int) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	if promptTokens != nil {
+		sc.promptTokens = promptTokens
+	}
+	if completionTokens != nil {
+		sc.completionTokens = completionTokens
+	}
+	if cacheRead != nil {
+		sc.cacheReadTokens = cacheRead
+	}
+	if cacheWrite != nil {
+		sc.cacheWriteTokens = cacheWrite
+	}
+}
+
+func (sc *StreamCapture) MarkInterruptedWithReason(finishReason string) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.interrupted = true
+	if finishReason != "" {
+		sc.finalFinish = finishReason
+	}
+}
+
+func (sc *StreamCapture) SummaryAsMap() map[string]any {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	m := map[string]any{
+		"stream_chunk_count":   sc.chunkCount,
+		"stream_done_received": sc.doneReceived,
+		"stream_interrupted":   sc.interrupted,
+	}
+	if sc.chunkCount > 0 {
+		m["stream_first_chunk_ms"] = sc.firstChunkMs
+		m["response_checksum"] = hex.EncodeToString(sc.checksum[:])
+	}
+	if len(sc.preview) > 0 {
+		m["response_preview"] = string(sc.preview)
+	}
+	if sc.finalFinish != "" {
+		m["failure_detail_code"] = sc.finalFinish
+	}
+	if sc.promptTokens != nil {
+		m["prompt_tokens"] = *sc.promptTokens
+	}
+	if sc.completionTokens != nil {
+		m["completion_tokens"] = *sc.completionTokens
+	}
+	if sc.cacheReadTokens != nil {
+		m["cache_read_tokens"] = *sc.cacheReadTokens
+	}
+	if sc.cacheWriteTokens != nil {
+		m["cache_write_tokens"] = *sc.cacheWriteTokens
+	}
+	return m
 }
 
 type EventBuilder struct {

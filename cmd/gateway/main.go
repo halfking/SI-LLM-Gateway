@@ -90,8 +90,8 @@ func main() {
 		exec := routing.NewExecutor(
 			router, cm, lim, pools, upClient,
 			norm.NormalizeChunk,
-			func(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string, normFunc routing.NormalizerFunc) {
-				relay.StreamChat(w, resp, clientModel, outboundModel, norm)
+			func(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string, normFunc routing.NormalizerFunc, capture *audit.StreamCapture) {
+				relay.StreamChatWithCapture(w, resp, clientModel, outboundModel, norm, capture)
 			},
 			auditSink,
 		)

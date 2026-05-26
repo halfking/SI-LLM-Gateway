@@ -12,14 +12,21 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kaixuan/llm-gateway-go/audit"
 )
 
 var (
 	streamChunkTimeout = 300 * time.Second
+	firstByteTimeout   = 30 * time.Second
+	keepaliveInterval  = 15 * time.Second
 )
 
 const (
-	streamBufSize = 64 * 1024
+	streamBufSize            = 64 * 1024
+	sseKeepaliveComment      = ": keep-alive\n\n"
+	sseKeepaliveEnvVar       = "LLM_GATEWAY_KEEPALIVE_INTERVAL"
+	sseFirstByteTimeoutEnvVar = "LLM_GATEWAY_FIRST_BYTE_TIMEOUT"
 )
 
 func init() {
@@ -28,18 +35,41 @@ func init() {
 			streamChunkTimeout = time.Duration(s) * time.Second
 		}
 	}
+	if v := os.Getenv(sseKeepaliveEnvVar); v != "" {
+		if s, err := strconv.Atoi(v); err == nil && s > 0 {
+			keepaliveInterval = time.Duration(s) * time.Second
+		}
+	}
+	if v := os.Getenv(sseFirstByteTimeoutEnvVar); v != "" {
+		if s, err := strconv.Atoi(v); err == nil && s > 0 {
+			firstByteTimeout = time.Duration(s) * time.Second
+		}
+	}
 }
 
-// StreamChat forwards a streaming chat completion from the upstream to the client.
-// It reads SSE chunks, discovers the upstream model name from the first chunk,
-// and replaces it with clientModel in all subsequent chunks.
-func StreamChat(
-	w http.ResponseWriter,
-	resp *http.Response,
-	clientModel string,
-	_ string,
-	norm *Normalizer,
-) {
+func StreamTimeout() time.Duration {
+	if v := os.Getenv("LLM_GATEWAY_STREAM_TIMEOUT"); v != "" {
+		if s, err := strconv.Atoi(v); err == nil && s > 0 {
+			return time.Duration(s) * time.Second
+		}
+	}
+	return 900 * time.Second
+}
+
+func UpstreamTimeout() time.Duration {
+	if v := os.Getenv("LLM_GATEWAY_UPSTREAM_TIMEOUT"); v != "" {
+		if s, err := strconv.Atoi(v); err == nil && s > 0 {
+			return time.Duration(s) * time.Second
+		}
+	}
+	return 120 * time.Second
+}
+
+func StreamChat(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string, norm *Normalizer) {
+	StreamChatWithCapture(w, resp, clientModel, outboundModel, norm, nil)
+}
+
+func StreamChatWithCapture(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string, norm *Normalizer, capture *audit.StreamCapture) {
 	defer resp.Body.Close()
 
 	flusher, ok := w.(http.Flusher)
@@ -60,38 +90,105 @@ func StreamChat(
 	} else {
 		ctx = context.Background()
 	}
+
 	reader := bufio.NewReaderSize(resp.Body, streamBufSize)
 	discoveredUpstream := ""
+	lastSend := time.Now()
 
+	// ── First-byte timeout ──────────────────────────────────────────
+	firstLine, err := readLineWithTimeout(ctx, reader, firstByteTimeout)
+	if err != nil {
+		if capture != nil {
+			capture.MarkInterruptedWithReason("first_byte_timeout")
+		}
+		slog.Warn("stream first-byte timeout", "error", err)
+		safeWriteSSE(w, "data: {\"error\":{\"message\":\"upstream first-byte timeout\",\"type\":\"timeout\",\"code\":\"first_byte_timeout\"}}\n\n")
+		safeFlush(flusher)
+		return
+	}
+
+	if firstLine != "" {
+		if clientModel != "" && discoveredUpstream == "" {
+			discoveredUpstream = extractModelFromChunk(firstLine)
+		}
+		if clientModel != "" {
+			firstLine = replaceModelInChunk(firstLine, clientModel, discoveredUpstream)
+		}
+
+		payload := extractPayload(firstLine)
+		if payload != "" && capture != nil {
+			finishReason := ExtractFinishReason(payload)
+			usage := ExtractUsageFromChunk(payload)
+			capture.ObservePayload(payload, finishReason, false)
+			if usage.PromptTokens != nil || usage.CompletionTokens != nil {
+				capture.ObserveUsage(usage.PromptTokens, usage.CompletionTokens, usage.CacheReadTokens, usage.CacheWriteTokens)
+			}
+		}
+
+		if norm != nil {
+			firstLine = string(norm.NormalizeChunk([]byte(firstLine), true))
+		}
+		safeWriteSSE(w, firstLine)
+		safeFlush(flusher)
+		lastSend = time.Now()
+	}
+
+	// ── Main streaming loop with keep-alive ─────────────────────────
 	for {
 		select {
 		case <-ctx.Done():
+			if capture != nil {
+				capture.MarkInterruptedWithReason("client_cancel")
+			}
 			return
 		default:
 		}
 
-		line, err := readLineWithTimeout(ctx, reader)
+		line, err := readLineWithTimeout(ctx, reader, streamChunkTimeout)
 		if err != nil {
 			if err == io.EOF || strings.Contains(err.Error(), "EOF") {
 				safeWriteSSE(w, "data: [DONE]\n\n")
 				safeFlush(flusher)
+				if capture != nil {
+					capture.ObservePayload("[DONE]", "", true)
+				}
 			} else if strings.Contains(err.Error(), "context canceled") {
 				slog.Debug("stream cancelled by client")
+				if capture != nil {
+					capture.MarkInterruptedWithReason("client_cancel")
+				}
 			} else if strings.Contains(err.Error(), "timeout") {
 				slog.Warn("stream read timeout, sending error chunk")
 				safeWriteSSE(w, "data: {\"error\":{\"message\":\"upstream read timeout\",\"type\":\"timeout\",\"code\":\"stream_timeout\"}}\n\n")
 				safeFlush(flusher)
+				if capture != nil {
+					capture.MarkInterruptedWithReason("stream_timeout")
+				}
 			} else {
 				slog.Warn("stream read error", "error", err)
+				if capture != nil {
+					capture.MarkInterruptedWithReason("read_error")
+				}
 			}
 			return
 		}
 
+		if clientModel != "" && discoveredUpstream == "" {
+			discoveredUpstream = extractModelFromChunk(line)
+		}
 		if clientModel != "" {
-			if discoveredUpstream == "" {
-				discoveredUpstream = extractModelFromChunk(line)
-			}
 			line = replaceModelInChunk(line, clientModel, discoveredUpstream)
+		}
+
+		payload := extractPayload(line)
+		if payload != "" && capture != nil {
+			finishReason := ExtractFinishReason(payload)
+			usage := ExtractUsageFromChunk(payload)
+			isDone := payload == "[DONE]"
+			capture.ObservePayload(payload, finishReason, isDone)
+			if usage.PromptTokens != nil || usage.CompletionTokens != nil {
+				capture.ObserveUsage(usage.PromptTokens, usage.CompletionTokens, usage.CacheReadTokens, usage.CacheWriteTokens)
+			}
 		}
 
 		if norm != nil {
@@ -100,16 +197,31 @@ func StreamChat(
 
 		safeWriteSSE(w, line)
 		safeFlush(flusher)
+		lastSend = time.Now()
+
+		// ── Keep-alive: if next read is slow, send comment ping ────
+		if time.Since(lastSend) > keepaliveInterval {
+			safeWriteSSE(w, sseKeepaliveComment)
+			safeFlush(flusher)
+		}
 	}
 }
 
-func readLineWithTimeout(ctx context.Context, reader *bufio.Reader) (string, error) {
+func extractPayload(line string) string {
+	if !strings.HasPrefix(line, "data: ") {
+		return ""
+	}
+	payload := strings.TrimPrefix(line, "data: ")
+	return strings.TrimSpace(payload)
+}
+
+func readLineWithTimeout(ctx context.Context, reader *bufio.Reader, timeout time.Duration) (string, error) {
 	type result struct {
 		line string
 		err  error
 	}
 	ch := make(chan result, 1)
-	ctx, cancel := context.WithTimeout(ctx, streamChunkTimeout)
+	readCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	go func() {
@@ -125,11 +237,11 @@ func readLineWithTimeout(ctx context.Context, reader *bufio.Reader) (string, err
 	select {
 	case r := <-ch:
 		return r.line, r.err
-	case <-ctx.Done():
-		if ctx.Err() == context.DeadlineExceeded {
+	case <-readCtx.Done():
+		if readCtx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("stream read timeout")
 		}
-		return "", ctx.Err()
+		return "", readCtx.Err()
 	}
 }
 
