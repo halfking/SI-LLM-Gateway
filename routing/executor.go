@@ -3,6 +3,7 @@ package routing
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,11 +17,75 @@ import (
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/pool"
 	"github.com/kaixuan/llm-gateway-go/provider"
-	"github.com/kaixuan/llm-gateway-go/relay"
 	"github.com/kaixuan/llm-gateway-go/resolve"
 	"github.com/kaixuan/llm-gateway-go/transform"
 	upstreampkg "github.com/kaixuan/llm-gateway-go/upstream"
 )
+
+const maxBodySize = 32 << 20
+
+type NormalizerFunc func(chunk []byte, isStream bool) []byte
+
+type StreamHandler func(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string, norm NormalizerFunc)
+
+type Executor struct {
+	Router      *Router
+	Circuit     *circuit.Manager
+	Limiter     *limiter.Limiter
+	Pools       *pool.PoolManager
+	Upstream    *upstreampkg.Client
+	Normalize   NormalizerFunc
+	StreamChat  StreamHandler
+	Auditor     audit.Sink
+
+	StreamTimeout   time.Duration
+	UpstreamTimeout time.Duration
+}
+
+func NewExecutor(
+	router *Router,
+	cm *circuit.Manager,
+	lim *limiter.Limiter,
+	pools *pool.PoolManager,
+	upstream *upstreampkg.Client,
+	normalize NormalizerFunc,
+	streamChat StreamHandler,
+	auditor audit.Sink,
+) *Executor {
+	if auditor == nil {
+		auditor = &audit.LogSink{}
+	}
+	if normalize == nil {
+		normalize = func(chunk []byte, isStream bool) []byte { return chunk }
+	}
+	return &Executor{
+		Router:          router,
+		Circuit:         cm,
+		Limiter:         lim,
+		Pools:           pools,
+		Upstream:        upstream,
+		Normalize:       normalize,
+		StreamChat:      streamChat,
+		Auditor:         auditor,
+		StreamTimeout:   900 * time.Second,
+		UpstreamTimeout: 120 * time.Second,
+	}
+}
+
+type ExecParams struct {
+	W             http.ResponseWriter
+	R             *http.Request
+	BodyBytes     []byte
+	IsStream      bool
+	ClientModel   string
+	OutboundModel string
+	ClientID      identity.ClientIdentity
+	Transform     *transform.TransformResult
+	Resolution    *resolve.Resolution
+	Candidates    []provider.Candidate
+	Policy        *provider.Policy
+	AuditBuilder  *audit.EventBuilder
+}
 
 type ExecuteResult struct {
 	Response  *http.Response
@@ -39,54 +104,6 @@ func (e *ExecuteError) Error() string {
 		return fmt.Sprintf("all %d candidates failed: %v", e.Tried, e.LastErr)
 	}
 	return fmt.Sprintf("all %d candidates failed", e.Tried)
-}
-
-type Executor struct {
-	Router     *Router
-	Circuit    *circuit.Manager
-	Limiter    *limiter.Limiter
-	Pools      *pool.PoolManager
-	Upstream   *upstreampkg.Client
-	Normalizer *relay.Normalizer
-	Auditor    audit.Sink
-}
-
-func NewExecutor(
-	router *Router,
-	cm *circuit.Manager,
-	lim *limiter.Limiter,
-	pools *pool.PoolManager,
-	upstream *upstreampkg.Client,
-	norm *relay.Normalizer,
-	auditor audit.Sink,
-) *Executor {
-	if auditor == nil {
-		auditor = &audit.LogSink{}
-	}
-	return &Executor{
-		Router:     router,
-		Circuit:    cm,
-		Limiter:    lim,
-		Pools:      pools,
-		Upstream:   upstream,
-		Normalizer: norm,
-		Auditor:    auditor,
-	}
-}
-
-type ExecParams struct {
-	W             http.ResponseWriter
-	R             *http.Request
-	BodyBytes     []byte
-	IsStream      bool
-	ClientModel   string
-	OutboundModel string
-	ClientID      identity.ClientIdentity
-	Transform     *transform.TransformResult
-	Resolution    *resolve.Resolution
-	Candidates    []provider.Candidate
-	Policy        *provider.Policy
-	AuditBuilder  *audit.EventBuilder
 }
 
 func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
@@ -163,7 +180,7 @@ func (e *Executor) tryCandidate(
 
 	bodyBytes := params.BodyBytes
 	if outboundModel != params.ClientModel {
-		bodyBytes = relay.ReplaceModelInRequestBody(bodyBytes, outboundModel)
+		bodyBytes = replaceModelInRequestBody(bodyBytes, outboundModel)
 	}
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -213,9 +230,9 @@ func (e *Executor) tryCandidate(
 		var httpClient *http.Client
 		if e.Pools != nil {
 			poolKey := pool.PoolKey{
-				IdentityHash:  params.ClientID.IdentityHash,
-				ProviderID:    cand.ProviderID,
-				CredentialID:  cand.CredentialID,
+				IdentityHash: params.ClientID.IdentityHash,
+				ProviderID:   cand.ProviderID,
+				CredentialID: cand.CredentialID,
 			}
 			if p := e.Pools.GetOrCreate(poolKey, ""); p.State() == pool.PoolActive {
 				httpClient = p.Client()
@@ -225,9 +242,9 @@ func (e *Executor) tryCandidate(
 			httpClient = http.DefaultClient
 		}
 
-		timeout := relay.UpstreamTimeout()
+		timeout := e.UpstreamTimeout
 		if params.IsStream {
-			timeout = relay.StreamTimeout()
+			timeout = e.StreamTimeout
 		}
 		ctx, cancel := context.WithTimeout(params.R.Context(), timeout)
 		defer cancel()
@@ -304,22 +321,24 @@ func (e *Executor) tryCandidate(
 		latencyMs := int(time.Since(tTotal).Milliseconds())
 
 		if params.IsStream {
-			relay.StreamChat(params.W, resp, params.ClientModel, outboundModel, e.Normalizer)
+			if e.StreamChat != nil {
+				e.StreamChat(params.W, resp, params.ClientModel, outboundModel, e.Normalize)
+			}
 		} else {
 			defer resp.Body.Close()
-			respBody, err := io.ReadAll(io.LimitReader(resp.Body, int64(relay.MaxBodySize())+1))
+			respBody, err := io.ReadAll(io.LimitReader(resp.Body, int64(maxBodySize)+1))
 			if err != nil {
 				return nil, err
 			}
-			if len(respBody) > relay.MaxBodySize() {
+			if len(respBody) > maxBodySize {
 				slog.Warn("upstream response truncated", "size", len(respBody))
-				respBody = respBody[:relay.MaxBodySize()]
+				respBody = respBody[:maxBodySize]
 			}
 			if params.ClientModel != "" {
-				respBody = relay.ReplaceModelInResponseBody(respBody, params.ClientModel)
+				respBody = replaceModelInResponseBody(respBody, params.ClientModel)
 			}
-			if e.Normalizer != nil {
-				respBody = e.Normalizer.NormalizeChunk(respBody, false)
+			if e.Normalize != nil {
+				respBody = e.Normalize(respBody, false)
 			}
 			for k, vs := range resp.Header {
 				for _, v := range vs {
@@ -346,5 +365,52 @@ func egressPref(tx *transform.TransformResult) []string {
 	return tx.EgressPreference
 }
 
-// Ensure compatibility with existing relay functions that we need to expose.
-// We add small wrappers to expose what executor needs.
+func replaceModelInRequestBody(body []byte, newModel string) []byte {
+	pattern := []byte(`"model"`)
+	idx := bytes.Index(body, pattern)
+	if idx < 0 {
+		return body
+	}
+	after := body[idx+len(pattern):]
+	colonIdx := bytes.IndexByte(after, ':')
+	if colonIdx < 0 {
+		return body
+	}
+	rest := after[colonIdx+1:]
+	rest = bytes.TrimLeft(rest, " \t\n\r")
+	if len(rest) == 0 || rest[0] != '"' {
+		return body
+	}
+	endIdx := bytes.IndexByte(rest[1:], '"')
+	if endIdx < 0 {
+		return body
+	}
+	oldValue := rest[1 : endIdx+1]
+	if string(oldValue) == newModel {
+		return body
+	}
+	var buf bytes.Buffer
+	prefix := body[:idx+len(pattern)+colonIdx+1]
+	suffix := rest[endIdx+2:]
+	buf.Write(prefix)
+	buf.WriteString(" \"")
+	buf.WriteString(newModel)
+	buf.WriteByte('"')
+	buf.Write(suffix)
+	return buf.Bytes()
+}
+
+func replaceModelInResponseBody(body []byte, clientModel string) []byte {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return body
+	}
+	if _, ok := obj["model"]; ok {
+		obj["model"], _ = json.Marshal(clientModel)
+		newBody, err := json.Marshal(obj)
+		if err == nil {
+			return newBody
+		}
+	}
+	return body
+}

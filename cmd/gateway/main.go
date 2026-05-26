@@ -33,9 +33,12 @@ import (
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/middleware"
 	"github.com/kaixuan/llm-gateway-go/pool"
+	"github.com/kaixuan/llm-gateway-go/provider"
 	"github.com/kaixuan/llm-gateway-go/relay"
 	"github.com/kaixuan/llm-gateway-go/resolve"
+	"github.com/kaixuan/llm-gateway-go/routing"
 	"github.com/kaixuan/llm-gateway-go/transform"
+	upstream "github.com/kaixuan/llm-gateway-go/upstream"
 )
 
 func main() {
@@ -75,6 +78,30 @@ func main() {
 	chatHandler := relay.NewChatHandler(cm, lim, matrix, pools, resolver, auditSink)
 	healthHandler := relay.NewHealthHandler(cm, lim)
 	modelsHandler := relay.NewModelsHandler(pythonEndpoint)
+
+	// ── Routing executor (multi-candidate P2C) ──────────────────────────
+	adminAPIKey := os.Getenv("LLM_GATEWAY_ADMIN_API_KEY")
+	providerClient := provider.NewClient(pythonEndpoint, adminAPIKey)
+	if providerClient.Enabled() {
+		stickyCache := routing.NewStickyCache()
+		router := routing.NewRouter(stickyCache, lim)
+		norm := relay.NewNormalizer()
+		upClient := upstream.New()
+		exec := routing.NewExecutor(
+			router, cm, lim, pools, upClient,
+			norm.NormalizeChunk,
+			func(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string, normFunc routing.NormalizerFunc) {
+				relay.StreamChat(w, resp, clientModel, outboundModel, norm)
+			},
+			auditSink,
+		)
+		exec.StreamTimeout = relay.StreamTimeout()
+		exec.UpstreamTimeout = relay.UpstreamTimeout()
+		chatHandler.SetExecutor(exec, providerClient, stickyCache)
+		slog.Info("routing executor enabled", "endpoint", pythonEndpoint)
+	} else {
+		slog.Warn("routing executor disabled (no LLM_GATEWAY_ADMIN_API_KEY or LLM_GATEWAY_PYTHON_ENDPOINT)")
+	}
 
 	// ── Listen address ────────────────────────────────────────────────────
 	listen := os.Getenv("LLM_GATEWAY_LISTEN")

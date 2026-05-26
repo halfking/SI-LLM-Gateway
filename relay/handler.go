@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -17,7 +18,9 @@ import (
 	"github.com/kaixuan/llm-gateway-go/identity"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/pool"
+	"github.com/kaixuan/llm-gateway-go/provider"
 	"github.com/kaixuan/llm-gateway-go/resolve"
+	"github.com/kaixuan/llm-gateway-go/routing"
 	"github.com/kaixuan/llm-gateway-go/transform"
 	upstreampkg "github.com/kaixuan/llm-gateway-go/upstream"
 )
@@ -71,6 +74,9 @@ type ChatHandler struct {
 	auditor    audit.Sink
 	client     *upstreampkg.Client
 	normalizer *Normalizer
+	executor   *routing.Executor
+	provider   *provider.Client
+	sticky     *routing.StickyCache
 }
 
 func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.Matrix, pools *pool.PoolManager, resolver *resolve.Resolver, auditor audit.Sink) *ChatHandler {
@@ -80,6 +86,12 @@ func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.M
 	return &ChatHandler{circuit: cm, limiter: l, matrix: matrix, pools: pools, resolver: resolver, auditor: auditor, client: upstreampkg.New(), normalizer: NewNormalizer()}
 }
 
+func (h *ChatHandler) SetExecutor(exec *routing.Executor, prov *provider.Client, sticky *routing.StickyCache) {
+	h.executor = exec
+	h.provider = prov
+	h.sticky = sticky
+}
+
 // ServeHTTP handles /v1/chat/completions and /v1/completions.
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -87,6 +99,147 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.executor != nil && h.provider != nil && h.provider.Enabled() {
+		h.serveWithExecutor(w, r)
+		return
+	}
+	h.serveFallback(w, r)
+}
+
+func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) {
+	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, int64(maxBodySize)+1))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]string{"message": "failed to read request body", "type": "invalid_request", "code": "body_read_error"},
+		})
+		return
+	}
+	if len(bodyBytes) > maxBodySize {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{
+			"error": map[string]string{"message": "request body exceeds 32 MiB limit", "type": "invalid_request", "code": "body_too_large"},
+		})
+		return
+	}
+	r.Body.Close()
+
+	var reqBody chatRequestBody
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]string{"message": "invalid JSON in request body", "type": "invalid_request", "code": "json_parse_error"},
+		})
+		return
+	}
+
+	clientModel := reqBody.Model
+	isStream := reqBody.Stream
+	clientID := identity.BuildIdentityFromRequest(r, "default", nil, nil, "")
+	identityHash := clientID.ShortID()
+
+	auditBuilder := audit.NewEvent().
+		ClientModel(clientModel).
+		IdentityHash(identityHash).
+		ClientProfile(clientID.Fingerprint.ClientProfile).
+		Stream(isStream).
+		RequestChecksum(bodyBytes)
+	defer func() {
+		h.auditor.Emit(r.Context(), auditBuilder.Build())
+	}()
+
+	candidates, policy, err := h.provider.GetCandidates(r.Context(), clientModel, clientID.Fingerprint.ClientProfile)
+	if err != nil {
+		slog.Error("failed to get candidates from provider", "error", err)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": map[string]string{"message": fmt.Sprintf("no available provider for model '%s'", clientModel), "type": "server_error", "code": "no_candidate"},
+		})
+		return
+	}
+	if len(candidates) == 0 {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": map[string]string{"message": fmt.Sprintf("no available provider for model '%s'", clientModel), "type": "server_error", "code": "no_candidate"},
+		})
+		return
+	}
+
+	var modelResolution *resolve.Resolution
+	if h.resolver != nil {
+		modelResolution = h.resolver.Resolve(r.Context(), clientModel, clientID.Fingerprint.ClientProfile)
+	}
+
+	var txResult *transform.TransformResult
+	tCtx := &transform.TransformContext{
+		RequestMode:   "chat",
+		ClientProfile: clientID.Fingerprint.ClientProfile,
+		ClientModel:   clientModel,
+	}
+	if modelResolution != nil && modelResolution.CanonicalName != nil {
+		tCtx.CanonicalName = *modelResolution.CanonicalName
+	}
+	if h.matrix != nil {
+		txResult = h.matrix.Resolve(tCtx)
+	}
+	explicitOutbound := ""
+	if txResult != nil && txResult.OutboundModel != "" {
+		explicitOutbound = transform.RenderOutboundModel(
+			txResult.OutboundModel, txResult.OutboundModel, clientModel, tCtx.CanonicalName,
+		)
+	}
+
+	auditBuilder.OutboundModel(explicitOutbound).Provider(candidates[0].ProviderID).Credential(candidates[0].CredentialID)
+	if modelResolution != nil {
+		auditBuilder.ResolutionPath(modelResolution.ResolutionPath)
+		if modelResolution.CanonicalName != nil {
+			auditBuilder.CanonicalName(*modelResolution.CanonicalName)
+		}
+	}
+	if txResult != nil {
+		auditBuilder.TransformRule(txResult.MatchedRule)
+	}
+
+	result, execErr := h.executor.Execute(&routing.ExecParams{
+		W:             w,
+		R:             r,
+		BodyBytes:     bodyBytes,
+		IsStream:      isStream,
+		ClientModel:   clientModel,
+		OutboundModel: explicitOutbound,
+		ClientID:      clientID,
+		Transform:     txResult,
+		Resolution:    modelResolution,
+		Candidates:    candidates,
+		Policy:        policy,
+		AuditBuilder:  auditBuilder,
+	})
+
+	if execErr != nil {
+		slog.Error("executor failed",
+			"error", execErr,
+			"model", clientModel,
+		)
+		if execErr, ok := execErr.(*routing.ExecuteError); ok && execErr.Exhausted {
+			writeJSON(w, http.StatusBadGateway, map[string]any{
+				"error": map[string]string{"message": "all providers unavailable", "type": "upstream_error", "code": "all_exhausted"},
+			})
+			return
+		}
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"error": map[string]string{"message": "upstream request failed", "type": "upstream_error", "code": "upstream_error"},
+		})
+		return
+	}
+
+	_ = result
+	auditBuilder.Success(true).Latency(time.Duration(result.LatencyMs) * time.Millisecond)
+	if h.sticky != nil && policy != nil {
+		stickyKey := routing.BuildStickyKey("default", nil, nil, "anonymous", clientID.Fingerprint.PrimarySeed())
+		stickyTTL := time.Duration(policy.StickyTTLMilliseconds) * time.Second
+		if stickyTTL < time.Minute {
+			stickyTTL = time.Minute
+		}
+		h.sticky.Set(stickyKey, result.Candidate.CredentialID, stickyTTL)
+	}
+}
+
+func (h *ChatHandler) serveFallback(w http.ResponseWriter, r *http.Request) {
 	svc := defaultService()
 
 	// ── Circuit breaker check ──────────────────────────────────────────

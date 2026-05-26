@@ -137,7 +137,7 @@ func TestReplaceModelInChunk_InvalidJSON(t *testing.T) {
 
 func TestReplaceModelInRequestBody(t *testing.T) {
 	body := []byte(`{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"hi"}],"stream":true}`)
-	result := replaceModelInRequestBody(body, "claude-sonnet-4-5-20250929")
+	result := ReplaceModelInRequestBody(body, "claude-sonnet-4-5-20250929")
 
 	var obj map[string]any
 	if err := json.Unmarshal(result, &obj); err != nil {
@@ -153,7 +153,7 @@ func TestReplaceModelInRequestBody(t *testing.T) {
 
 func TestReplaceModelInRequestBody_InvalidJSON(t *testing.T) {
 	body := []byte(`not json`)
-	result := replaceModelInRequestBody(body, "new-model")
+	result := ReplaceModelInRequestBody(body, "new-model")
 	if string(result) != "not json" {
 		t.Error("invalid JSON should be returned as-is")
 	}
@@ -165,7 +165,7 @@ func TestReplaceModelInRequestBody_InvalidJSON(t *testing.T) {
 
 func TestReplaceModelInResponse(t *testing.T) {
 	body := []byte(`{"id":"chat-1","model":"claude-sonnet-4-5-20250929","choices":[{"message":{"role":"assistant","content":"Hello"}}]}`)
-	result := replaceModelInResponseBody(body, "claude-sonnet-4.5")
+	result := ReplaceModelInResponseBody(body, "claude-sonnet-4.5")
 
 	var obj map[string]any
 	if err := json.Unmarshal(result, &obj); err != nil {
@@ -178,7 +178,7 @@ func TestReplaceModelInResponse(t *testing.T) {
 
 func TestReplaceModelInResponse_AlreadyClientModel(t *testing.T) {
 	body := []byte(`{"model":"gpt-4o"}`)
-	result := replaceModelInResponseBody(body, "gpt-4o")
+	result := ReplaceModelInResponseBody(body, "gpt-4o")
 	if string(result) != string(body) {
 		t.Error("should not modify when already client model")
 	}
@@ -202,7 +202,7 @@ func TestReplaceModelInResponse_ToolCallsResponse(t *testing.T) {
 		}],
 		"usage":{"prompt_tokens":50,"completion_tokens":20,"total_tokens":70}
 	}`)
-	result := replaceModelInResponseBody(body, "gpt-4o")
+	result := ReplaceModelInResponseBody(body, "gpt-4o")
 
 	var obj map[string]any
 	if err := json.Unmarshal(result, &obj); err != nil {
