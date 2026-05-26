@@ -132,12 +132,11 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Stop background loops
-	lim.Stop()
-	pools.CloseAll()
-
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("gateway shutdown error", "error", err)
 	}
+	lim.Stop()
+	pools.Stop()
+	pools.CloseAll()
 	slog.Info("gateway stopped")
 }

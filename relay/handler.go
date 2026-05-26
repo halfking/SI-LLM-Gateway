@@ -22,6 +22,8 @@ import (
 	upstreampkg "github.com/kaixuan/llm-gateway-go/upstream"
 )
 
+const maxBodySize = 32 << 20
+
 // ServiceID maps an API key to a (providerID, credentialID) pair.
 // In production this will come from the Python control plane; for now
 // it's configured via environment variables.
@@ -105,13 +107,23 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Read and buffer body (capped at 32 MiB) ──────────────────────
-	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 32<<20))
+	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
 			"error": map[string]string{
 				"message": "failed to read request body",
 				"type":    "invalid_request",
 				"code":    "body_read_error",
+			},
+		})
+		return
+	}
+	if len(bodyBytes) > maxBodySize {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{
+			"error": map[string]string{
+				"message": "request body exceeds 32 MiB limit",
+				"type":    "invalid_request",
+				"code":    "body_too_large",
 			},
 		})
 		return
@@ -212,7 +224,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Build upstream request ─────────────────────────────────────────
-	ChatCompletionsPhase3(w, r, bodyBytes, isStream, clientModel, explicitOutbound, clientID, txResult, svc, h.circuit, h.limiter, h.pools, h.client, h.normalizer, release)
+	ChatCompletionsPhase3(w, r, bodyBytes, isStream, clientModel, explicitOutbound, clientID, txResult, svc, h.circuit, h.limiter, h.pools, h.client, h.normalizer, auditBuilder, release)
 }
 
 //-----------------------------------------------------------------------------
@@ -234,6 +246,7 @@ func ChatCompletionsPhase3(
 	pools *pool.PoolManager,
 	upClient *upstreampkg.Client,
 	norm *Normalizer,
+	auditBuilder *audit.EventBuilder,
 	release limiter.ReleaseFunc,
 ) {
 	var released bool
@@ -399,6 +412,7 @@ func ChatCompletionsPhase3(
 		released = true
 		release()
 		cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
+		auditBuilder.Success(true)
 	} else {
 		defer resp.Body.Close()
 		respBody, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
@@ -436,6 +450,7 @@ func ChatCompletionsPhase3(
 	released = true
 	release()
 	cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
+	auditBuilder.Success(true)
 	}
 }
 

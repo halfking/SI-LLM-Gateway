@@ -16,6 +16,7 @@ func WithRequestID(next http.Handler) http.Handler {
 		id := r.Header.Get("X-Request-Id")
 		if id == "" {
 			id = generateID()
+			r.Header.Set("X-Request-Id", id)
 		}
 		w.Header().Set("X-Request-Id", id)
 		next.ServeHTTP(w, r)

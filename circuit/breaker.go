@@ -106,7 +106,8 @@ type Breaker struct {
 	key           string
 	state         atomic.Int32
 	failCount     atomic.Int32
-	consecutive   atomic.Int32 // consecutive failures (for escalation)
+	consecutive   atomic.Int32
+	halfOpenProbes atomic.Int32
 	coolingPolicy CoolingPolicy
 
 	mu             sync.Mutex
@@ -155,7 +156,7 @@ func (b *Breaker) Allow() bool {
 	case StateOpen:
 		return b.tryTransitionToHalfOpen()
 	case StateHalfOpen:
-		return true // allow probe request
+		return b.halfOpenProbes.Add(1) <= 1
 	default:
 		return false
 	}
@@ -173,6 +174,7 @@ func (b *Breaker) tryTransitionToHalfOpen() bool {
 
 	if time.Now().After(b.coolingExpires) {
 		b.state.Store(int32(StateHalfOpen))
+		b.halfOpenProbes.Store(0)
 		b.nextProbeAt = time.Now()
 		slog.Info("circuit half-open",
 			"key", b.key,
@@ -209,6 +211,7 @@ func (b *Breaker) RecordFailure(kind ErrorKind) {
 
 	case RecoveryAuto, RecoveryExponential:
 		b.state.Store(int32(StateOpen))
+		b.halfOpenProbes.Store(0)
 		b.openSince = time.Now()
 
 		if policy.RecoveryType == RecoveryExponential {
@@ -260,6 +263,7 @@ func (b *Breaker) RecordSuccess() {
 	b.state.Store(int32(StateClosed))
 	b.consecutive.Store(0)
 	b.coolingCycle = 0
+	b.halfOpenProbes.Store(0)
 	b.lastFailureAt = time.Time{}
 
 	if prev != StateClosed {
@@ -277,6 +281,7 @@ func (b *Breaker) Reset() {
 	b.consecutive.Store(0)
 	b.failCount.Store(0)
 	b.coolingCycle = 0
+	b.halfOpenProbes.Store(0)
 	b.lastFailureAt = time.Time{}
 	b.lastErrorKind = ""
 	slog.Info("circuit reset", "key", b.key)

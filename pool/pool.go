@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"sync"
@@ -24,6 +25,9 @@ const (
 	healthCheckInterval    = 30 * time.Second
 	healthCheckTimeout     = 5 * time.Second
 	degradedThreshold      = 3
+	poolIdleTTL           = 5 * time.Minute
+	poolMaxPools          = 1024
+	poolEvictInterval     = 60 * time.Second
 )
 
 // PoolState represents the health state of a connection pool.
@@ -72,6 +76,7 @@ type Pool struct {
 
 	state       atomic.Int32
 	failCount   atomic.Int32
+	lastUsed    atomic.Int64
 	mu          sync.Mutex
 	stopCh      chan struct{}
 }
@@ -105,6 +110,18 @@ func (p *Pool) Client() *http.Client { return p.client }
 
 // State returns the current pool health state.
 func (p *Pool) State() PoolState { return PoolState(p.state.Load()) }
+
+func (p *Pool) touch() {
+	p.lastUsed.Store(time.Now().UnixMilli())
+}
+
+func (p *Pool) LastUsed() time.Time {
+	ms := p.lastUsed.Load()
+	if ms == 0 {
+		return time.Time{}
+	}
+	return time.UnixMilli(ms)
+}
 
 // StartHealthCheck begins periodic health probing.
 func (p *Pool) StartHealthCheck() {
@@ -202,13 +219,18 @@ func (p *Pool) probe() {
 
 // PoolManager manages all connection pools keyed by (identity, provider, credential).
 type PoolManager struct {
-	mu    sync.RWMutex
-	pools map[PoolKey]*Pool
+	mu     sync.RWMutex
+	pools  map[PoolKey]*Pool
+	stopCh chan struct{}
 }
 
-// NewPoolManager creates a new pool manager.
 func NewPoolManager() *PoolManager {
-	return &PoolManager{pools: make(map[PoolKey]*Pool)}
+	pm := &PoolManager{
+		pools:  make(map[PoolKey]*Pool),
+		stopCh: make(chan struct{}),
+	}
+	go pm.evictLoop()
+	return pm
 }
 
 // GetOrCreate returns the pool for the given key, creating it if needed.
@@ -217,20 +239,27 @@ func (pm *PoolManager) GetOrCreate(key PoolKey, probeURL string) *Pool {
 	p, ok := pm.pools[key]
 	pm.mu.RUnlock()
 	if ok {
+		p.touch()
 		return p
 	}
 
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	// Double-check after acquiring write lock
 	if p, ok = pm.pools[key]; ok {
+		p.touch()
 		return p
 	}
+
+	if len(pm.pools) >= poolMaxPools {
+		pm.evictOldestLocked()
+	}
+
 	p = NewPool(key, probeURL)
+	p.touch()
 	p.StartHealthCheck()
 	pm.pools[key] = p
-	slog.Info("pool created", "key", key.String(), "probe", probeURL)
+	slog.Info("pool created", "key", key.String(), "probe", probeURL, "total", len(pm.pools))
 	return p
 }
 
@@ -239,6 +268,59 @@ func (pm *PoolManager) Get(key PoolKey) *Pool {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 	return pm.pools[key]
+}
+
+func (pm *PoolManager) evictOldestLocked() {
+	var oldestKey PoolKey
+	var oldestTime int64 = math.MaxInt64
+	for k, p := range pm.pools {
+		lu := p.lastUsed.Load()
+		if lu < oldestTime {
+			oldestTime = lu
+			oldestKey = k
+		}
+	}
+	if p, ok := pm.pools[oldestKey]; ok {
+		p.Close()
+		delete(pm.pools, oldestKey)
+		slog.Info("pool evicted (max reached)", "key", oldestKey.String())
+	}
+}
+
+func (pm *PoolManager) evictLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("pool evictLoop panic", "recover", r)
+		}
+	}()
+	ticker := time.NewTicker(poolEvictInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			pm.evictIdle()
+		case <-pm.stopCh:
+			return
+		}
+	}
+}
+
+func (pm *PoolManager) evictIdle() {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	now := time.Now()
+	for key, p := range pm.pools {
+		lu := p.LastUsed()
+		if !lu.IsZero() && now.Sub(lu) > poolIdleTTL {
+			p.Close()
+			delete(pm.pools, key)
+			slog.Info("pool evicted (idle)", "key", key.String(), "idle_for", now.Sub(lu).Round(time.Second))
+		}
+	}
+}
+
+func (pm *PoolManager) Stop() {
+	close(pm.stopCh)
 }
 
 // CloseAll stops and closes all pools.
