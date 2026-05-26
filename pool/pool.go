@@ -74,11 +74,12 @@ type Pool struct {
 	client    *http.Client
 	probeURL  string
 
-	state       atomic.Int32
-	failCount   atomic.Int32
-	lastUsed    atomic.Int64
-	mu          sync.Mutex
-	stopCh      chan struct{}
+	state         atomic.Int32
+	failCount     atomic.Int32
+	successCount  atomic.Int32
+	lastUsed      atomic.Int64
+	mu            sync.Mutex
+	stopCh        chan struct{}
 }
 
 // NewPool creates a new connection pool.
@@ -143,16 +144,20 @@ func (p *Pool) StopHealthCheck() {
 // RecordFailure increments the failure counter and may mark the pool degraded.
 func (p *Pool) RecordFailure() {
 	count := p.failCount.Add(1)
+	p.successCount.Store(0)
 	if count >= degradedThreshold {
 		p.state.Store(int32(PoolDegraded))
-		slog.Warn("pool degraded", "key", p.key.String(), "failures", count)
 	}
 }
 
 // RecordSuccess resets the failure counter and marks the pool active.
 func (p *Pool) RecordSuccess() {
 	p.failCount.Store(0)
-	p.state.Store(int32(PoolActive))
+	n := p.successCount.Add(1)
+	if n >= 2 && p.State() == PoolDegraded {
+		p.state.Store(int32(PoolActive))
+		p.successCount.Store(0)
+	}
 }
 
 // Close shuts down the pool's idle connections.

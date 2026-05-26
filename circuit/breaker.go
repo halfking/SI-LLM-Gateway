@@ -197,7 +197,7 @@ func (b *Breaker) RecordFailure(kind ErrorKind) {
 
 	policy, ok := defaultPolicies[kind]
 	if !ok {
-		policy = defaultPolicies[KindTransient]
+		policy = b.coolingPolicy
 	}
 
 	switch policy.RecoveryType {

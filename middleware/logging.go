@@ -17,8 +17,8 @@ func (rw *responseWriter) WriteHeader(code int) {
 	if !rw.written {
 		rw.statusCode = code
 		rw.written = true
+		rw.ResponseWriter.WriteHeader(code)
 	}
-	rw.ResponseWriter.WriteHeader(code)
 }
 
 func (rw *responseWriter) Write(b []byte) (int, error) {

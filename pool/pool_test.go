@@ -36,8 +36,9 @@ func TestPoolFailureDegradation(t *testing.T) {
 	}
 
 	p.RecordSuccess()
+	p.RecordSuccess()
 	if p.State() != PoolActive {
-		t.Fatal("pool should be active after success")
+		t.Fatal("pool should be active after 2 consecutive successes")
 	}
 }
 

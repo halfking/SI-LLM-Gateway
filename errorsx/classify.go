@@ -17,12 +17,13 @@ const (
 	KindAuth         ErrorKind = "auth"
 	KindQuota        ErrorKind = "quota"
 	KindUpstreamDown ErrorKind = "upstream_down"
+	KindCanceled     ErrorKind = "canceled"
 )
 
 func ClassifyError(err error, resp *http.Response) ErrorKind {
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			return ""
+			return KindCanceled
 		}
 		msg := err.Error()
 		if strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline") {

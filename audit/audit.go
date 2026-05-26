@@ -191,7 +191,14 @@ func NewMultiSink(sinks ...Sink) *MultiSink {
 
 func (m *MultiSink) Emit(ctx context.Context, event Event) {
 	for _, s := range m.sinks {
-		s.Emit(ctx, event)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("audit sink panic", "error", r)
+				}
+			}()
+			s.Emit(ctx, event)
+		}()
 	}
 }
 
@@ -213,7 +220,9 @@ func (j *JSONSink) Emit(_ context.Context, event Event) {
 	defer j.mu.Unlock()
 	j.lastN = append(j.lastN, event)
 	if len(j.lastN) > j.maxLen {
-		j.lastN = j.lastN[len(j.lastN)-j.maxLen:]
+		trimmed := make([]Event, j.maxLen)
+		copy(trimmed, j.lastN[len(j.lastN)-j.maxLen:])
+		j.lastN = trimmed
 	}
 }
 

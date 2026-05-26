@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type Resolution struct {
@@ -31,27 +33,29 @@ type Resolver struct {
 	ttl      time.Duration
 	endpoint string
 	client   *http.Client
+	sfGroup  singleflight.Group
+	stopCh   chan struct{}
 }
 
 func NewResolver(pythonEndpoint string, cacheTTL time.Duration) *Resolver {
 	if cacheTTL == 0 {
 		cacheTTL = 120 * time.Second
 	}
-	if pythonEndpoint == "" {
-		slog.Warn("resolve: no Python endpoint configured, resolution disabled")
-		return &Resolver{
-			cache: make(map[string]cacheEntry),
-			ttl:   cacheTTL,
-		}
-	}
-	return &Resolver{
+	r := &Resolver{
 		cache:    make(map[string]cacheEntry),
 		ttl:      cacheTTL,
-		endpoint: strings.TrimRight(pythonEndpoint, "/"),
-		client: &http.Client{
-			Timeout: 5 * time.Second,
-		},
+		stopCh:   make(chan struct{}),
 	}
+	if pythonEndpoint == "" {
+		slog.Warn("resolve: no Python endpoint configured, resolution disabled")
+		return r
+	}
+	r.endpoint = strings.TrimRight(pythonEndpoint, "/")
+	r.client = &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	go r.evictLoop()
+	return r
 }
 
 func cacheKey(model, profile string) string {
@@ -75,23 +79,29 @@ func (r *Resolver) Resolve(ctx context.Context, clientModel, clientProfile strin
 	}
 	r.mu.RUnlock()
 
-	resolved, err := r.fetch(ctx, clientModel, clientProfile)
+	v, err, _ := r.sfGroup.Do(key, func() (any, error) {
+		resolved, fetchErr := r.fetch(ctx, clientModel, clientProfile)
+		if fetchErr != nil {
+			slog.Warn("resolve: fetch failed, using passthrough",
+				"model", clientModel,
+				"error", fetchErr,
+			)
+			return passthrough(clientModel), nil
+		}
+
+		r.mu.Lock()
+		r.cache[key] = cacheEntry{
+			resolved:   resolved,
+			expiration: time.Now().Add(r.ttl),
+		}
+		r.mu.Unlock()
+
+		return resolved, nil
+	})
 	if err != nil {
-		slog.Warn("resolve: fetch failed, using passthrough",
-			"model", clientModel,
-			"error", err,
-		)
 		return passthrough(clientModel)
 	}
-
-	r.mu.Lock()
-	r.cache[key] = cacheEntry{
-		resolved:   resolved,
-		expiration: time.Now().Add(r.ttl),
-	}
-	r.mu.Unlock()
-
-	return resolved
+	return v.(*Resolution)
 }
 
 func (r *Resolver) fetch(ctx context.Context, clientModel, clientProfile string) (*Resolution, error) {
@@ -149,4 +159,21 @@ func passthrough(model string) *Resolution {
 		RawModels:      []string{lowered},
 		ResolutionPath: "direct",
 	}
+}
+
+func (r *Resolver) evictLoop() {
+	ticker := time.NewTicker(r.ttl)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			r.EvictExpired()
+		case <-r.stopCh:
+			return
+		}
+	}
+}
+
+func (r *Resolver) Stop() {
+	close(r.stopCh)
 }

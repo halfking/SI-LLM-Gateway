@@ -9,8 +9,8 @@ import (
 
 func TestClassifyError_ContextCanceled(t *testing.T) {
 	kind := ClassifyError(context.Canceled, nil)
-	if kind != "" {
-		t.Errorf("expected empty kind for context.Canceled, got %q", kind)
+	if kind != KindCanceled {
+		t.Errorf("expected KindCanceled for context.Canceled, got %q", kind)
 	}
 }
 

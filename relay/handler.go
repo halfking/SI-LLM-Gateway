@@ -333,7 +333,11 @@ func ChatCompletionsPhase3(
 		httpClient = http.DefaultClient
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+	timeout := 120 * time.Second
+	if isStream {
+		timeout = 600 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	upstreamReq = upstreamReq.WithContext(ctx)
 
@@ -364,7 +368,9 @@ func ChatCompletionsPhase3(
 		})
 		released = true
 		release()
-		if errKind == "" {
+		if errKind == errorsx.KindCanceled {
+			// Client disconnect — don't affect circuit breaker state
+		} else if errKind == "" {
 			cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
 		} else {
 			cm.RecordFailure(svc.ProviderID, svc.CredentialID, errKind)
@@ -415,7 +421,7 @@ func ChatCompletionsPhase3(
 		auditBuilder.Success(true)
 	} else {
 		defer resp.Body.Close()
-		respBody, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize+1))
 		if err != nil {
 			slog.Error("failed to read upstream response", "error", err)
 			writeJSON(w, http.StatusBadGateway, map[string]any{
@@ -429,6 +435,10 @@ func ChatCompletionsPhase3(
 			released = true
 			cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
 			return
+		}
+		if len(respBody) > maxBodySize {
+			slog.Warn("upstream response truncated", "size", len(respBody))
+			respBody = respBody[:maxBodySize]
 		}
 
 	// Replace model in non-streaming response
@@ -456,19 +466,42 @@ func ChatCompletionsPhase3(
 
 // replaceModelInRequestBody replaces the "model" field in a JSON body.
 func replaceModelInRequestBody(body []byte, newModel string) []byte {
-	var obj map[string]json.RawMessage
-	if err := json.Unmarshal(body, &obj); err != nil {
+	quotedOld := bytes.Contains(body, []byte(`"model"`))
+	if !quotedOld {
 		return body
 	}
-	if _, ok := obj["model"]; ok {
-		obj["model"], _ = json.Marshal(newModel)
-		newBody, err := json.Marshal(obj)
-		if err != nil {
-			return body
-		}
-		return newBody
+	pattern := []byte(`"model"`)
+	idx := bytes.Index(body, pattern)
+	if idx < 0 {
+		return body
 	}
-	return body
+	after := body[idx+len(pattern):]
+	colonIdx := bytes.IndexByte(after, ':')
+	if colonIdx < 0 {
+		return body
+	}
+	rest := after[colonIdx+1:]
+	rest = bytes.TrimLeft(rest, " \t\n\r")
+	if len(rest) == 0 || rest[0] != '"' {
+		return body
+	}
+	endIdx := bytes.IndexByte(rest[1:], '"')
+	if endIdx < 0 {
+		return body
+	}
+	oldValue := rest[1 : endIdx+1]
+	if string(oldValue) == newModel {
+		return body
+	}
+	var buf bytes.Buffer
+	prefix := body[:idx+len(pattern)+colonIdx+1]
+	suffix := rest[endIdx+2:]
+	buf.Write(prefix)
+	buf.WriteString(" \"")
+	buf.WriteString(newModel)
+	buf.WriteByte('"')
+	buf.Write(suffix)
+	return buf.Bytes()
 }
 
 // replaceModelInResponseBody replaces whatever model is in the response with clientModel.

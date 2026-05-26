@@ -69,14 +69,14 @@ func (h *ModelsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for key, vals := range r.Header {
-		for _, val := range vals {
-			switch key {
-			case "Authorization", "X-Client-Profile", "X-Request-Id":
-				req.Header.Add(key, val)
+		for key, vals := range r.Header {
+			for _, val := range vals {
+				switch key {
+				case "X-Client-Profile", "X-Request-Id":
+					req.Header.Add(key, val)
+				}
 			}
 		}
-	}
 
 	resp, err := h.client.Do(req)
 	if err != nil {

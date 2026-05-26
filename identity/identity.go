@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 )
+
+var identitySalt = os.Getenv("LLM_GATEWAY_IDENTITY_SALT")
 
 // Header names accepted as fingerprint material.
 const (
@@ -153,11 +156,13 @@ func ExtractFingerprint(r *http.Request, clientProfile string) ClientFingerprint
 	}
 }
 
-func firstNonEmpty(s string) string {
-	if s == "" {
-		return ""
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
 	}
-	return s
+	return ""
 }
 
 // BuildIdentity builds a stable ClientIdentity from tenant/key anchors +
@@ -176,7 +181,7 @@ func BuildIdentity(
 	}
 
 	seed := fp.PrimarySeed()
-	identityKey := fmt.Sprintf("%s:%s:%s", tenantID, appOrKey, seed)
+	identityKey := fmt.Sprintf("%s:%s:%s:%s", tenantID, appOrKey, seed, identitySalt)
 	identityHash := sha256Hex(identityKey)
 
 	vip := deriveVirtualIP(identityHash)
