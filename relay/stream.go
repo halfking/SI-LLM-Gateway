@@ -8,14 +8,27 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
 
-const (
-	streamChunkTimeout = 30 * time.Second
-	streamBufSize      = 64 * 1024
+var (
+	streamChunkTimeout = 300 * time.Second
 )
+
+const (
+	streamBufSize = 64 * 1024
+)
+
+func init() {
+	if v := os.Getenv("LLM_GATEWAY_STREAM_CHUNK_TIMEOUT"); v != "" {
+		if s, err := strconv.Atoi(v); err == nil && s > 0 {
+			streamChunkTimeout = time.Duration(s) * time.Second
+		}
+	}
+}
 
 // StreamChat forwards a streaming chat completion from the upstream to the client.
 // It reads SSE chunks, discovers the upstream model name from the first chunk,

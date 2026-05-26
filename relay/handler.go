@@ -24,6 +24,8 @@ import (
 
 const maxBodySize = 32 << 20
 
+func MaxBodySize() int { return maxBodySize }
+
 // ServiceID maps an API key to a (providerID, credentialID) pair.
 // In production this will come from the Python control plane; for now
 // it's configured via environment variables.
@@ -184,7 +186,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// ── Replace model in request body if transformed ───────────────────
 	if explicitOutbound != "" && explicitOutbound != clientModel {
-		bodyBytes = replaceModelInRequestBody(bodyBytes, explicitOutbound)
+		bodyBytes = ReplaceModelInRequestBody(bodyBytes, explicitOutbound)
 	}
 
 	// ── Audit event builder ────────────────────────────────────────────
@@ -333,9 +335,9 @@ func ChatCompletionsPhase3(
 		httpClient = http.DefaultClient
 	}
 
-	timeout := 120 * time.Second
+	timeout := UpstreamTimeout()
 	if isStream {
-		timeout = 600 * time.Second
+		timeout = StreamTimeout()
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
@@ -443,7 +445,7 @@ func ChatCompletionsPhase3(
 
 	// Replace model in non-streaming response
 		if clientModel != "" {
-			respBody = replaceModelInResponseBody(respBody, clientModel)
+			respBody = ReplaceModelInResponseBody(respBody, clientModel)
 		}
 
 		if norm != nil {
@@ -464,8 +466,8 @@ func ChatCompletionsPhase3(
 	}
 }
 
-// replaceModelInRequestBody replaces the "model" field in a JSON body.
-func replaceModelInRequestBody(body []byte, newModel string) []byte {
+// ReplaceModelInRequestBody replaces the "model" field in a JSON body.
+func ReplaceModelInRequestBody(body []byte, newModel string) []byte {
 	quotedOld := bytes.Contains(body, []byte(`"model"`))
 	if !quotedOld {
 		return body
@@ -504,8 +506,8 @@ func replaceModelInRequestBody(body []byte, newModel string) []byte {
 	return buf.Bytes()
 }
 
-// replaceModelInResponseBody replaces whatever model is in the response with clientModel.
-func replaceModelInResponseBody(body []byte, clientModel string) []byte {
+// ReplaceModelInResponseBody replaces whatever model is in the response with clientModel.
+func ReplaceModelInResponseBody(body []byte, clientModel string) []byte {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(body, &obj); err != nil {
 		return body
@@ -591,3 +593,15 @@ func copySafeHeaders(src http.Header) http.Header {
 	}
 	return dst
 }
+
+func envDuration(key string, def time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if s, err := strconv.Atoi(v); err == nil && s > 0 {
+			return time.Duration(s) * time.Second
+		}
+	}
+	return def
+}
+
+func StreamTimeout() time.Duration     { return envDuration("LLM_GATEWAY_STREAM_TIMEOUT", 900*time.Second) }
+func UpstreamTimeout() time.Duration   { return envDuration("LLM_GATEWAY_UPSTREAM_TIMEOUT", 120*time.Second) }

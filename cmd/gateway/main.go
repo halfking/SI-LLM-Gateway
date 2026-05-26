@@ -6,11 +6,17 @@
 //
 // Environment variables:
 //
-//	LLM_GATEWAY_LISTEN             TCP listen address (default ":8781")
-//	LLM_GATEWAY_API_KEY            Gateway API key for client auth (empty = disabled)
-//	LLM_GATEWAY_LOG_LEVEL          Log level: debug, info, warn, error (default "info")
-//	LLM_GATEWAY_DEFAULT_PROVIDER   Default provider ID (default "1")
-//	LLM_GATEWAY_DEFAULT_CREDENTIAL Default credential ID (default "1")
+//	LLM_GATEWAY_LISTEN                  TCP listen address (default ":8781")
+//	LLM_GATEWAY_API_KEY                 Gateway API key for client auth (empty = disabled)
+//	LLM_GATEWAY_LOG_LEVEL               Log level: debug, info, warn, error (default "info")
+//	LLM_GATEWAY_DEFAULT_PROVIDER        Default provider ID (default "1")
+//	LLM_GATEWAY_DEFAULT_CREDENTIAL      Default credential ID (default "1")
+//	LLM_GATEWAY_PYTHON_ENDPOINT         Python control plane base URL (e.g. http://127.0.0.1:8780)
+//	LLM_GATEWAY_ADMIN_API_KEY           Admin API key for Python control plane calls
+//	LLM_GATEWAY_UPSTREAM                Upstream URL override (default http://127.0.0.1:8780)
+//	LLM_GATEWAY_STREAM_CHUNK_TIMEOUT    Per-SSE-chunk idle timeout in seconds (default 300)
+//	LLM_GATEWAY_STREAM_TIMEOUT          Total streaming request timeout in seconds (default 900)
+//	LLM_GATEWAY_UPSTREAM_TIMEOUT        Non-streaming request timeout in seconds (default 120)
 package main
 
 import (
