@@ -186,6 +186,16 @@ func (e *Executor) tryCandidate(
 	if params.IsStream {
 		bodyBytes = injectStreamOptions(bodyBytes)
 	}
+	if params.Transform != nil {
+		bodyBytes = transform.ApplyRequestWhitelist(
+			bodyBytes,
+			params.Transform.PassthroughFields,
+			params.Transform.StripRequestFields,
+		)
+	}
+	if !transform.IsToolUseCapable(cand.CatalogCode) && transform.NeedsToolCollapse(bodyBytes) {
+		bodyBytes = transform.CollapseToolHistory(bodyBytes)
+	}
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {

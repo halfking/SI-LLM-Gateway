@@ -34,12 +34,14 @@ type TransformContext struct {
 
 // TransformResult holds the resolved transform for a request.
 type TransformResult struct {
-	EgressPreference []string
-	OutboundModel    string
-	StripHeaders     []string
-	InjectHeaders    map[string]string
-	Passthrough      []string
-	MatchedRule      string
+	EgressPreference     []string
+	OutboundModel        string
+	StripHeaders         []string
+	InjectHeaders        map[string]string
+	Passthrough          []string
+	PassthroughFields    []string
+	StripRequestFields   []string
+	MatchedRule          string
 }
 
 // Matrix loads and evaluates request transform rules.
@@ -234,6 +236,20 @@ func (m *Matrix) Resolve(ctx *TransformContext) *TransformResult {
 			result.Passthrough = make([]string, len(ps))
 			for i, p := range ps {
 				result.Passthrough[i] = fmt.Sprint(p)
+			}
+		}
+
+		if pf, ok := rule["passthrough_fields"].([]any); ok {
+			result.PassthroughFields = make([]string, len(pf))
+			for i, p := range pf {
+				result.PassthroughFields[i] = fmt.Sprint(p)
+			}
+		}
+
+		if sf, ok := rule["strip_request_fields"].([]any); ok {
+			result.StripRequestFields = make([]string, len(sf))
+			for i, p := range sf {
+				result.StripRequestFields[i] = fmt.Sprint(p)
 			}
 		}
 

@@ -1,0 +1,157 @@
+package transform
+
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestApplyRequestWhitelist_NoOp(t *testing.T) {
+	body := []byte(`{"model":"gpt-4","messages":[],"stream":true}`)
+	result := ApplyRequestWhitelist(body, nil, nil)
+	if string(result) != string(body) {
+		t.Errorf("empty lists should be no-op")
+	}
+}
+
+func TestApplyRequestWhitelist_Passthrough(t *testing.T) {
+	body := []byte(`{"model":"gpt-4","messages":[],"stream":true,"extra_field":"remove","max_tokens":100}`)
+	result := ApplyRequestWhitelist(body, []string{"model", "messages", "stream"}, nil)
+
+	var obj map[string]any
+	json.Unmarshal(result, &obj)
+
+	if _, ok := obj["extra_field"]; ok {
+		t.Error("extra_field should be removed")
+	}
+	if _, ok := obj["max_tokens"]; !ok {
+		t.Error("max_tokens should be kept (always_keep)")
+	}
+	if _, ok := obj["model"]; !ok {
+		t.Error("model should be kept")
+	}
+}
+
+func TestApplyRequestWhitelist_StripOnly(t *testing.T) {
+	body := []byte(`{"model":"gpt-4","parallel_tool_calls":true,"reasoning_effort":"high"}`)
+	result := ApplyRequestWhitelist(body, nil, []string{"parallel_tool_calls", "reasoning_effort"})
+
+	var obj map[string]any
+	json.Unmarshal(result, &obj)
+
+	if _, ok := obj["parallel_tool_calls"]; ok {
+		t.Error("parallel_tool_calls should be stripped")
+	}
+	if _, ok := obj["reasoning_effort"]; ok {
+		t.Error("reasoning_effort should be stripped")
+	}
+	if _, ok := obj["model"]; !ok {
+		t.Error("model should remain")
+	}
+}
+
+func TestApplyRequestWhitelist_BothLists(t *testing.T) {
+	body := []byte(`{"model":"gpt-4","messages":[],"stream":true,"extra":"x","remove_me":"y","max_tokens":50}`)
+	result := ApplyRequestWhitelist(body, []string{"model", "messages", "stream"}, []string{"extra"})
+
+	var obj map[string]any
+	json.Unmarshal(result, &obj)
+
+	if _, ok := obj["extra"]; ok {
+		t.Error("extra should be stripped")
+	}
+	if _, ok := obj["remove_me"]; ok {
+		t.Error("remove_me not in passthrough, should be removed")
+	}
+	if _, ok := obj["max_tokens"]; !ok {
+		t.Error("max_tokens in always_keep should survive")
+	}
+}
+
+func TestNeedsToolCollapse_NoTool(t *testing.T) {
+	body := []byte(`{"messages":[{"role":"user","content":"hello"},{"role":"assistant","content":"hi"}]}`)
+	if NeedsToolCollapse(body) {
+		t.Error("no tool messages should not need collapse")
+	}
+}
+
+func TestNeedsToolCollapse_ToolRole(t *testing.T) {
+	body := []byte(`{"messages":[{"role":"user","content":"go"},{"role":"tool","content":"result","tool_call_id":"123"}]}`)
+	if !NeedsToolCollapse(body) {
+		t.Error("tool role message should need collapse")
+	}
+}
+
+func TestNeedsToolCollapse_ToolCalls(t *testing.T) {
+	body := []byte(`{"messages":[{"role":"assistant","tool_calls":[{"id":"1","function":{"name":"test"}}]}]}`)
+	if !NeedsToolCollapse(body) {
+		t.Error("assistant with tool_calls should need collapse")
+	}
+}
+
+func TestCollapseToolHistory_Basic(t *testing.T) {
+	body := []byte(`{
+		"messages": [
+			{"role":"system","content":"You are helpful."},
+			{"role":"user","content":"What's the weather?"},
+			{"role":"assistant","tool_calls":[{"id":"tc1","function":{"name":"get_weather","arguments":"{\"city\":\"NYC\"}"}}]},
+			{"role":"tool","content":"72F sunny","tool_call_id":"tc1"},
+			{"role":"assistant","content":"It's 72F in NYC."}
+		],
+		"tools":[{"type":"function","function":{"name":"get_weather"}}],
+		"tool_choice":"auto"
+	}`)
+
+	result := CollapseToolHistory(body)
+
+	var obj map[string]any
+	json.Unmarshal(result, &obj)
+
+	if _, ok := obj["tools"]; ok {
+		t.Error("tools should be removed after collapse")
+	}
+	if _, ok := obj["tool_choice"]; ok {
+		t.Error("tool_choice should be removed after collapse")
+	}
+
+	msgs, _ := obj["messages"].([]any)
+	if len(msgs) < 2 {
+		t.Fatalf("expected at least 2 messages, got %d", len(msgs))
+	}
+
+	firstMsg, _ := msgs[0].(map[string]any)
+	if firstMsg["role"] != "system" {
+		t.Errorf("first message should be system, got %v", firstMsg["role"])
+	}
+}
+
+func TestCollapseToolHistory_AttemptCompletion(t *testing.T) {
+	body := []byte(`{
+		"messages": [
+			{"role":"user","content":"do it"},
+			{"role":"assistant","tool_calls":[{"id":"1","function":{"name":"attempt_completion","arguments":"done!"}}]}
+		]
+	}`)
+
+	result := CollapseToolHistory(body)
+	var obj map[string]any
+	json.Unmarshal(result, &obj)
+
+	msgs, _ := obj["messages"].([]any)
+	lastMsg, _ := msgs[len(msgs)-1].(map[string]any)
+	content, _ := lastMsg["content"].(string)
+	if content != "[完成] done!" {
+		t.Errorf("expected attempt_completion collapse, got: %s", content)
+	}
+}
+
+func TestIsToolUseCapable(t *testing.T) {
+	if !IsToolUseCapable("openai") {
+		t.Error("openai should be tool-use capable")
+	}
+	if !IsToolUseCapable("anthropic") {
+		t.Error("anthropic should be tool-use capable")
+	}
+	if IsToolUseCapable("volcengine") {
+		t.Error("volcengine should NOT be tool-use capable")
+	}
+}
