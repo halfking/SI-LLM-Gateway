@@ -29,11 +29,13 @@ import (
 	"time"
 
 	"github.com/kaixuan/llm-gateway-go/audit"
+	"github.com/kaixuan/llm-gateway-go/auth"
 	"github.com/kaixuan/llm-gateway-go/circuit"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/middleware"
 	"github.com/kaixuan/llm-gateway-go/pool"
 	"github.com/kaixuan/llm-gateway-go/provider"
+	"github.com/kaixuan/llm-gateway-go/ratelimit"
 	"github.com/kaixuan/llm-gateway-go/relay"
 	"github.com/kaixuan/llm-gateway-go/resolve"
 	"github.com/kaixuan/llm-gateway-go/routing"
@@ -101,6 +103,16 @@ func main() {
 		slog.Info("routing executor enabled", "endpoint", pythonEndpoint)
 	} else {
 		slog.Warn("routing executor disabled (no LLM_GATEWAY_ADMIN_API_KEY or LLM_GATEWAY_PYTHON_ENDPOINT)")
+	}
+
+	// ── Auth + Rate Limiting ──────────────────────────────────────────────
+	keyVerifier := auth.NewKeyVerifier(pythonEndpoint, adminAPIKey)
+	if keyVerifier.Enabled() {
+		slidingRL := ratelimit.NewSlidingWindowLimiter()
+		chatHandler.SetAuth(keyVerifier, slidingRL)
+		slog.Info("API key authentication + RPM rate limiting enabled")
+	} else {
+		slog.Warn("API key authentication disabled (no admin key or Python endpoint)")
 	}
 
 	// ── Listen address ────────────────────────────────────────────────────

@@ -10,15 +10,18 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kaixuan/llm-gateway-go/audit"
+	"github.com/kaixuan/llm-gateway-go/auth"
 	"github.com/kaixuan/llm-gateway-go/circuit"
 	"github.com/kaixuan/llm-gateway-go/errorsx"
 	"github.com/kaixuan/llm-gateway-go/identity"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/pool"
 	"github.com/kaixuan/llm-gateway-go/provider"
+	"github.com/kaixuan/llm-gateway-go/ratelimit"
 	"github.com/kaixuan/llm-gateway-go/resolve"
 	"github.com/kaixuan/llm-gateway-go/routing"
 	"github.com/kaixuan/llm-gateway-go/transform"
@@ -77,6 +80,8 @@ type ChatHandler struct {
 	executor   *routing.Executor
 	provider   *provider.Client
 	sticky     *routing.StickyCache
+	keyVerifier *auth.KeyVerifier
+	rateLimiter *ratelimit.SlidingWindowLimiter
 }
 
 func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.Matrix, pools *pool.PoolManager, resolver *resolve.Resolver, auditor audit.Sink) *ChatHandler {
@@ -90,6 +95,11 @@ func (h *ChatHandler) SetExecutor(exec *routing.Executor, prov *provider.Client,
 	h.executor = exec
 	h.provider = prov
 	h.sticky = sticky
+}
+
+func (h *ChatHandler) SetAuth(kv *auth.KeyVerifier, rl *ratelimit.SlidingWindowLimiter) {
+	h.keyVerifier = kv
+	h.rateLimiter = rl
 }
 
 // ServeHTTP handles /v1/chat/completions and /v1/completions.
@@ -107,6 +117,45 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) {
+	// ── API key authentication ──────────────────────────────────────────
+	var keyInfo *auth.KeyInfo
+	if h.keyVerifier != nil && h.keyVerifier.Enabled() {
+		rawKey := extractBearerToken(r)
+		if rawKey == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{
+				"error": map[string]string{"message": "Missing API key", "type": "authentication_error", "code": "missing_key"},
+			})
+			return
+		}
+		ki, verifyErr := h.keyVerifier.Verify(r.Context(), rawKey)
+		if verifyErr != nil {
+			if _, ok := verifyErr.(*auth.InvalidKeyError); ok {
+				w.Header().Set("WWW-Authenticate", "Bearer")
+				writeJSON(w, http.StatusUnauthorized, map[string]any{
+					"error": map[string]string{"message": "Invalid or expired API key", "type": "authentication_error", "code": "invalid_key"},
+				})
+				return
+			}
+			slog.Warn("key verification RPC failed, proceeding without auth", "error", verifyErr)
+		} else {
+			keyInfo = ki
+		}
+	}
+
+	// ── RPM rate limit ──────────────────────────────────────────────────
+	if keyInfo != nil && h.rateLimiter != nil && keyInfo.RateLimitRPM != nil && *keyInfo.RateLimitRPM > 0 {
+		if !h.rateLimiter.CheckRPM(keyInfo.ID, *keyInfo.RateLimitRPM) {
+			_, remaining := h.rateLimiter.RPMStatus(keyInfo.ID, *keyInfo.RateLimitRPM)
+			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", *keyInfo.RateLimitRPM))
+			w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
+			w.Header().Set("Retry-After", "60")
+			writeJSON(w, http.StatusTooManyRequests, map[string]any{
+				"error": map[string]string{"message": "Rate limit exceeded", "type": "rate_limit_error", "code": "rate_limit_exceeded"},
+			})
+			return
+		}
+	}
+
 	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, int64(maxBodySize)+1))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -763,4 +812,18 @@ func envDuration(key string, def time.Duration) time.Duration {
 		}
 	}
 	return def
+}
+
+func extractBearerToken(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		return ""
+	}
+	if strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimPrefix(auth, "Bearer ")
+	}
+	if strings.HasPrefix(auth, "bearer ") {
+		return strings.TrimPrefix(auth, "bearer ")
+	}
+	return ""
 }
