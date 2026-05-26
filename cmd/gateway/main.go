@@ -68,6 +68,7 @@ func main() {
 
 	chatHandler := relay.NewChatHandler(cm, lim, matrix, pools, resolver, auditSink)
 	healthHandler := relay.NewHealthHandler(cm, lim)
+	modelsHandler := relay.NewModelsHandler(pythonEndpoint)
 
 	// ── Listen address ────────────────────────────────────────────────────
 	listen := os.Getenv("LLM_GATEWAY_LISTEN")
@@ -84,6 +85,9 @@ func main() {
 	// Chat completions
 	mux.Handle("/v1/chat/completions", chatHandler)
 	mux.Handle("/v1/completions", chatHandler)
+
+	// Models listing
+	mux.Handle("/v1/models", modelsHandler)
 
 	// Legacy health endpoint
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +109,7 @@ func main() {
 		Addr:         listen,
 		Handler:      handler,
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 300 * time.Second,
+		WriteTimeout: 0,
 		IdleTimeout:  60 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}

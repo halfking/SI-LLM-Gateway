@@ -16,6 +16,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/kaixuan/llm-gateway-go/errorsx"
 )
 
 // ---------------------------------------------------------------------------
@@ -48,20 +50,19 @@ func (s State) String() string {
 }
 
 // ---------------------------------------------------------------------------
-// ErrorKind — mirrors upstream.ErrorKind without importing it
+// ErrorKind — shared error classification from errorsx package
 // ---------------------------------------------------------------------------
 
-// ErrorKind classifies upstream errors for circuit breaker decisions.
-type ErrorKind string
+type ErrorKind = errorsx.ErrorKind
 
-const (
-	KindTransient    ErrorKind = "transient"
-	KindTimeout      ErrorKind = "timeout"
-	KindNetwork      ErrorKind = "network"
-	KindRateLimit    ErrorKind = "rate_limit"
-	KindAuth         ErrorKind = "auth"
-	KindQuota        ErrorKind = "quota"
-	KindUpstreamDown ErrorKind = "upstream_down"
+var (
+	KindTransient    = errorsx.KindTransient
+	KindTimeout      = errorsx.KindTimeout
+	KindNetwork      = errorsx.KindNetwork
+	KindRateLimit    = errorsx.KindRateLimit
+	KindAuth         = errorsx.KindAuth
+	KindQuota        = errorsx.KindQuota
+	KindUpstreamDown = errorsx.KindUpstreamDown
 )
 
 // ---------------------------------------------------------------------------

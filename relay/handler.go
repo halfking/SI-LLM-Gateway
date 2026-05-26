@@ -4,22 +4,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/kaixuan/llm-gateway-go/audit"
 	"github.com/kaixuan/llm-gateway-go/circuit"
+	"github.com/kaixuan/llm-gateway-go/errorsx"
 	"github.com/kaixuan/llm-gateway-go/identity"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/pool"
 	"github.com/kaixuan/llm-gateway-go/resolve"
 	"github.com/kaixuan/llm-gateway-go/transform"
+	upstreampkg "github.com/kaixuan/llm-gateway-go/upstream"
 )
 
 // ServiceID maps an API key to a (providerID, credentialID) pair.
@@ -59,19 +59,21 @@ type chatResponseBody struct {
 
 // ChatHandler handles chat completions with circuit breaker and concurrency control.
 type ChatHandler struct {
-	circuit  *circuit.Manager
-	limiter  *limiter.Limiter
-	matrix   *transform.Matrix
-	pools    *pool.PoolManager
-	resolver *resolve.Resolver
-	auditor  audit.Sink
+	circuit    *circuit.Manager
+	limiter    *limiter.Limiter
+	matrix     *transform.Matrix
+	pools      *pool.PoolManager
+	resolver   *resolve.Resolver
+	auditor    audit.Sink
+	client     *upstreampkg.Client
+	normalizer *Normalizer
 }
 
 func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.Matrix, pools *pool.PoolManager, resolver *resolve.Resolver, auditor audit.Sink) *ChatHandler {
 	if auditor == nil {
 		auditor = &audit.LogSink{}
 	}
-	return &ChatHandler{circuit: cm, limiter: l, matrix: matrix, pools: pools, resolver: resolver, auditor: auditor}
+	return &ChatHandler{circuit: cm, limiter: l, matrix: matrix, pools: pools, resolver: resolver, auditor: auditor, client: upstreampkg.New(), normalizer: NewNormalizer()}
 }
 
 // ServeHTTP handles /v1/chat/completions and /v1/completions.
@@ -164,7 +166,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	explicitOutbound := ""
 	if txResult != nil && txResult.OutboundModel != "" {
 		explicitOutbound = transform.RenderOutboundModel(
-			txResult.OutboundModel, txResult.OutboundModel, clientModel, "",
+			txResult.OutboundModel, txResult.OutboundModel, clientModel, tCtx.CanonicalName,
 		)
 	}
 
@@ -210,25 +212,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Build upstream request ─────────────────────────────────────────
-	ChatCompletionsPhase3(w, r, bodyBytes, isStream, clientModel, explicitOutbound, clientID, txResult, svc, h.circuit, h.limiter, h.pools, release)
-}
-
-// identityHashFromRequest extracts a consistent identity hash from the request.
-// Uses the X-Device-Seed header, or falls back to a hash of X-Request-Id + remote addr.
-func identityHashFromRequest(r *http.Request) string {
-	if seed := r.Header.Get("X-Device-Seed"); seed != "" {
-		return seed
-	}
-	// Fallback: use request id first 16 chars
-	if rid := r.Header.Get("X-Request-Id"); len(rid) >= 16 {
-		return rid[:16]
-	}
-	// Last resort: remote address
-	addr := r.RemoteAddr
-	if idx := strings.LastIndex(addr, ":"); idx > 0 {
-		addr = addr[:idx]
-	}
-	return addr
+	ChatCompletionsPhase3(w, r, bodyBytes, isStream, clientModel, explicitOutbound, clientID, txResult, svc, h.circuit, h.limiter, h.pools, h.client, h.normalizer, release)
 }
 
 //-----------------------------------------------------------------------------
@@ -248,6 +232,8 @@ func ChatCompletionsPhase3(
 	cm *circuit.Manager,
 	lim *limiter.Limiter,
 	pools *pool.PoolManager,
+	upClient *upstreampkg.Client,
+	norm *Normalizer,
 	release limiter.ReleaseFunc,
 ) {
 	var released bool
@@ -325,8 +311,8 @@ func ChatCompletionsPhase3(
 			ProviderID:   svc.ProviderID,
 			CredentialID: svc.CredentialID,
 		}
-		p := pools.Get(poolKey)
-		if p != nil && p.State() == pool.PoolActive {
+		p := pools.GetOrCreate(poolKey, "")
+		if p.State() == pool.PoolActive {
 			httpClient = p.Client()
 		}
 	}
@@ -334,18 +320,31 @@ func ChatCompletionsPhase3(
 		httpClient = http.DefaultClient
 	}
 
-	// ── Send the request ───────────────────────────────────────────────
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 	upstreamReq = upstreamReq.WithContext(ctx)
 
-	resp, err := httpClient.Do(upstreamReq)
-	if err != nil {
-		slog.Error("upstream request failed", "error", err)
-		errKind := classifyError(err, nil)
+	var resp *http.Response
+	var uErr *upstreampkg.Error
+	if upClient != nil {
+		resp, uErr = upClient.Do(upstreamReq)
+	} else {
+		var doErr error
+		resp, doErr = httpClient.Do(upstreamReq)
+		if doErr != nil {
+			uErr = &upstreampkg.Error{Kind: errorsx.ClassifyError(doErr, nil), Message: doErr.Error(), Err: doErr}
+		}
+	}
+
+	if uErr != nil && (resp == nil || resp.StatusCode >= 500) {
+		slog.Error("upstream request failed", "error", uErr)
+		errKind := errorsx.ErrorKind("")
+		if uErr != nil {
+			errKind = uErr.Kind
+		}
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"error": map[string]string{
-				"message": "upstream request failed: " + err.Error(),
+				"message": "upstream request failed",
 				"type":    "upstream_error",
 				"code":    string(errKind),
 			},
@@ -367,7 +366,7 @@ func ChatCompletionsPhase3(
 		defer resp.Body.Close()
 		body := make([]byte, 4096)
 		n, _ := resp.Body.Read(body)
-		errKind := classifyError(nil, resp)
+		errKind := errorsx.ClassifyError(nil, resp)
 
 		for k, vs := range resp.Header {
 			for _, v := range vs {
@@ -396,8 +395,7 @@ func ChatCompletionsPhase3(
 
 	// ── Success — proxy the response ───────────────────────────────────
 	if isStream {
-		defer resp.Body.Close()
-		StreamChat(w, resp, clientModel, explicitOutbound)
+		StreamChat(w, resp, clientModel, explicitOutbound, norm)
 		released = true
 		release()
 		cm.RecordSuccess(svc.ProviderID, svc.CredentialID)
@@ -413,16 +411,20 @@ func ChatCompletionsPhase3(
 					"code":    "read_error",
 				},
 			})
-		release()
-		released = true
-		cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
-		return
-	}
+			release()
+			released = true
+			cm.RecordFailure(svc.ProviderID, svc.CredentialID, circuit.KindTransient)
+			return
+		}
 
 	// Replace model in non-streaming response
-	if clientModel != "" {
-		respBody = replaceModelInResponseBody(respBody, clientModel)
-	}
+		if clientModel != "" {
+			respBody = replaceModelInResponseBody(respBody, clientModel)
+		}
+
+		if norm != nil {
+			respBody = norm.NormalizeChunk(respBody, false)
+		}
 
 	for k, vs := range resp.Header {
 		for _, v := range vs {
@@ -472,168 +474,6 @@ func replaceModelInResponseBody(body []byte, clientModel string) []byte {
 
 // ChatCompletionsWithHooks proxies a chat completion request and calls the
 // done callback with success/failure after the request completes.
-// Deprecated: Use ChatCompletionsPhase3 instead.
-func ChatCompletionsWithHooks(
-	w http.ResponseWriter,
-	r *http.Request,
-	done func(success bool, errKind circuit.ErrorKind),
-) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			slog.Error("panic in chat handler", "panic", rec)
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"error": map[string]string{
-					"message": "internal server error",
-					"type":    "server_error",
-					"code":    "panic",
-				},
-			})
-			done(false, circuit.KindTransient)
-		}
-	}()
-
-	rid := r.Header.Get("X-Request-Id")
-	slog.Info("chat completions",
-		"request_id", rid,
-		"upstream", upstream.String(),
-	)
-
-	isStream := isStreamRequest(r)
-
-	upstreamReq, err := http.NewRequestWithContext(r.Context(), r.Method, upstream.String()+r.URL.Path, r.Body)
-	if err != nil {
-		slog.Error("failed to create upstream request", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{
-			"error": map[string]string{
-				"message": "failed to create upstream request",
-				"type":    "server_error",
-				"code":    "upstream_error",
-			},
-		})
-		done(false, circuit.KindTransient)
-		return
-	}
-
-	upstreamReq.Header = r.Header.Clone()
-	upstreamReq.Header.Set("X-Request-Id", rid)
-
-	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
-	defer cancel()
-	upstreamReq = upstreamReq.WithContext(ctx)
-
-	resp, err := http.DefaultClient.Do(upstreamReq)
-	if err != nil {
-		slog.Error("upstream request failed", "error", err)
-		errKind := classifyError(err, nil)
-		writeJSON(w, http.StatusBadGateway, map[string]any{
-			"error": map[string]string{
-				"message": "upstream request failed: " + err.Error(),
-				"type":    "upstream_error",
-				"code":    string(errKind),
-			},
-		})
-		done(errKind == "", errKind)
-		return
-	}
-
-	if resp.StatusCode >= 400 {
-		defer resp.Body.Close()
-		body := make([]byte, 4096)
-		n, _ := resp.Body.Read(body)
-		errKind := classifyError(nil, resp)
-
-		for k, vs := range resp.Header {
-			for _, v := range vs {
-				w.Header().Add(k, v)
-			}
-		}
-		w.WriteHeader(resp.StatusCode)
-		if n > 0 {
-			w.Write(body[:n])
-		}
-
-		if resp.StatusCode >= 400 && resp.StatusCode < 500 &&
-			resp.StatusCode != 429 && resp.StatusCode != 401 &&
-			resp.StatusCode != 403 && resp.StatusCode != 402 {
-			done(true, "")
-		} else {
-			done(false, errKind)
-		}
-		return
-	}
-
-	if isStream {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		w.WriteHeader(http.StatusOK)
-
-		StreamChatFromResponse(w, resp, "", "")
-		done(true, "")
-	} else {
-		defer resp.Body.Close()
-		for k, vs := range resp.Header {
-			for _, v := range vs {
-				w.Header().Add(k, v)
-			}
-		}
-		w.WriteHeader(resp.StatusCode)
-
-		body := make([]byte, 32*1024)
-		for {
-			n, err := resp.Body.Read(body)
-			if n > 0 {
-				w.Write(body[:n])
-			}
-			if err != nil {
-				break
-			}
-		}
-		done(true, "")
-	}
-}
-
-// isStreamRequest checks if the client requested streaming via Accept header.
-func isStreamRequest(r *http.Request) bool {
-	return r.Header.Get("Accept") == "text/event-stream"
-}
-
-// classifyError maps HTTP status / Go errors to circuit.ErrorKind.
-// Client errors (4xx) are mapped to a non-circuit-breaking kind.
-func classifyError(err error, resp *http.Response) circuit.ErrorKind {
-	if err != nil {
-		// Client context cancellation is NOT an upstream fault.
-		if errors.Is(err, context.Canceled) {
-			return ""
-		}
-		msg := err.Error()
-		if strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline") {
-			return circuit.KindTimeout
-		}
-		if strings.Contains(msg, "connection") || strings.Contains(msg, "refused") ||
-			strings.Contains(msg, "no such host") || strings.Contains(msg, "reset") {
-			return circuit.KindNetwork
-		}
-		return circuit.KindTransient
-	}
-	if resp == nil {
-		return circuit.KindUpstreamDown
-	}
-	switch {
-	case resp.StatusCode == 429:
-		return circuit.KindRateLimit
-	case resp.StatusCode == 401 || resp.StatusCode == 403:
-		return circuit.KindAuth
-	case resp.StatusCode == 402:
-		return circuit.KindQuota
-	case resp.StatusCode >= 500:
-		return circuit.KindUpstreamDown
-	default:
-		return circuit.KindTransient
-	}
-}
-
-// writeJSON writes a JSON response.
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -677,29 +517,6 @@ func (h *HealthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
-}
-
-// StreamChatFromResponse streams a chat response as SSE without model replacement.
-// Deprecated: Use StreamChat from stream.go for proper SSE parsing and model replacement.
-func StreamChatFromResponse(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		return
-	}
-
-	defer resp.Body.Close()
-	buf := make([]byte, 4096)
-	for {
-		n, err := resp.Body.Read(buf)
-		if n > 0 {
-			data := string(buf[:n])
-			w.Write([]byte(data))
-			flusher.Flush()
-		}
-		if err != nil {
-			break
-		}
-	}
 }
 
 var hopByHopHeaders = map[string]bool{

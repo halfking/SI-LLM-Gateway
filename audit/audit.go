@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -244,10 +245,7 @@ func (j *JSONSink) Count() int {
 
 func randomHex(n int) string {
 	b := make([]byte, n)
-	for i := range b {
-		b[i] = byte(time.Now().UnixNano() % 256)
-		time.Sleep(0)
-	}
+	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
 

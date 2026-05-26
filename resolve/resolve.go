@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -94,12 +95,13 @@ func (r *Resolver) Resolve(ctx context.Context, clientModel, clientProfile strin
 }
 
 func (r *Resolver) fetch(ctx context.Context, clientModel, clientProfile string) (*Resolution, error) {
-	url := fmt.Sprintf("%s/api/routing/resolve?model=%s", r.endpoint, clientModel)
+	params := url.Values{"model": {clientModel}}
 	if clientProfile != "" {
-		url += "&profile=" + clientProfile
+		params.Set("profile", clientProfile)
 	}
+	fetchURL := fmt.Sprintf("%s/api/routing/resolve?%s", r.endpoint, params.Encode())
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}

@@ -109,7 +109,15 @@ func (s *Semaphore) TryAcquireWithTimeout(timeout time.Duration) bool {
 
 // Release releases a token.
 func (s *Semaphore) Release() {
-	s.used.Add(-1)
+	for {
+		v := s.used.Load()
+		if v <= 0 {
+			return
+		}
+		if s.used.CompareAndSwap(v, v-1) {
+			return
+		}
+	}
 }
 
 // Shrink reduces capacity by the given factor (0 < factor < 1).
@@ -360,6 +368,11 @@ func (l *Limiter) Stats() map[string]any {
 }
 
 func (l *Limiter) recoveryLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("limiter recoveryLoop panic", "recover", r)
+		}
+	}()
 	ticker := time.NewTicker(shrinkRecoveryInterval)
 	defer ticker.Stop()
 
@@ -377,12 +390,10 @@ func (l *Limiter) recoveryStep() {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
-	now := time.Now()
 	for _, s := range l.pools {
 		s.RecoverStep(l.poolLimit)
 	}
 	for _, s := range l.creds {
 		s.RecoverStep(l.credentialLimit)
 	}
-	_ = now
 }

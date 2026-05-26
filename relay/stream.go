@@ -25,6 +25,7 @@ func StreamChat(
 	resp *http.Response,
 	clientModel string,
 	_ string,
+	norm *Normalizer,
 ) {
 	defer resp.Body.Close()
 
@@ -79,6 +80,11 @@ func StreamChat(
 			}
 			line = replaceModelInChunk(line, clientModel, discoveredUpstream)
 		}
+
+		if norm != nil {
+			line = string(norm.NormalizeChunk([]byte(line), true))
+		}
+
 		safeWriteSSE(w, line)
 		safeFlush(flusher)
 	}
@@ -90,7 +96,15 @@ func readLineWithTimeout(ctx context.Context, reader *bufio.Reader) (string, err
 		err  error
 	}
 	ch := make(chan result, 1)
+	ctx, cancel := context.WithTimeout(ctx, streamChunkTimeout)
+	defer cancel()
+
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				ch <- result{"", fmt.Errorf("read panic: %v", r)}
+			}
+		}()
 		line, err := reader.ReadString('\n')
 		ch <- result{line, err}
 	}()
@@ -99,9 +113,10 @@ func readLineWithTimeout(ctx context.Context, reader *bufio.Reader) (string, err
 	case r := <-ch:
 		return r.line, r.err
 	case <-ctx.Done():
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("stream read timeout")
+		}
 		return "", ctx.Err()
-	case <-time.After(streamChunkTimeout):
-		return "", fmt.Errorf("stream read timeout")
 	}
 }
 
@@ -142,14 +157,6 @@ func safeWriteSSE(w io.Writer, line string) {
 	io.WriteString(w, line)
 }
 
-// writeSSE writes a single SSE line to the response writer.
-func writeSSE(w io.Writer, line string) {
-	_, _ = io.WriteString(w, line)
-}
-
-// replaceModelInChunk replaces the model field in SSE data chunks.
-// Uses JSON parsing for robust replacement. If outboundModel is known (non-empty),
-// only replaces exact matches. Otherwise replaces any model field with clientModel.
 func replaceModelInChunk(line, clientModel, discoveredUpstream string) string {
 	if !strings.HasPrefix(line, "data: ") || clientModel == "" {
 		return line
@@ -186,12 +193,6 @@ func replaceModelInChunk(line, clientModel, discoveredUpstream string) string {
 	return "data: " + string(newJSON) + "\n"
 }
 
-func isTimeoutError(err error) bool {
-	return strings.Contains(err.Error(), "timeout") ||
-		strings.Contains(err.Error(), "deadline exceeded")
-}
-
-// BuildSSEChunk constructs an SSE-formatted data chunk.
 func BuildSSEChunk(data string) string {
 	var b strings.Builder
 	scanner := bufio.NewScanner(strings.NewReader(data))
@@ -201,6 +202,3 @@ func BuildSSEChunk(data string) string {
 	b.WriteString("\n")
 	return b.String()
 }
-
-// BuildDoneEvent returns the SSE stream termination event.
-func BuildDoneEvent() string { return "data: [DONE]\n\n" }

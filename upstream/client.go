@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kaixuan/llm-gateway-go/errorsx"
 	"github.com/kaixuan/llm-gateway-go/identity"
 )
 
@@ -22,20 +23,18 @@ const (
 	connectTimeout  = 10 * time.Second
 )
 
-// ErrorKind classifies the upstream error for circuit-breaker / audit.
-type ErrorKind string
+type ErrorKind = errorsx.ErrorKind
 
-const (
-	KindTransient    ErrorKind = "transient"
-	KindTimeout      ErrorKind = "timeout"
-	KindNetwork      ErrorKind = "network"
-	KindRateLimit    ErrorKind = "rate_limit"
-	KindAuth         ErrorKind = "auth"
-	KindQuota        ErrorKind = "quota"
-	KindUpstreamDown ErrorKind = "upstream_down"
+var (
+	KindTransient    = errorsx.KindTransient
+	KindTimeout      = errorsx.KindTimeout
+	KindNetwork      = errorsx.KindNetwork
+	KindRateLimit    = errorsx.KindRateLimit
+	KindAuth         = errorsx.KindAuth
+	KindQuota        = errorsx.KindQuota
+	KindUpstreamDown = errorsx.KindUpstreamDown
 )
 
-// Error carries the classified error kind and original error.
 type Error struct {
 	Kind    ErrorKind
 	Message string
@@ -44,36 +43,6 @@ type Error struct {
 
 func (e *Error) Error() string { return fmt.Sprintf("[%s] %s: %v", e.Kind, e.Message, e.Err) }
 func (e *Error) Unwrap() error { return e.Err }
-
-// classifyError maps HTTP status / Go errors to ErrorKind.
-func classifyError(err error, resp *http.Response) ErrorKind {
-	if err != nil {
-		msg := err.Error()
-		if strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline") {
-			return KindTimeout
-		}
-		if strings.Contains(msg, "connection") || strings.Contains(msg, "refused") ||
-			strings.Contains(msg, "no such host") || strings.Contains(msg, "reset") {
-			return KindNetwork
-		}
-		return KindTransient
-	}
-	if resp == nil {
-		return KindUpstreamDown
-	}
-	switch {
-	case resp.StatusCode == 429:
-		return KindRateLimit
-	case resp.StatusCode == 401 || resp.StatusCode == 403:
-		return KindAuth
-	case resp.StatusCode == 402:
-		return KindQuota
-	case resp.StatusCode >= 500:
-		return KindUpstreamDown
-	default:
-		return KindTransient
-	}
-}
 
 // Client wraps http.Client with upstream-specific configuration.
 type Client struct {
@@ -103,7 +72,8 @@ func New() *Client {
 }
 
 // Do sends an HTTP request with retry and error classification.
-// It does NOT close the response body — caller must do that.
+// It does NOT close the response body on success — caller must do that.
+// On retryable errors after exhausting retries, the response body IS closed.
 func (c *Client) Do(req *http.Request) (*http.Response, *Error) {
 	var (
 		resp *http.Response
@@ -111,6 +81,13 @@ func (c *Client) Do(req *http.Request) (*http.Response, *Error) {
 	)
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
 		if attempt > 0 {
+			if req.GetBody != nil {
+				body, err := req.GetBody()
+				if err != nil {
+					return nil, &Error{Kind: KindTransient, Message: "rewind body failed", Err: err}
+				}
+				req.Body = body
+			}
 			delay := c.baseDelay * (1 << (attempt - 1))
 			slog.Debug("upstream retry", "attempt", attempt, "delay_ms", delay.Milliseconds())
 			select {
@@ -126,8 +103,8 @@ func (c *Client) Do(req *http.Request) (*http.Response, *Error) {
 			return resp, nil
 		}
 
-		kind := classifyError(doErr, resp)
-		if !isRetryable(kind) {
+		kind := errorsx.ClassifyError(doErr, resp)
+		if !errorsx.IsRetryable(kind) {
 			msg := ""
 			if doErr != nil {
 				msg = doErr.Error()
@@ -144,15 +121,6 @@ func (c *Client) Do(req *http.Request) (*http.Response, *Error) {
 		uErr = &Error{Kind: kind, Message: "retry exhausted", Err: doErr}
 	}
 	return resp, uErr
-}
-
-func isRetryable(kind ErrorKind) bool {
-	switch kind {
-	case KindTransient, KindTimeout, KindNetwork, KindUpstreamDown, KindRateLimit:
-		return true
-	default:
-		return false
-	}
 }
 
 // BuildUpstreamRequest creates an HTTP request to the upstream LLM provider.

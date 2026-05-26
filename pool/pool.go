@@ -145,6 +145,11 @@ func (p *Pool) Close() {
 }
 
 func (p *Pool) healthLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("pool healthLoop panic", "recover", r)
+		}
+	}()
 	interval := healthCheckInterval
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
