@@ -32,6 +32,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/auth"
 	"github.com/kaixuan/llm-gateway-go/circuit"
 	"github.com/kaixuan/llm-gateway-go/config"
+	"github.com/kaixuan/llm-gateway-go/credentialstate"
 	"github.com/kaixuan/llm-gateway-go/db"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/middleware"
@@ -118,6 +119,9 @@ func main() {
 		)
 		exec.StreamTimeout = relay.StreamTimeout()
 		exec.UpstreamTimeout = relay.UpstreamTimeout()
+		if dbConn != nil && dbConn.Enabled() {
+			exec.State = credentialstate.NewWriter(dbConn.Pool())
+		}
 		chatHandler.SetExecutor(exec, providerClient, stickyCache)
 		slog.Info("routing executor enabled", "endpoint", pythonEndpoint)
 	} else {

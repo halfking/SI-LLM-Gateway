@@ -12,6 +12,7 @@ import (
 
 	"github.com/kaixuan/llm-gateway-go/audit"
 	"github.com/kaixuan/llm-gateway-go/circuit"
+	"github.com/kaixuan/llm-gateway-go/credentialstate"
 	"github.com/kaixuan/llm-gateway-go/disguise"
 	"github.com/kaixuan/llm-gateway-go/errorsx"
 	"github.com/kaixuan/llm-gateway-go/identity"
@@ -40,6 +41,7 @@ type Executor struct {
 	Normalize   NormalizerFunc
 	StreamChat  StreamHandler
 	Auditor     audit.Sink
+	State       *credentialstate.Writer
 
 	StreamTimeout   time.Duration
 	UpstreamTimeout time.Duration
@@ -157,6 +159,7 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 		release()
 
 		if execErr == nil {
+			e.restoreCredentialState(params.R.Context(), cand.CredentialID)
 			return result, nil
 		}
 
@@ -164,9 +167,11 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 		kind := errorsx.ClassifyError(execErr, nil)
 		if kind == errorsx.KindAuth || kind == errorsx.KindQuota {
 			e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
+			e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, kind, execErr)
 			continue
 		}
 		e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
+		e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, kind, execErr)
 	}
 
 	return nil, &ExecuteError{LastErr: lastErr, Tried: tried, Exhausted: true}
@@ -390,6 +395,42 @@ func (e *Executor) tryCandidate(
 		}, nil
 	}
 	return nil, fmt.Errorf("exhausted %d retries for credential %d", maxRetries, cand.CredentialID)
+}
+
+func (e *Executor) restoreCredentialState(ctx context.Context, credentialID int) {
+	if e.State == nil || !e.State.Enabled() {
+		return
+	}
+	if err := e.State.RestoreOnSuccess(ctx, credentialID); err != nil {
+		slog.Debug("credential state restore failed", "credential_id", credentialID, "error", err)
+	}
+}
+
+func (e *Executor) writeCredentialStateOnError(ctx context.Context, credentialID int, kind errorsx.ErrorKind, err error) {
+	if e.State == nil || !e.State.Enabled() {
+		return
+	}
+	if !shouldWriteCredentialState(kind) {
+		return
+	}
+	failure := credentialstate.Failure{Kind: kind}
+	if err != nil {
+		failure.Detail = err.Error()
+	}
+	if err := e.State.WriteOnError(ctx, credentialID, failure); err != nil {
+		slog.Debug("credential state error write failed", "credential_id", credentialID, "kind", kind, "error", err)
+	}
+}
+
+func shouldWriteCredentialState(kind errorsx.ErrorKind) bool {
+	switch kind {
+	case errorsx.KindAuth, errorsx.KindAuthRevoked,
+		errorsx.KindQuota, errorsx.KindQuotaPeriodic, errorsx.KindQuotaBalance, errorsx.KindQuotaPermanent,
+		errorsx.KindConcurrent, errorsx.KindRateLimit:
+		return true
+	default:
+		return false
+	}
 }
 
 func egressPref(tx *transform.TransformResult) []string {
