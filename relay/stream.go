@@ -95,6 +95,13 @@ func StreamChatWithCapture(w http.ResponseWriter, resp *http.Response, clientMod
 	discoveredUpstream := ""
 	lastSend := time.Now()
 
+	if clientModel != "" && outboundModel != "" && clientModel != outboundModel {
+		slog.Debug("upstream model diff",
+			"client_model", clientModel,
+			"outbound_model", outboundModel,
+		)
+	}
+
 	// ── First-byte timeout ──────────────────────────────────────────
 	firstLine, err := readLineWithTimeout(ctx, reader, firstByteTimeout)
 	if err != nil {

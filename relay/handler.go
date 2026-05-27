@@ -124,23 +124,21 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) {
+	requestID := r.Header.Get("X-Request-Id")
+
 	// ── API key authentication ──────────────────────────────────────────
 	var keyInfo *auth.KeyInfo
 	if h.keyVerifier != nil && h.keyVerifier.Enabled() {
 		rawKey := extractBearerToken(r)
 		if rawKey == "" {
-			writeJSON(w, http.StatusUnauthorized, map[string]any{
-				"error": map[string]string{"message": "Missing API key", "type": "authentication_error", "code": "missing_key"},
-			})
+			writeErrorJSON(w, http.StatusUnauthorized, requestID, "Missing API key", "authentication_error", "missing_key")
 			return
 		}
 		ki, verifyErr := h.keyVerifier.Verify(r.Context(), rawKey)
 		if verifyErr != nil {
 			if _, ok := verifyErr.(*auth.InvalidKeyError); ok {
 				w.Header().Set("WWW-Authenticate", "Bearer")
-				writeJSON(w, http.StatusUnauthorized, map[string]any{
-					"error": map[string]string{"message": "Invalid or expired API key", "type": "authentication_error", "code": "invalid_key"},
-				})
+				writeErrorJSON(w, http.StatusUnauthorized, requestID, "Invalid or expired API key", "authentication_error", "invalid_key")
 				return
 			}
 			slog.Warn("key verification RPC failed, proceeding without auth", "error", verifyErr)
@@ -156,9 +154,7 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", *keyInfo.RateLimitRPM))
 			w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
 			w.Header().Set("Retry-After", "60")
-			writeJSON(w, http.StatusTooManyRequests, map[string]any{
-				"error": map[string]string{"message": "Rate limit exceeded", "type": "rate_limit_error", "code": "rate_limit_exceeded"},
-			})
+			writeErrorJSON(w, http.StatusTooManyRequests, requestID, "Rate limit exceeded", "rate_limit_error", "rate_limit_exceeded")
 			return
 		}
 	}
@@ -213,15 +209,11 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 	candidates, policy, err := h.provider.GetCandidates(r.Context(), clientModel, clientID.Fingerprint.ClientProfile)
 	if err != nil {
 		slog.Error("failed to get candidates from provider", "error", err)
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
-			"error": map[string]string{"message": fmt.Sprintf("no available provider for model '%s'", clientModel), "type": "server_error", "code": "no_candidate"},
-		})
+		writeErrorJSON(w, http.StatusServiceUnavailable, requestID, fmt.Sprintf("no available provider for model '%s'", clientModel), "server_error", "no_candidate")
 		return
 	}
 	if len(candidates) == 0 {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
-			"error": map[string]string{"message": fmt.Sprintf("no available provider for model '%s'", clientModel), "type": "server_error", "code": "no_candidate"},
-		})
+		writeErrorJSON(w, http.StatusServiceUnavailable, requestID, fmt.Sprintf("no available provider for model '%s'", clientModel), "server_error", "no_candidate")
 		return
 	}
 
@@ -282,14 +274,10 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 			"model", clientModel,
 		)
 		if execErr, ok := execErr.(*routing.ExecuteError); ok && execErr.Exhausted {
-			writeJSON(w, http.StatusBadGateway, map[string]any{
-				"error": map[string]string{"message": "all providers unavailable", "type": "upstream_error", "code": "all_exhausted"},
-			})
+			writeErrorJSON(w, http.StatusBadGateway, requestID, "all providers unavailable", "upstream_error", "all_exhausted")
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]any{
-			"error": map[string]string{"message": "upstream request failed", "type": "upstream_error", "code": "upstream_error"},
-		})
+		writeErrorJSON(w, http.StatusBadGateway, requestID, "upstream request failed", "upstream_error", "upstream_error")
 		return
 	}
 
@@ -934,4 +922,20 @@ func strPtr(v string) *string  {
 		return nil
 	}
 	return &v
+}
+
+func writeErrorJSON(w http.ResponseWriter, status int, requestID, msg, errType, code string) {
+	w.Header().Set("Content-Type", "application/json")
+	if requestID != "" {
+		w.Header().Set("X-Request-Id", requestID)
+	}
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]any{
+		"error": map[string]string{
+			"message":    msg,
+			"type":       errType,
+			"code":       code,
+			"request_id": requestID,
+		},
+	})
 }
