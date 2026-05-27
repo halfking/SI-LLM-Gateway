@@ -39,6 +39,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/relay"
 	"github.com/kaixuan/llm-gateway-go/resolve"
 	"github.com/kaixuan/llm-gateway-go/routing"
+	"github.com/kaixuan/llm-gateway-go/telemetry"
 	"github.com/kaixuan/llm-gateway-go/transform"
 	upstream "github.com/kaixuan/llm-gateway-go/upstream"
 )
@@ -115,6 +116,13 @@ func main() {
 		slog.Warn("API key authentication disabled (no admin key or Python endpoint)")
 	}
 
+	// ── Telemetry ─────────────────────────────────────────────────────────
+	telemetryClient := telemetry.NewClient(pythonEndpoint, adminAPIKey)
+	if telemetryClient.Enabled() {
+		chatHandler.SetTelemetry(telemetryClient)
+		slog.Info("telemetry emission enabled")
+	}
+
 	// ── Listen address ────────────────────────────────────────────────────
 	listen := os.Getenv("LLM_GATEWAY_LISTEN")
 	if listen == "" {
@@ -181,6 +189,7 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("gateway shutdown error", "error", err)
 	}
+	telemetryClient.Stop()
 	lim.Stop()
 	pools.Stop()
 	pools.CloseAll()

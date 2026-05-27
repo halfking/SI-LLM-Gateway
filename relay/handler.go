@@ -24,6 +24,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/ratelimit"
 	"github.com/kaixuan/llm-gateway-go/resolve"
 	"github.com/kaixuan/llm-gateway-go/routing"
+	"github.com/kaixuan/llm-gateway-go/telemetry"
 	"github.com/kaixuan/llm-gateway-go/transform"
 	upstreampkg "github.com/kaixuan/llm-gateway-go/upstream"
 )
@@ -57,6 +58,7 @@ type chatRequestBody struct {
 	Model    string          `json:"model"`
 	Stream   bool            `json:"stream"`
 	Messages json.RawMessage `json:"messages,omitempty"`
+	User     string          `json:"user,omitempty"`
 }
 
 type chatResponseBody struct {
@@ -82,6 +84,7 @@ type ChatHandler struct {
 	sticky     *routing.StickyCache
 	keyVerifier *auth.KeyVerifier
 	rateLimiter *ratelimit.SlidingWindowLimiter
+	telemetryClient *telemetry.Client
 }
 
 func NewChatHandler(cm *circuit.Manager, l *limiter.Limiter, matrix *transform.Matrix, pools *pool.PoolManager, resolver *resolve.Resolver, auditor audit.Sink) *ChatHandler {
@@ -100,6 +103,10 @@ func (h *ChatHandler) SetExecutor(exec *routing.Executor, prov *provider.Client,
 func (h *ChatHandler) SetAuth(kv *auth.KeyVerifier, rl *ratelimit.SlidingWindowLimiter) {
 	h.keyVerifier = kv
 	h.rateLimiter = rl
+}
+
+func (h *ChatHandler) SetTelemetry(tc *telemetry.Client) {
+	h.telemetryClient = tc
 }
 
 // ServeHTTP handles /v1/chat/completions and /v1/completions.
@@ -181,6 +188,7 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 
 	clientModel := reqBody.Model
 	isStream := reqBody.Stream
+	endUser := resolveEndUser(reqBody.User, r)
 	clientID := identity.BuildIdentityFromRequest(r, "default", nil, nil, "")
 	identityHash := clientID.ShortID()
 
@@ -288,13 +296,95 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 	_ = result
 	auditBuilder.Success(true).Latency(time.Duration(result.LatencyMs) * time.Millisecond)
 	if h.sticky != nil && policy != nil {
-		stickyKey := routing.BuildStickyKey("default", nil, nil, "anonymous", clientID.Fingerprint.PrimarySeed())
+		stickyKey := routing.BuildStickyKey("default", nil, nil, endUser, clientID.Fingerprint.PrimarySeed())
 		stickyTTL := time.Duration(policy.StickyTTLMilliseconds) * time.Second
 		if stickyTTL < time.Minute {
 			stickyTTL = time.Minute
 		}
 		h.sticky.Set(stickyKey, result.Candidate.CredentialID, stickyTTL)
 	}
+
+	h.emitTelemetry(auditBuilder.Build(), result, endUser, keyInfo, streamCapture)
+}
+
+func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResult, endUser string, keyInfo *auth.KeyInfo, capture *audit.StreamCapture) {
+	if h.telemetryClient == nil || !h.telemetryClient.Enabled() {
+		return
+	}
+
+	var apiKeyID *int
+	var tenantID string = "default"
+	if keyInfo != nil {
+		apiKeyID = &keyInfo.ID
+		tenantID = keyInfo.TenantID
+	}
+
+	h.telemetryClient.EmitDecisionLog(&telemetry.DecisionLogEntry{
+		RequestID:          evt.RequestID,
+		TenantID:           tenantID,
+		APIKeyID:           apiKeyID,
+		Model:              evt.ClientModel,
+		ChosenCredentialID: intPtr(result.Candidate.CredentialID),
+		ChosenProviderID:   intPtr(result.Candidate.ProviderID),
+		CandidatesTried:    1,
+		LatencyMs:          result.LatencyMs,
+		Success:            true,
+		ClientModel:        strPtr(evt.ClientModel),
+		OutboundModel:      strPtr(evt.OutboundModel),
+		ClientProfile:      strPtr(evt.ClientProfile),
+		RequestMode:        strPtr("chat"),
+		IdentityHash:       strPtr(evt.IdentityHash),
+		TransformRuleID:    strPtr(evt.TransformRule),
+	})
+
+	reqLog := &telemetry.RequestLogEntry{
+		RequestID:     evt.RequestID,
+		TenantID:      tenantID,
+		APIKeyID:      apiKeyID,
+		EndUserID:     strPtr(endUser),
+		ClientModel:   strPtr(evt.ClientModel),
+		OutboundModel: strPtr(evt.OutboundModel),
+		CredentialID:  intPtr(result.Candidate.CredentialID),
+		ProviderID:    intPtr(result.Candidate.ProviderID),
+		ClientProfile: strPtr(evt.ClientProfile),
+		RequestMode:   strPtr("chat"),
+		LatencyMs:     intPtr(result.LatencyMs),
+		Success:       true,
+		IdentityHash:  strPtr(evt.IdentityHash),
+	}
+
+	if capture != nil {
+		m := capture.SummaryAsMap()
+		if v, ok := m["prompt_tokens"].(int); ok {
+			reqLog.PromptTokens = &v
+		}
+		if v, ok := m["completion_tokens"].(int); ok {
+			reqLog.CompletionTokens = &v
+		}
+		if v, ok := m["cache_read_tokens"].(int); ok {
+			reqLog.CacheReadTokens = &v
+		}
+		if v, ok := m["cache_write_tokens"].(int); ok {
+			reqLog.CacheWriteTokens = &v
+		}
+		if v, ok := m["stream_first_chunk_ms"].(int); ok {
+			reqLog.StreamFirstChunkMs = &v
+		}
+		if v, ok := m["stream_chunk_count"].(int); ok {
+			reqLog.StreamChunkCount = &v
+		}
+		if v, ok := m["response_checksum"].(string); ok {
+			reqLog.ResponseChecksum = &v
+		}
+		if v, ok := m["stream_done_received"].(bool); ok {
+			reqLog.StreamDoneReceived = &v
+		}
+		if v, ok := m["stream_interrupted"].(bool); ok {
+			reqLog.StreamInterrupted = &v
+		}
+	}
+
+	h.telemetryClient.EmitRequestLog(reqLog)
 }
 
 func (h *ChatHandler) serveFallback(w http.ResponseWriter, r *http.Request) {
@@ -826,4 +916,22 @@ func extractBearerToken(r *http.Request) string {
 		return strings.TrimPrefix(auth, "bearer ")
 	}
 	return ""
+}
+
+func resolveEndUser(bodyUser string, r *http.Request) string {
+	if bodyUser != "" {
+		return bodyUser
+	}
+	if header := r.Header.Get("X-End-User-Id"); header != "" {
+		return strings.TrimSpace(header)
+	}
+	return "anonymous"
+}
+
+func intPtr(v int) *int        { return &v }
+func strPtr(v string) *string  {
+	if v == "" {
+		return nil
+	}
+	return &v
 }
