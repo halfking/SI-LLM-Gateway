@@ -139,6 +139,9 @@ func main() {
 
 	// ── Telemetry ─────────────────────────────────────────────────────────
 	telemetryClient := telemetry.NewClient(pythonEndpoint, adminAPIKey)
+	if dbConn != nil && dbConn.Enabled() {
+		telemetryClient.SetDB(dbConn.Pool())
+	}
 	if telemetryClient.Enabled() {
 		chatHandler.SetTelemetry(telemetryClient)
 		slog.Info("telemetry emission enabled")
