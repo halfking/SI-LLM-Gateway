@@ -144,7 +144,7 @@ func hexBytes(s string, start, end int) []byte {
 // headers.  Mirrors Python's extract_fingerprint().
 func ExtractFingerprint(r *http.Request, clientProfile string) ClientFingerprint {
 	h := r.Header
-	return ClientFingerprint{
+	fp := ClientFingerprint{
 		DeviceSeed:     firstNonEmpty(h.Get(headerDeviceSeed)),
 		MachineID:      firstNonEmpty(h.Get(headerMachineID)),
 		RuntimeName:    firstNonEmpty(h.Get(headerRuntimeName)),
@@ -154,6 +154,37 @@ func ExtractFingerprint(r *http.Request, clientProfile string) ClientFingerprint
 		UserAgent:      firstNonEmpty(h.Get("User-Agent")),
 		ClientProfile:  clientProfile,
 	}
+	// When all structured fields are empty, use client IP as fallback
+	// to prevent identity collision for headerless clients.
+	if fp.DeviceSeed == "" && fp.MachineID == "" && fp.UserAgent == "" &&
+		fp.OSName == "" && fp.OSArch == "" && fp.RuntimeName == "" &&
+		fp.RuntimeVersion == "" && fp.ClientProfile == "" {
+		clientIP := extractClientIP(r)
+		if clientIP != "" {
+			fp.UserAgent = "ip:" + clientIP
+		}
+	}
+	return fp
+}
+
+// extractClientIP extracts the client IP from X-Forwarded-For or RemoteAddr.
+func extractClientIP(r *http.Request) string {
+	// Try X-Forwarded-For first (for proxied requests)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take the first IP (client IP)
+		if idx := strings.IndexByte(xff, ','); idx > 0 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+	// Fall back to RemoteAddr (ip:port format)
+	if addr := r.RemoteAddr; addr != "" {
+		if idx := strings.LastIndex(addr, ":"); idx > 0 {
+			return addr[:idx]
+		}
+		return addr
+	}
+	return ""
 }
 
 func firstNonEmpty(values ...string) string {
