@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 )
@@ -368,4 +369,39 @@ func ComputeRequestChecksum(model string, body []byte) string {
 	h.Write([]byte(model))
 	h.Write(body)
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func MessageDigest(messages []byte) (checksum string, preview string) {
+	h := sha256.New()
+	h.Write(messages)
+	checksum = hex.EncodeToString(h.Sum(nil))
+
+	var msgs []map[string]json.RawMessage
+	if json.Unmarshal(messages, &msgs) != nil {
+		if len(messages) > 200 {
+			preview = string(messages[:200])
+		} else {
+			preview = string(messages)
+		}
+		return
+	}
+
+	start := len(msgs) - 4
+	if start < 0 {
+		start = 0
+	}
+	var parts []string
+	for i := start; i < len(msgs); i++ {
+		raw, _ := json.Marshal(msgs[i])
+		s := string(raw)
+		if len(s) > 200 {
+			s = s[:200]
+		}
+		parts = append(parts, s)
+	}
+	preview = strings.Join(parts, "\n")
+	if len(preview) > 4096 {
+		preview = preview[:4096]
+	}
+	return
 }
