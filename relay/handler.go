@@ -124,6 +124,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	requestID := r.Header.Get("X-Request-Id")
 
 	// ── API key authentication ──────────────────────────────────────────
@@ -182,7 +183,6 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 		})
 		return
 	}
-	r.Body.Close()
 
 	var reqBody chatRequestBody
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
@@ -408,6 +408,7 @@ func (h *ChatHandler) serveFallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Read and buffer body (capped at 32 MiB) ──────────────────────
+	defer r.Body.Close()
 	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -429,7 +430,6 @@ func (h *ChatHandler) serveFallback(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	r.Body.Close()
 
 	// ── Parse request body for model + stream ──────────────────────────
 	var reqBody chatRequestBody

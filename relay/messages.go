@@ -45,6 +45,7 @@ func NewMessagesHandler(ch *ChatHandler) *MessagesHandler {
 }
 
 func (h *MessagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	if r.Method != http.MethodPost {
 		writeAnthropicError(w, http.StatusMethodNotAllowed, "invalid_request", "Method not allowed")
 		return
@@ -87,7 +88,6 @@ func (h *MessagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeAnthropicError(w, http.StatusRequestEntityTooLarge, "invalid_request", "Request body too large")
 		return
 	}
-	r.Body.Close()
 
 	var reqBody messagesRequestBody
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
