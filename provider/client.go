@@ -158,7 +158,7 @@ func NewClient(pythonEndpoint, adminAPIKey string) *Client {
 }
 
 func (c *Client) Enabled() bool {
-	return c.endpoint != ""
+	return c.endpoint != "" || c.dbPool != nil
 }
 
 func (c *Client) SetDB(pool *pgxpool.Pool, secretKey, credentialEncryptionKey string) {
@@ -190,7 +190,11 @@ func (c *Client) GetCandidates(ctx context.Context, model, profile string) ([]Ca
 	c.mu.RUnlock()
 
 	v, err, _ := c.sf.Do("cand:"+key, func() (any, error) {
-		resp, fetchErr := c.fetchCandidates(ctx, model, profile)
+		resp, fetchErr := c.fetchCandidatesDB(ctx, model, profile)
+		if fetchErr != nil {
+			slog.Warn("candidate resolve DB failed, falling back to RPC", "model", model, "error", fetchErr)
+			resp, fetchErr = c.fetchCandidates(ctx, model, profile)
+		}
 		if fetchErr != nil {
 			return nil, fetchErr
 		}
@@ -229,7 +233,11 @@ func (c *Client) getPolicyCached(ctx context.Context) (*Policy, error) {
 	c.mu.RUnlock()
 
 	v, err, _ := c.sf.Do("policy", func() (any, error) {
-		pol, fetchErr := c.fetchPolicy(ctx)
+		pol, fetchErr := c.fetchPolicyDB(ctx)
+		if fetchErr != nil {
+			slog.Warn("policy DB fetch failed, falling back to RPC", "error", fetchErr)
+			pol, fetchErr = c.fetchPolicy(ctx)
+		}
 		if fetchErr != nil {
 			return DefaultPolicy(), nil
 		}
@@ -245,6 +253,281 @@ func (c *Client) getPolicyCached(ctx context.Context) (*Policy, error) {
 		return DefaultPolicy(), nil
 	}
 	return v.(*Policy), nil
+}
+
+func (c *Client) fetchCandidatesDB(ctx context.Context, model, profile string) (*resolveResponse, error) {
+	if c.dbPool == nil {
+		return nil, fmt.Errorf("routing DB not configured")
+	}
+	res, err := c.resolveModelDB(ctx, model, profile)
+	if err != nil {
+		return nil, err
+	}
+	cands, err := c.loadCandidatesDB(ctx, res.RawModels)
+	if err != nil {
+		return nil, err
+	}
+	planOrder := make([]struct {
+		CredentialID int    `json:"credential_id"`
+		ProviderID   int    `json:"provider_id"`
+		RawModel     string `json:"raw_model"`
+		Tier         int    `json:"tier"`
+	}, 0, len(cands))
+	rawCandidates := make([]json.RawMessage, 0, len(cands))
+	for _, cand := range cands {
+		planOrder = append(planOrder, struct {
+			CredentialID int    `json:"credential_id"`
+			ProviderID   int    `json:"provider_id"`
+			RawModel     string `json:"raw_model"`
+			Tier         int    `json:"tier"`
+		}{CredentialID: cand.CredentialID, ProviderID: cand.ProviderID, RawModel: cand.RawModel, Tier: cand.Tier})
+		b, _ := json.Marshal(cand)
+		rawCandidates = append(rawCandidates, b)
+	}
+	res.PlanOrder = planOrder
+	res.Candidates = rawCandidates
+	return res, nil
+}
+
+func (c *Client) resolveModelDB(ctx context.Context, model, profile string) (*resolveResponse, error) {
+	profile = strings.TrimSpace(strings.ToLower(profile))
+	if profile == "" {
+		profile = ""
+	}
+
+	var canonicalID *int
+	var canonicalName string
+	err := c.dbPool.QueryRow(ctx, `
+		SELECT id, canonical_name
+		FROM models_canonical
+		WHERE lower(canonical_name) = lower($1)
+		  AND COALESCE(status, 'active') = 'active'
+	`, model).Scan(&canonicalID, &canonicalName)
+	if err == nil && canonicalID != nil {
+		raw, err := c.aliasRawNamesDB(ctx, *canonicalID, profile)
+		if err != nil {
+			return nil, err
+		}
+		return &resolveResponse{ClientModel: model, CanonicalName: canonicalName, CanonicalID: canonicalID, ResolutionPath: "canonical", RawModels: lowerUnique(append(raw, model))}, nil
+	}
+	if err != nil && err != pgx.ErrNoRows {
+		return nil, err
+	}
+
+	err = c.dbPool.QueryRow(ctx, `
+		SELECT mc.id, mc.canonical_name
+		FROM model_aliases ma
+		JOIN models_canonical mc ON mc.id = ma.canonical_id
+		WHERE lower(ma.raw_name) = lower($1)
+		  AND COALESCE(ma.status, 'active') = 'active'
+		  AND COALESCE(mc.status, 'active') = 'active'
+		  AND (
+		      ma.client_profiles IS NULL
+		      OR cardinality(ma.client_profiles) = 0
+		      OR $2 = ANY(ma.client_profiles)
+		      OR $2 = ''
+		  )
+		LIMIT 1
+	`, model, profile).Scan(&canonicalID, &canonicalName)
+	if err == nil && canonicalID != nil {
+		raw, err := c.aliasRawNamesDB(ctx, *canonicalID, profile)
+		if err != nil {
+			return nil, err
+		}
+		return &resolveResponse{ClientModel: model, CanonicalName: canonicalName, CanonicalID: canonicalID, ResolutionPath: "alias", RawModels: lowerUnique(append(raw, model))}, nil
+	}
+	if err != nil && err != pgx.ErrNoRows {
+		return nil, err
+	}
+	return &resolveResponse{ClientModel: model, CanonicalID: nil, CanonicalName: "", ResolutionPath: "direct", RawModels: []string{strings.ToLower(model)}}, nil
+}
+
+func (c *Client) aliasRawNamesDB(ctx context.Context, canonicalID int, profile string) ([]string, error) {
+	rows, err := c.dbPool.Query(ctx, `
+		SELECT raw_name
+		FROM model_aliases
+		WHERE canonical_id = $1
+		  AND COALESCE(status, 'active') = 'active'
+		  AND (
+		      client_profiles IS NULL
+		      OR cardinality(client_profiles) = 0
+		      OR $2 = ANY(client_profiles)
+		      OR $2 = ''
+		  )
+	`, canonicalID, profile)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		out = append(out, raw)
+	}
+	return out, rows.Err()
+}
+
+func (c *Client) loadCandidatesDB(ctx context.Context, rawModels []string) ([]Candidate, error) {
+	if len(rawModels) == 0 {
+		return nil, nil
+	}
+	rows, err := c.dbPool.Query(ctx, `
+		SELECT
+			c.id::int AS credential_id,
+			p.id::int AS provider_id,
+			p.base_url,
+			p.protocol,
+			COALESCE(p.catalog_code, '') AS catalog_code,
+			COALESCE(mo.routing_tier, 2)::int AS tier,
+			COALESCE(mo.weight, 100)::int AS weight,
+			COALESCE(mo.outbound_model_name, mo.raw_model_name) AS model_name,
+			COALESCE(mo.success_rate, 0.9)::float8 AS success_rate,
+			COALESCE(mo.p95_latency_ms, 9999)::int AS p95_latency_ms,
+			c.concurrency_limit,
+			c.balance_usd::float8,
+			COALESCE(c.circuit_state, 'closed') AS circuit_state,
+			COALESCE(c.availability_state, 'ready') AS availability_state,
+			COALESCE(c.quota_state, 'ok') AS quota_state,
+			COALESCE(c.lifecycle_status, 'active') AS lifecycle_status,
+			mo.unit_price_in_per_1m::float8,
+			mo.unit_price_out_per_1m::float8,
+			CASE
+				WHEN mo.available IS NOT TRUE THEN FALSE
+				WHEN c.status NOT IN ('active','cooling','degraded') THEN FALSE
+				WHEN p.enabled IS NOT TRUE THEN FALSE
+				WHEN COALESCE(c.lifecycle_status, 'active') <> 'active' THEN FALSE
+				WHEN COALESCE(c.availability_state, 'ready') IN ('suspended', 'auth_failed') THEN FALSE
+				WHEN COALESCE(c.availability_state, 'ready') IN ('cooling', 'rate_limited', 'unreachable')
+				     AND (c.availability_recover_at IS NULL OR c.availability_recover_at > now()) THEN FALSE
+				WHEN COALESCE(c.quota_state, 'ok') IN ('balance_exhausted', 'permanently_exhausted') THEN FALSE
+				WHEN COALESCE(c.quota_state, 'ok') = 'periodic_exhausted'
+				     AND (c.quota_recover_at IS NULL OR c.quota_recover_at > now()) THEN FALSE
+				WHEN COALESCE(c.circuit_state, 'closed') = 'open'
+				     AND (c.cooling_until IS NULL OR c.cooling_until > now()) THEN FALSE
+				WHEN c.balance_usd IS NOT NULL AND c.balance_usd <= 0 THEN FALSE
+				ELSE TRUE
+			END AS runtime_routable
+		FROM model_offers mo
+		JOIN credentials c ON c.id = mo.credential_id
+		JOIN providers p ON p.id = c.provider_id
+		LEFT JOIN model_aliases ma ON lower(ma.raw_name) = lower(mo.raw_model_name)
+		LEFT JOIN models_canonical mc ON mc.id = COALESCE(mo.canonical_id, ma.canonical_id)
+		WHERE p.tenant_id = 'default'
+		  AND lower(mo.raw_model_name) = ANY($1)
+		  AND COALESCE(mc.status, 'active') != 'disabled'
+		ORDER BY COALESCE(mo.routing_tier, 2), COALESCE(mo.weight, 100) DESC, COALESCE(mo.success_rate, 0.9) DESC
+	`, rawModels)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Candidate
+	for rows.Next() {
+		var cand Candidate
+		if err := rows.Scan(
+			&cand.CredentialID,
+			&cand.ProviderID,
+			&cand.BaseURL,
+			&cand.Protocol,
+			&cand.CatalogCode,
+			&cand.Tier,
+			&cand.Weight,
+			&cand.RawModel,
+			&cand.SuccessRate,
+			&cand.P95LatencyMs,
+			&cand.ConcurrencyLimit,
+			&cand.BalanceUSD,
+			&cand.CircuitState,
+			&cand.AvailabilityState,
+			&cand.QuotaState,
+			&cand.LifecycleStatus,
+			&cand.PriceInPer1M,
+			&cand.PriceOutPer1M,
+			&cand.Routable,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, cand)
+	}
+	return out, rows.Err()
+}
+
+func (c *Client) fetchPolicyDB(ctx context.Context) (*Policy, error) {
+	if c.dbPool == nil {
+		return nil, fmt.Errorf("policy DB not configured")
+	}
+	var pol Policy
+	err := c.dbPool.QueryRow(ctx, `
+		SELECT
+			COALESCE(algorithm_version, 2)::int,
+			COALESCE(retry_per_credential, 1)::int,
+			COALESCE(tier_fallback_max, 3)::int,
+			COALESCE(circuit_open_seconds, 300)::int,
+			COALESCE(circuit_failure_threshold, 5)::int,
+			COALESCE(circuit_max_open_seconds, 1800)::int,
+			COALESCE(sticky_ttl_seconds, 1800)::int
+		FROM routing_policy
+		WHERE tenant_id = 'default'
+		ORDER BY id
+		LIMIT 1
+	`).Scan(
+		&pol.AlgorithmVersion,
+		&pol.RetryPerCredential,
+		&pol.TierFallbackMax,
+		&pol.CircuitOpenSeconds,
+		&pol.CircuitFailureThreshold,
+		&pol.CircuitMaxOpenSeconds,
+		&pol.StickyTTLMilliseconds,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return normalizePolicy(&pol), nil
+}
+
+func normalizePolicy(pol *Policy) *Policy {
+	if pol == nil {
+		return DefaultPolicy()
+	}
+	if pol.AlgorithmVersion == 0 {
+		pol.AlgorithmVersion = 2
+	}
+	if pol.RetryPerCredential == 0 {
+		pol.RetryPerCredential = 1
+	}
+	if pol.TierFallbackMax == 0 {
+		pol.TierFallbackMax = 3
+	}
+	if pol.CircuitOpenSeconds == 0 {
+		pol.CircuitOpenSeconds = 300
+	}
+	if pol.CircuitFailureThreshold == 0 {
+		pol.CircuitFailureThreshold = 5
+	}
+	if pol.CircuitMaxOpenSeconds == 0 {
+		pol.CircuitMaxOpenSeconds = 1800
+	}
+	if pol.StickyTTLMilliseconds == 0 {
+		pol.StickyTTLMilliseconds = 1800
+	}
+	return pol
+}
+
+func lowerUnique(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func (c *Client) RevealAPIKey(ctx context.Context, providerID, credentialID int) (string, error) {
