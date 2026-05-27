@@ -65,6 +65,12 @@ var (
 	KindUpstreamDown = errorsx.KindUpstreamDown
 )
 
+const (
+	autoRecoveryFailureThreshold        int32 = 3
+	exponentialRecoveryFailureThreshold int32 = 2
+	permanentRecoveryFailureThreshold   int32 = 2
+)
+
 // ---------------------------------------------------------------------------
 // CoolingPolicy — per-error-kind recovery strategy
 // ---------------------------------------------------------------------------
@@ -81,9 +87,9 @@ type CoolingPolicy struct {
 type RecoveryType int
 
 const (
-	RecoveryAuto    RecoveryType = iota // Auto-recover after cooling period
-	RecoveryExponential                  // Exponential backoff cooling
-	RecoveryPermanent                    // Quarantine, manual recovery only
+	RecoveryAuto        RecoveryType = iota // Auto-recover after cooling period
+	RecoveryExponential                     // Exponential backoff cooling
+	RecoveryPermanent                       // Quarantine, manual recovery only
 )
 
 // Default cooling policies per error kind.
@@ -103,19 +109,19 @@ var defaultPolicies = map[ErrorKind]CoolingPolicy{
 
 // Breaker is a single circuit breaker instance, keyed by provider+credential.
 type Breaker struct {
-	key           string
-	state         atomic.Int32
-	failCount     atomic.Int32
-	consecutive   atomic.Int32
+	key            string
+	state          atomic.Int32
+	failCount      atomic.Int32
+	consecutive    atomic.Int32
 	halfOpenProbes atomic.Int32
-	coolingPolicy CoolingPolicy
+	coolingPolicy  CoolingPolicy
 
 	mu             sync.Mutex
 	lastFailureAt  time.Time
-	openSince      time.Time     // when the circuit was opened
-	coolingExpires time.Time     // when cooling ends
-	coolingCycle   int           // current exponential backoff cycle
-	nextProbeAt    time.Time     // when half-open probe is allowed
+	openSince      time.Time // when the circuit was opened
+	coolingExpires time.Time // when cooling ends
+	coolingCycle   int       // current exponential backoff cycle
+	nextProbeAt    time.Time // when half-open probe is allowed
 	lastErrorKind  ErrorKind
 }
 
@@ -190,14 +196,35 @@ func (b *Breaker) RecordFailure(kind ErrorKind) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.lastFailureAt = time.Now()
-	b.lastErrorKind = kind
-	b.consecutive.Add(1)
-	b.failCount.Add(1)
-
+	now := time.Now()
 	policy, ok := defaultPolicies[kind]
 	if !ok {
 		policy = b.coolingPolicy
+	}
+	if b.lastErrorKind != "" && b.lastErrorKind != kind {
+		b.consecutive.Store(0)
+		if policy.RecoveryType == RecoveryExponential {
+			b.coolingCycle = 0
+		}
+	}
+
+	b.lastFailureAt = now
+	b.lastErrorKind = kind
+	consecutive := b.consecutive.Add(1)
+	b.failCount.Add(1)
+
+	threshold := failureConfirmationThreshold(policy)
+	if b.State() == StateHalfOpen {
+		threshold = 1
+	}
+	if consecutive < threshold {
+		slog.Warn("circuit failure pending confirmation",
+			"key", b.key,
+			"error_kind", kind,
+			"consecutive", consecutive,
+			"threshold", threshold,
+		)
+		return
 	}
 
 	switch policy.RecoveryType {
@@ -212,7 +239,7 @@ func (b *Breaker) RecordFailure(kind ErrorKind) {
 	case RecoveryAuto, RecoveryExponential:
 		b.state.Store(int32(StateOpen))
 		b.halfOpenProbes.Store(0)
-		b.openSince = time.Now()
+		b.openSince = now
 
 		if policy.RecoveryType == RecoveryExponential {
 			b.coolingCycle++
@@ -220,7 +247,7 @@ func (b *Breaker) RecordFailure(kind ErrorKind) {
 			if cooling > policy.MaxCooling {
 				cooling = policy.MaxCooling
 			}
-			b.coolingExpires = time.Now().Add(cooling)
+			b.coolingExpires = now.Add(cooling)
 			if b.coolingCycle >= 5 {
 				slog.Warn("circuit repeated cooling cycles",
 					"key", b.key,
@@ -230,15 +257,15 @@ func (b *Breaker) RecordFailure(kind ErrorKind) {
 				)
 			}
 		} else {
-			b.coolingExpires = time.Now().Add(policy.InitialCooling)
+			b.coolingExpires = now.Add(policy.InitialCooling)
 			// Escalate: 3 consecutive transient/timeout/network → use exponential policy
 			if kind == KindTransient || kind == KindTimeout || kind == KindNetwork {
-				if b.consecutive.Load() >= 3 {
+				if consecutive >= autoRecoveryFailureThreshold {
 					escalated := defaultPolicies[KindUpstreamDown]
-					b.coolingExpires = time.Now().Add(escalated.InitialCooling)
+					b.coolingExpires = now.Add(escalated.InitialCooling)
 					slog.Warn("circuit escalated to exponential cooling",
 						"key", b.key,
-						"consecutive", b.consecutive.Load(),
+						"consecutive", consecutive,
 						"error_kind", kind,
 					)
 				}
@@ -251,6 +278,17 @@ func (b *Breaker) RecordFailure(kind ErrorKind) {
 			"cooling_until", b.coolingExpires.Format(time.RFC3339),
 			"cycle", b.coolingCycle,
 		)
+	}
+}
+
+func failureConfirmationThreshold(policy CoolingPolicy) int32 {
+	switch policy.RecoveryType {
+	case RecoveryPermanent:
+		return permanentRecoveryFailureThreshold
+	case RecoveryExponential:
+		return exponentialRecoveryFailureThreshold
+	default:
+		return autoRecoveryFailureThreshold
 	}
 }
 
@@ -318,7 +356,7 @@ func (b *Breaker) Stats() map[string]any {
 
 // Manager manages all circuit breakers keyed by (provider, credential).
 type Manager struct {
-	mu    sync.RWMutex
+	mu       sync.RWMutex
 	breakers map[string]*Breaker
 }
 

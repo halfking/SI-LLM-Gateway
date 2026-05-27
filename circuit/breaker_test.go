@@ -15,16 +15,41 @@ func TestNewBreakerIsClosed(t *testing.T) {
 	}
 }
 
-func TestTransientFailureOpensCircuit(t *testing.T) {
+func TestSingleTransientFailureDoesNotOpenCircuit(t *testing.T) {
 	b := New(1, 1)
 	b.RecordFailure(KindTransient)
-	if b.State() != StateOpen {
-		t.Fatalf("expected open, got %s", b.State())
+	if b.State() != StateClosed {
+		t.Fatalf("expected closed while failure is unconfirmed, got %s", b.State())
+	}
+	if !b.Allow() {
+		t.Fatal("single transient failure should not block requests")
 	}
 }
 
-func TestAuthFailureQuarantines(t *testing.T) {
+func TestConfirmedTransientFailureOpensCircuit(t *testing.T) {
 	b := New(1, 1)
+	b.RecordFailure(KindTransient)
+	b.RecordFailure(KindTransient)
+	b.RecordFailure(KindTransient)
+	if b.State() != StateOpen {
+		t.Fatalf("expected open after confirmed failures, got %s", b.State())
+	}
+}
+
+func TestSingleAuthFailureDoesNotQuarantine(t *testing.T) {
+	b := New(1, 1)
+	b.RecordFailure(KindAuth)
+	if b.State() != StateClosed {
+		t.Fatalf("expected closed while auth failure is unconfirmed, got %s", b.State())
+	}
+	if !b.Allow() {
+		t.Fatal("single auth failure should not block requests")
+	}
+}
+
+func TestConfirmedAuthFailureQuarantines(t *testing.T) {
+	b := New(1, 1)
+	b.RecordFailure(KindAuth)
 	b.RecordFailure(KindAuth)
 	if b.State() != StateQuarantined {
 		t.Fatalf("expected quarantined, got %s", b.State())
@@ -37,6 +62,7 @@ func TestAuthFailureQuarantines(t *testing.T) {
 func TestQuotaFailureQuarantines(t *testing.T) {
 	b := New(1, 1)
 	b.RecordFailure(KindQuota)
+	b.RecordFailure(KindQuota)
 	if b.State() != StateQuarantined {
 		t.Fatalf("expected quarantined, got %s", b.State())
 	}
@@ -47,6 +73,8 @@ func TestQuotaFailureQuarantines(t *testing.T) {
 
 func TestSuccessClosesCircuit(t *testing.T) {
 	b := New(1, 1)
+	b.RecordFailure(KindTransient)
+	b.RecordFailure(KindTransient)
 	b.RecordFailure(KindTransient)
 	if b.State() != StateOpen {
 		t.Fatalf("expected open after failure")
@@ -68,6 +96,8 @@ func TestSuccessClosesCircuit(t *testing.T) {
 
 func TestHalfOpenProbeRecovery(t *testing.T) {
 	b := New(1, 1)
+	b.RecordFailure(KindTransient)
+	b.RecordFailure(KindTransient)
 	b.RecordFailure(KindTransient)
 
 	// Simulate cooling expiry
@@ -92,6 +122,8 @@ func TestHalfOpenProbeRecovery(t *testing.T) {
 
 func TestHalfOpenProbeFailure(t *testing.T) {
 	b := New(1, 1)
+	b.RecordFailure(KindTransient)
+	b.RecordFailure(KindTransient)
 	b.RecordFailure(KindTransient)
 
 	// Simulate cooling expiry
@@ -119,7 +151,8 @@ func TestHalfOpenProbeFailure(t *testing.T) {
 func TestRateLimitExponentialBackoff(t *testing.T) {
 	b := New(1, 1)
 
-	// First rate limit → 30s cooling
+	// Confirmed rate limit → 30s cooling
+	b.RecordFailure(KindRateLimit)
 	b.RecordFailure(KindRateLimit)
 	if b.State() != StateOpen {
 		t.Fatalf("expected open, got %s", b.State())
@@ -136,8 +169,8 @@ func TestRateLimitExponentialBackoff(t *testing.T) {
 	b.mu.Lock()
 	b.coolingExpires = time.Now().Add(-1 * time.Second) // expire current cooling
 	b.mu.Unlock()
-	b.Allow()                                              // transition to half-open
-	b.RecordFailure(KindRateLimit)                         // fail again
+	b.Allow()                      // transition to half-open
+	b.RecordFailure(KindRateLimit) // half-open probe failure
 
 	b.mu.Lock()
 	secondCooling := b.coolingExpires.Sub(time.Now())
@@ -165,6 +198,7 @@ func TestTransientEscalation(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	b := New(1, 1)
+	b.RecordFailure(KindAuth)
 	b.RecordFailure(KindAuth)
 	if b.State() != StateQuarantined {
 		t.Fatalf("expected quarantined")
@@ -225,6 +259,10 @@ func TestManagerRecordAndAllow(t *testing.T) {
 	}
 
 	m.RecordFailure(1, 1, KindAuth)
+	if !m.Allow(1, 1) {
+		t.Fatal("should still allow after one unconfirmed auth failure")
+	}
+	m.RecordFailure(1, 1, KindAuth)
 	if m.Allow(1, 1) {
 		t.Fatal("should not allow after auth failure")
 	}
@@ -240,6 +278,7 @@ func TestManagerStats(t *testing.T) {
 	m.GetOrCreate(1, 1)
 	m.GetOrCreate(2, 2)
 
+	m.RecordFailure(1, 1, KindAuth)
 	m.RecordFailure(1, 1, KindAuth) // quarantined
 
 	stats := m.Stats()
@@ -261,6 +300,8 @@ func TestManagerStats(t *testing.T) {
 
 func TestManagerProbeCheck(t *testing.T) {
 	m := NewManager()
+	m.RecordFailure(1, 1, KindTransient)
+	m.RecordFailure(1, 1, KindTransient)
 	m.RecordFailure(1, 1, KindTransient)
 
 	// Should not probe while still cooling
@@ -288,6 +329,8 @@ func TestManagerProbeCheck(t *testing.T) {
 func TestManagerResetAll(t *testing.T) {
 	m := NewManager()
 	m.RecordFailure(1, 1, KindAuth)
+	m.RecordFailure(1, 1, KindAuth)
+	m.RecordFailure(2, 2, KindQuota)
 	m.RecordFailure(2, 2, KindQuota)
 
 	if m.Allow(1, 1) || m.Allow(2, 2) {
@@ -304,7 +347,8 @@ func TestManagerResetAll(t *testing.T) {
 func TestUpstreamDownExponentialBackoff(t *testing.T) {
 	b := New(1, 1)
 
-	// First upstream_down → 30s
+	// Confirmed upstream_down → 30s
+	b.RecordFailure(KindUpstreamDown)
 	b.RecordFailure(KindUpstreamDown)
 	b.mu.Lock()
 	c1 := b.coolingExpires.Sub(time.Now())

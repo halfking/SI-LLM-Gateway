@@ -33,15 +33,15 @@ type StreamHandler func(w http.ResponseWriter, resp *http.Response, clientModel,
 type StreamWrapperFunc func(w http.ResponseWriter, resp *http.Response, norm NormalizerFunc, capture *audit.StreamCapture)
 
 type Executor struct {
-	Router      *Router
-	Circuit     *circuit.Manager
-	Limiter     *limiter.Limiter
-	Pools       *pool.PoolManager
-	Upstream    *upstreampkg.Client
-	Normalize   NormalizerFunc
-	StreamChat  StreamHandler
-	Auditor     audit.Sink
-	State       *credentialstate.Writer
+	Router     *Router
+	Circuit    *circuit.Manager
+	Limiter    *limiter.Limiter
+	Pools      *pool.PoolManager
+	Upstream   *upstreampkg.Client
+	Normalize  NormalizerFunc
+	StreamChat StreamHandler
+	Auditor    audit.Sink
+	State      *credentialstate.Writer
 
 	StreamTimeout   time.Duration
 	UpstreamTimeout time.Duration
@@ -165,13 +165,10 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 
 		lastErr = execErr
 		kind := errorsx.ClassifyError(execErr, nil)
-		if kind == errorsx.KindAuth || kind == errorsx.KindQuota {
-			e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
-			e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, kind, execErr)
-			continue
-		}
 		e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
-		e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, kind, execErr)
+		if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, kind) {
+			e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, kind, execErr)
+		}
 	}
 
 	return nil, &ExecuteError{LastErr: lastErr, Tried: tried, Exhausted: true}
@@ -310,11 +307,8 @@ func (e *Executor) tryCandidate(
 			if uErr != nil {
 				errKind = uErr.Kind
 			}
-			if errKind != errorsx.KindCanceled {
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, errKind)
-				if errKind == errorsx.KindRateLimit {
-					e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
-				}
+			if errKind == errorsx.KindRateLimit {
+				e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
 			}
 			if !errorsx.IsRetryable(errKind) || attempt >= maxRetries {
 				return nil, uErr
@@ -342,11 +336,8 @@ func (e *Executor) tryCandidate(
 				resp.StatusCode != 429 && resp.StatusCode != 401 &&
 				resp.StatusCode != 403 && resp.StatusCode != 402 {
 				e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID)
-			} else {
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, errKind)
-				if errKind == errorsx.KindRateLimit {
-					e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
-				}
+			} else if errKind == errorsx.KindRateLimit {
+				e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
 			}
 			if !errorsx.IsRetryable(errKind) || attempt >= maxRetries {
 				return nil, fmt.Errorf("upstream %d", resp.StatusCode)
@@ -431,6 +422,27 @@ func shouldWriteCredentialState(kind errorsx.ErrorKind) bool {
 	default:
 		return false
 	}
+}
+
+func (e *Executor) shouldWriteCredentialStateOnConfirmedFailure(providerID, credentialID int, kind errorsx.ErrorKind) bool {
+	if !shouldWriteCredentialState(kind) {
+		return false
+	}
+	if e.Circuit == nil {
+		return true
+	}
+	b := e.Circuit.GetOrCreate(providerID, credentialID)
+	state := b.State()
+	if state == circuit.StateOpen || state == circuit.StateQuarantined {
+		return true
+	}
+	slog.Warn("credential state write pending failure confirmation",
+		"credential_id", credentialID,
+		"provider_id", providerID,
+		"kind", kind,
+		"consecutive", b.ConsecutiveFailures(),
+	)
+	return false
 }
 
 func egressPref(tx *transform.TransformResult) []string {
