@@ -81,6 +81,8 @@ func main() {
 	chatHandler := relay.NewChatHandler(cm, lim, matrix, pools, resolver, auditSink)
 	healthHandler := relay.NewHealthHandler(cm, lim)
 	modelsHandler := relay.NewModelsHandler(pythonEndpoint)
+	messagesHandler := relay.NewMessagesHandler(chatHandler)
+	responsesHandler := relay.NewResponsesHandler(chatHandler)
 
 	// ── Routing executor (multi-candidate P2C) ──────────────────────────
 	adminAPIKey := os.Getenv("LLM_GATEWAY_ADMIN_API_KEY")
@@ -138,6 +140,12 @@ func main() {
 	// Chat completions
 	mux.Handle("/v1/chat/completions", chatHandler)
 	mux.Handle("/v1/completions", chatHandler)
+
+	// Anthropic Messages API
+	mux.Handle("/v1/messages", messagesHandler)
+
+	// OpenAI Responses API
+	mux.Handle("/v1/responses", responsesHandler)
 
 	// Models listing
 	mux.Handle("/v1/models", modelsHandler)

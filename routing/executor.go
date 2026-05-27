@@ -28,6 +28,8 @@ type NormalizerFunc func(chunk []byte, isStream bool) []byte
 
 type StreamHandler func(w http.ResponseWriter, resp *http.Response, clientModel, outboundModel string, norm NormalizerFunc, capture *audit.StreamCapture)
 
+type StreamWrapperFunc func(w http.ResponseWriter, resp *http.Response, norm NormalizerFunc, capture *audit.StreamCapture)
+
 type Executor struct {
 	Router      *Router
 	Circuit     *circuit.Manager
@@ -86,6 +88,7 @@ type ExecParams struct {
 	Policy        *provider.Policy
 	AuditBuilder  *audit.EventBuilder
 	Capture       *audit.StreamCapture
+	StreamWrapper StreamWrapperFunc
 }
 
 type ExecuteResult struct {
@@ -335,7 +338,9 @@ func (e *Executor) tryCandidate(
 		latencyMs := int(time.Since(tTotal).Milliseconds())
 
 		if params.IsStream {
-			if e.StreamChat != nil {
+			if params.StreamWrapper != nil {
+				params.StreamWrapper(params.W, resp, e.Normalize, params.Capture)
+			} else if e.StreamChat != nil {
 				e.StreamChat(params.W, resp, params.ClientModel, outboundModel, e.Normalize, params.Capture)
 			}
 		} else {
