@@ -12,6 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kaixuan/llm-gateway-go/secret"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -87,10 +90,10 @@ func DefaultPolicy() *Policy {
 }
 
 type resolveResponse struct {
-	ClientModel    string `json:"client_model"`
-	CanonicalName  string `json:"canonical_name"`
-	CanonicalID    *int   `json:"canonical_id"`
-	ResolutionPath string `json:"resolution_path"`
+	ClientModel    string   `json:"client_model"`
+	CanonicalName  string   `json:"canonical_name"`
+	CanonicalID    *int     `json:"canonical_id"`
+	ResolutionPath string   `json:"resolution_path"`
 	RawModels      []string `json:"raw_models"`
 	PlanOrder      []struct {
 		CredentialID int    `json:"credential_id"`
@@ -107,13 +110,13 @@ type revealResponse struct {
 }
 
 type policyResponse struct {
-	AlgorithmVersion        int   `json:"algorithm_version"`
-	RetryPerCredential      int   `json:"retry_per_credential"`
-	TierFallbackMax         int   `json:"tier_fallback_max"`
-	CircuitOpenSeconds      int   `json:"circuit_open_seconds"`
-	CircuitFailureThreshold int   `json:"circuit_failure_threshold"`
-	CircuitMaxOpenSeconds   int   `json:"circuit_max_open_seconds"`
-	StickyTTLMilliseconds   int   `json:"sticky_ttl_seconds"`
+	AlgorithmVersion        int `json:"algorithm_version"`
+	RetryPerCredential      int `json:"retry_per_credential"`
+	TierFallbackMax         int `json:"tier_fallback_max"`
+	CircuitOpenSeconds      int `json:"circuit_open_seconds"`
+	CircuitFailureThreshold int `json:"circuit_failure_threshold"`
+	CircuitMaxOpenSeconds   int `json:"circuit_max_open_seconds"`
+	StickyTTLMilliseconds   int `json:"sticky_ttl_seconds"`
 }
 
 type cacheEntry[T any] struct {
@@ -125,6 +128,8 @@ type Client struct {
 	endpoint   string
 	adminKey   string
 	httpClient *http.Client
+	dbPool     *pgxpool.Pool
+	fernetKey  []byte
 
 	mu        sync.RWMutex
 	candCache map[string]cacheEntry[*resolveResponse]
@@ -154,6 +159,15 @@ func NewClient(pythonEndpoint, adminAPIKey string) *Client {
 
 func (c *Client) Enabled() bool {
 	return c.endpoint != ""
+}
+
+func (c *Client) SetDB(pool *pgxpool.Pool, secretKey, credentialEncryptionKey string) {
+	c.dbPool = pool
+	if key, err := secret.FernetKeyFromSecret(secretKey, credentialEncryptionKey); err == nil {
+		c.fernetKey = key
+	} else if pool != nil {
+		slog.Warn("credential fernet key unavailable; reveal will use RPC fallback", "error", err)
+	}
 }
 
 func (c *Client) GetCandidates(ctx context.Context, model, profile string) ([]Candidate, *Policy, error) {
@@ -348,6 +362,16 @@ func (c *Client) fetchPolicy(ctx context.Context) (*Policy, error) {
 }
 
 func (c *Client) fetchReveal(ctx context.Context, providerID, credentialID int) (string, error) {
+	if c.dbPool != nil && len(c.fernetKey) == 32 {
+		if apiKey, err := c.fetchRevealDB(ctx, providerID, credentialID); err == nil {
+			return apiKey, nil
+		} else {
+			slog.Warn("credential reveal DB failed, falling back to RPC", "credential_id", credentialID, "error", err)
+		}
+	}
+	if c.endpoint == "" {
+		return "", fmt.Errorf("provider reveal not configured")
+	}
 	fetchURL := fmt.Sprintf("%s/api/providers/%d/credentials/%d/reveal", c.endpoint, providerID, credentialID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fetchURL, nil)
 	if err != nil {
@@ -370,6 +394,25 @@ func (c *Client) fetchReveal(ctx context.Context, providerID, credentialID int) 
 		return "", err
 	}
 	return rr.APIKey, nil
+}
+
+func (c *Client) fetchRevealDB(ctx context.Context, providerID, credentialID int) (string, error) {
+	var ciphertext []byte
+	err := c.dbPool.QueryRow(ctx, `
+		SELECT secret_ciphertext
+		FROM credentials
+		WHERE id = $1 AND provider_id = $2 AND status <> 'disabled'
+	`, credentialID, providerID).Scan(&ciphertext)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", fmt.Errorf("credential %d not found", credentialID)
+		}
+		return "", err
+	}
+	if len(ciphertext) == 0 {
+		return "", fmt.Errorf("credential %d has no secret", credentialID)
+	}
+	return secret.DecryptFernet(ciphertext, c.fernetKey)
 }
 
 func (c *Client) enrichWithAPIKeys(ctx context.Context, rr *resolveResponse) []Candidate {

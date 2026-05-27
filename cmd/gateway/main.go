@@ -31,6 +31,8 @@ import (
 	"github.com/kaixuan/llm-gateway-go/audit"
 	"github.com/kaixuan/llm-gateway-go/auth"
 	"github.com/kaixuan/llm-gateway-go/circuit"
+	"github.com/kaixuan/llm-gateway-go/config"
+	"github.com/kaixuan/llm-gateway-go/db"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/middleware"
 	"github.com/kaixuan/llm-gateway-go/pool"
@@ -62,6 +64,17 @@ func main() {
 	})))
 
 	// ── Dependencies ──────────────────────────────────────────────────────
+	cfg := config.Load()
+	dbConn, err := db.Open(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		slog.Warn("postgres disabled", "error", err)
+	}
+	defer func() {
+		if dbConn != nil {
+			dbConn.Close()
+		}
+	}()
+
 	cm := circuit.NewManager()
 	lim := limiter.New()
 
@@ -87,6 +100,9 @@ func main() {
 	// ── Routing executor (multi-candidate P2C) ──────────────────────────
 	adminAPIKey := os.Getenv("LLM_GATEWAY_ADMIN_API_KEY")
 	providerClient := provider.NewClient(pythonEndpoint, adminAPIKey)
+	if dbConn != nil && dbConn.Enabled() {
+		providerClient.SetDB(dbConn.Pool(), cfg.SecretKey, cfg.CredentialEncryptionKey)
+	}
 	if providerClient.Enabled() {
 		stickyCache := routing.NewStickyCache()
 		router := routing.NewRouter(stickyCache, lim)
@@ -110,6 +126,9 @@ func main() {
 
 	// ── Auth + Rate Limiting ──────────────────────────────────────────────
 	keyVerifier := auth.NewKeyVerifier(pythonEndpoint, adminAPIKey)
+	if dbConn != nil && dbConn.Enabled() {
+		keyVerifier.SetDB(dbConn.Pool(), cfg.SecretKey)
+	}
 	if keyVerifier.Enabled() {
 		slidingRL := ratelimit.NewSlidingWindowLimiter()
 		chatHandler.SetAuth(keyVerifier, slidingRL)
@@ -168,11 +187,11 @@ func main() {
 	handler = middleware.WithRecovery(handler)
 
 	srv := &http.Server{
-		Addr:         listen,
-		Handler:      handler,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 0,
-		IdleTimeout:  60 * time.Second,
+		Addr:           listen,
+		Handler:        handler,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   0,
+		IdleTimeout:    60 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
 
