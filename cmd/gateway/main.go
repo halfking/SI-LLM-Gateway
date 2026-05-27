@@ -191,6 +191,7 @@ func main() {
 	handler := middleware.APIKeyAuth(mux)
 	handler = middleware.WithRequestID(handler)
 	handler = middleware.WithLogging(handler)
+	handler = middleware.CORS(handler)
 	handler = middleware.WithRecovery(handler)
 
 	srv := &http.Server{
