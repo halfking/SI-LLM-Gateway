@@ -41,6 +41,7 @@ type TransformResult struct {
 	Passthrough          []string
 	PassthroughFields    []string
 	StripRequestFields   []string
+	DisguiseProfileID    string
 	MatchedRule          string
 }
 

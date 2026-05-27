@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -154,4 +155,62 @@ type InvalidKeyError struct {
 
 func (e *InvalidKeyError) Error() string {
 	return e.Message
+}
+
+type BudgetExceededError struct {
+	KeyID   int
+	Budget  float64
+	Spent   float64
+}
+
+func (e *BudgetExceededError) Error() string {
+	return fmt.Sprintf("budget exceeded for key %d: spent %.4f >= budget %.4f", e.KeyID, e.Spent, e.Budget)
+}
+
+type budgetCheckResponse struct {
+	APIKeyID int      `json:"api_key_id"`
+	BudgetUSD *float64 `json:"budget_usd"`
+	SpentUSD float64  `json:"spent_usd"`
+	Exceeded bool     `json:"exceeded"`
+}
+
+func (kv *KeyVerifier) CheckBudget(ctx context.Context, keyID int) error {
+	if !kv.Enabled() {
+		return nil
+	}
+
+	payload, _ := json.Marshal(map[string]any{"api_key_id": keyID})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, kv.endpoint+"/api/keys/budget-check", bytes.NewReader(payload))
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+kv.adminKey)
+
+	resp, err := kv.httpClient.Do(req)
+	if err != nil {
+		slog.Warn("budget check RPC failed", "error", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode != http.StatusOK {
+		slog.Warn("budget check RPC non-200", "status", resp.StatusCode, "body", string(body))
+		return nil
+	}
+
+	var result budgetCheckResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil
+	}
+
+	if result.Exceeded {
+		budget := 0.0
+		if result.BudgetUSD != nil {
+			budget = *result.BudgetUSD
+		}
+		return &BudgetExceededError{KeyID: keyID, Budget: budget, Spent: result.SpentUSD}
+	}
+	return nil
 }

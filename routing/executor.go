@@ -12,6 +12,7 @@ import (
 
 	"github.com/kaixuan/llm-gateway-go/audit"
 	"github.com/kaixuan/llm-gateway-go/circuit"
+	"github.com/kaixuan/llm-gateway-go/disguise"
 	"github.com/kaixuan/llm-gateway-go/errorsx"
 	"github.com/kaixuan/llm-gateway-go/identity"
 	"github.com/kaixuan/llm-gateway-go/limiter"
@@ -198,6 +199,20 @@ func (e *Executor) tryCandidate(
 	}
 	if !transform.IsToolUseCapable(cand.CatalogCode) && transform.NeedsToolCollapse(bodyBytes) {
 		bodyBytes = transform.CollapseToolHistory(bodyBytes)
+	}
+	bodyBytes = transform.ApplyCapabilitySanitizer(bodyBytes, cand.CatalogCode)
+
+	if disguise.IsEnabled() && disguise.ShouldApply(bodyBytes) {
+		profileName := ""
+		if params.Transform != nil && params.Transform.DisguiseProfileID != "" {
+			profileName = params.Transform.DisguiseProfileID
+		} else if params.ClientID.Fingerprint.ClientProfile != "" {
+			profileName = params.ClientID.Fingerprint.ClientProfile
+		}
+		if profileName != "" {
+			bodyBytes, _ = disguise.Apply(bodyBytes, nil, nil, "default", 0)
+			slog.Debug("disguise layer applied", "profile", profileName)
+		}
 	}
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {

@@ -159,6 +159,16 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// ── Budget pre-check ─────────────────────────────────────────────────
+	if keyInfo != nil && h.keyVerifier != nil {
+		if budgetErr := h.keyVerifier.CheckBudget(r.Context(), keyInfo.ID); budgetErr != nil {
+			if _, ok := budgetErr.(*auth.BudgetExceededError); ok {
+				writeErrorJSON(w, http.StatusPaymentRequired, requestID, "Budget exhausted. Contact admin to top up.", "insufficient_quota", "budget_exhausted")
+				return
+			}
+		}
+	}
+
 	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, int64(maxBodySize)+1))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{

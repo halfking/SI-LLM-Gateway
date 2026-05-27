@@ -98,11 +98,137 @@ func NeedsToolCollapse(body []byte) bool {
 }
 
 func CollapseToolHistory(body []byte) []byte {
+	return collapseToolHistory(body)
+}
+
+func ApplyCapabilitySanitizer(body []byte, catalogCode string) []byte {
+	switch catalogCode {
+	case "nvidia_nim":
+		body = stripBooleanParams(body)
+	case "deepseek":
+		body = capMaxTokens(body, 8192)
+	}
+	return body
+}
+
+func capMaxTokens(body []byte, maxVal int) []byte {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(body, &obj); err != nil {
 		return body
 	}
+	raw, ok := obj["max_tokens"]
+	if !ok {
+		return body
+	}
+	var val int
+	if json.Unmarshal(raw, &val) != nil || val <= maxVal {
+		return body
+	}
+	obj["max_tokens"], _ = json.Marshal(maxVal)
+	result, err := json.Marshal(obj)
+	if err != nil {
+		return body
+	}
+	return result
+}
 
+func stripBooleanParams(body []byte) []byte {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return body
+	}
+	raw, ok := obj["tools"]
+	if !ok {
+		return body
+	}
+	var tools []map[string]json.RawMessage
+	if json.Unmarshal(raw, &tools) != nil {
+		return body
+	}
+	modified := false
+	for i, tool := range tools {
+		fn, ok := tool["function"]
+		if !ok {
+			continue
+		}
+		var fnObj map[string]json.RawMessage
+		if json.Unmarshal(fn, &fnObj) != nil {
+			continue
+		}
+		params, ok := fnObj["parameters"]
+		if !ok {
+			continue
+		}
+		stripped := stripBoolFromSchema(params)
+		if stripped != nil {
+			fnObj["parameters"] = stripped
+			tools[i]["function"], _ = json.Marshal(fnObj)
+			modified = true
+		}
+	}
+	if !modified {
+		return body
+	}
+	obj["tools"], _ = json.Marshal(tools)
+	result, err := json.Marshal(obj)
+	if err != nil {
+		return body
+	}
+	return result
+}
+
+func stripBoolFromSchema(raw json.RawMessage) json.RawMessage {
+	var schema map[string]json.RawMessage
+	if json.Unmarshal(raw, &schema) != nil {
+		return nil
+	}
+	props, ok := schema["properties"]
+	if !ok {
+		return nil
+	}
+	var properties map[string]json.RawMessage
+	if json.Unmarshal(props, &properties) != nil {
+		return nil
+	}
+	modified := false
+	for key, val := range properties {
+		var prop map[string]any
+		if json.Unmarshal(val, &prop) != nil {
+			continue
+		}
+		if typ, ok := prop["type"].(string); ok && typ == "boolean" {
+			delete(properties, key)
+			modified = true
+		}
+	}
+	if !modified {
+		return nil
+	}
+	schema["properties"], _ = json.Marshal(properties)
+	if req, ok := schema["required"]; ok {
+		var reqList []string
+		if json.Unmarshal(req, &reqList) == nil {
+			filtered := reqList[:0]
+			for _, s := range reqList {
+				if _, exists := properties[s]; exists {
+					filtered = append(filtered, s)
+				}
+			}
+			schema["required"], _ = json.Marshal(filtered)
+		}
+	}
+	result, err := json.Marshal(schema)
+	if err != nil {
+		return nil
+	}
+	return result
+}
+
+func collapseToolHistory(body []byte) []byte {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return body
+	}
 	msgsRaw, ok := obj["messages"]
 	if !ok {
 		return body
