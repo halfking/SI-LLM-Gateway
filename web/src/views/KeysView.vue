@@ -1,0 +1,557 @@
+<script setup lang="ts">
+import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { getKeys, createKey, revokeKey, revealKey, approveKey, disableKey, enableKey, patchApplicationProfile, type ApiKey, type KeyCreatedResponse } from '../api'
+import { store, clearApiKey } from '../store'
+
+const router = useRouter()
+
+const keys = ref<ApiKey[]>([])
+const profileEdit = ref<{ code: string; profile: string } | null>(null)
+const profileSaving = ref(false)
+const loading = ref(false)
+const error = ref('')
+const activeTab = ref<'all' | 'active' | 'pending' | 'closed'>('active')
+
+function isExpired(k: ApiKey): boolean {
+  if (!k.expires_at) return false
+  return new Date(k.expires_at).getTime() <= Date.now()
+}
+
+function keyState(k: ApiKey): 'active' | 'pending' | 'closed' {
+  if (k.status === 'pending') return 'pending'
+  if (k.status === 'active' && !isExpired(k) && k.enabled) return 'active'
+  return 'closed'
+}
+
+function keyStateLabel(k: ApiKey): string {
+  if (k.status === 'pending') return '待审批'
+  if (k.status === 'active' && !isExpired(k) && k.enabled) return '正常'
+  return isExpired(k) ? '已过期' : '已作废'
+}
+
+function keyStateBadgeClass(k: ApiKey): string {
+  const state = keyState(k)
+  if (state === 'active') return 'badge-green'
+  if (state === 'pending') return 'badge-yellow'
+  return 'badge-red'
+}
+
+const statusTabs = computed(() => {
+  const summary = { all: 0, active: 0, pending: 0, closed: 0 }
+  for (const k of keys.value) {
+    summary.all += 1
+    summary[keyState(k)] += 1
+  }
+  return [
+    { value: 'all' as const, label: '全部', count: summary.all },
+    { value: 'active' as const, label: '可用', count: summary.active },
+    { value: 'pending' as const, label: '待审', count: summary.pending },
+    { value: 'closed' as const, label: '已作废/过期', count: summary.closed },
+  ]
+})
+
+const filteredKeys = computed(() => {
+  if (activeTab.value === 'all') return keys.value
+  return keys.value.filter((k) => keyState(k) === activeTab.value)
+})
+
+// New key modal
+const showNew = ref(false)
+const newApp = ref('')
+const newOwner = ref('')
+const newBudget = ref('')
+const newRpm = ref('')
+const newSaving = ref(false)
+const newErr = ref('')
+const createdKey = ref<KeyCreatedResponse | null>(null)
+
+// Copy feedback
+const copiedId = ref<string | null>(null)
+const copyNotice = ref('')
+let copyNoticeTimer: number | undefined
+
+async function saveAppProfile() {
+  if (!profileEdit.value) return
+  profileSaving.value = true
+  try {
+    await patchApplicationProfile(
+      profileEdit.value.code,
+      profileEdit.value.profile.trim() || null,
+    )
+    profileEdit.value = null
+    await load()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '保存 profile 失败'
+  } finally {
+    profileSaving.value = false
+  }
+}
+
+async function load() {
+  loading.value = true
+  error.value = ''
+  try {
+    keys.value = await getKeys()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+function openNew() {
+  newApp.value = 'default'
+  newOwner.value = ''
+  newBudget.value = ''
+  newRpm.value = ''
+  newErr.value = ''
+  createdKey.value = null
+  showNew.value = true
+}
+
+async function submitNew() {
+  if (!newApp.value) { newErr.value = '请填写应用代码'; return }
+  newSaving.value = true
+  newErr.value = ''
+  try {
+    const resp = await createKey({
+      application_code: newApp.value,
+      owner_user: newOwner.value || undefined,
+      budget_usd: newBudget.value ? Number(newBudget.value) : undefined,
+      rate_limit_rpm: newRpm.value ? Number(newRpm.value) : undefined,
+    })
+    createdKey.value = resp
+    await load()
+  } catch (e: unknown) {
+    newErr.value = e instanceof Error ? e.message : '创建失败'
+  } finally {
+    newSaving.value = false
+  }
+}
+
+async function revoke(k: ApiKey) {
+  if (!confirm(`确认吊销密钥 ${k.key_prefix}***？此操作不可撤销。`)) return
+  try {
+    await revokeKey(k.id)
+    keys.value = keys.value.filter(x => x.id !== k.id)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '吊销失败'
+  }
+}
+
+function fmtDate(s: string | null | undefined) {
+  if (!s) return '—'
+  return new Date(s).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+function fmtCost(n: number | string | null | undefined): string {
+  if (n == null) return '—'
+  return '$' + Number(n).toFixed(2)
+}
+
+async function copyText(val: string): Promise<void> {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(val)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = val
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  textarea.style.top = '0'
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+  const ok = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  if (!ok) throw new Error('copy failed')
+}
+
+// Copy a row key — fetches full decrypted key from backend first
+async function copyKey(k: ApiKey, id: string) {
+  try {
+    let val: string
+    if (k.key_prefix) {
+      const result = await revealKey(k.id)
+      val = result.api_key
+    } else {
+      val = k.key_prefix
+    }
+    await copyText(val)
+    copiedId.value = id
+    copyNotice.value = '已复制完整密钥'
+  } catch (e) {
+    // 409 means key was created before encrypted storage feature - can't reveal retroactively
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.includes('No encrypted key stored') || msg.includes('409')) {
+      copyNotice.value = '此密钥不支持复制完整内容，请重新签发密钥'
+    } else {
+      copyNotice.value = msg || '复制失败'
+    }
+  }
+  if (copyNoticeTimer) window.clearTimeout(copyNoticeTimer)
+  copyNoticeTimer = window.setTimeout(() => {
+    copiedId.value = null
+    copyNotice.value = ''
+  }, 4000)
+}
+
+async function copyCreatedKey(id: string) {
+  const val = createdKey.value?.api_key
+  try {
+    if (!val) throw new Error('后端未返回有效密钥')
+    await copyText(val)
+    copiedId.value = id
+    copyNotice.value = '已复制完整密钥'
+  } catch (e) {
+    copyNotice.value = e instanceof Error ? e.message : '复制失败，请手动复制'
+  }
+  if (copyNoticeTimer) window.clearTimeout(copyNoticeTimer)
+  copyNoticeTimer = window.setTimeout(() => {
+    copiedId.value = null
+    copyNotice.value = ''
+  }, 2500)
+}
+
+async function approve(k: ApiKey) {
+  try {
+    await approveKey(k.id)
+    await load()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '审批失败'
+  }
+}
+
+async function disable(k: ApiKey) {
+  // System keys cannot be disabled
+  if ((k as any).is_system) {
+    error.value = '系统密钥无法禁用'
+    return
+  }
+  if (!confirm(`确认禁用密钥 ${k.key_prefix}？可通过"启用"恢复。`)) return
+  try {
+    await disableKey(k.id)
+    // If the disabled key is the current session key, clear session and redirect
+    // because disabled keys can't authenticate anymore
+    const currentKeyPrefix = store.apiKey ? store.apiKey.substring(0, 12) : ''
+    if (k.key_prefix && currentKeyPrefix.startsWith(k.key_prefix.substring(0, 8))) {
+      clearApiKey()
+      window.location.href = '/login'
+      return
+    }
+    await load()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '禁用失败'
+  }
+}
+
+async function enable(k: ApiKey) {
+  try {
+    await enableKey(k.id)
+    await load()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '启用失败'
+  }
+}
+
+function viewStats(k: ApiKey) {
+  router.push(`/keys/${k.id}`)
+}
+
+function setTab(next: 'all' | 'active' | 'pending' | 'closed') {
+  activeTab.value = next
+}
+
+onMounted(load)
+onBeforeUnmount(() => {
+  if (copyNoticeTimer) window.clearTimeout(copyNoticeTimer)
+})
+</script>
+
+<template>
+  <div>
+    <div class="page-header">
+      <h2>API 密钥管理</h2>
+      <button class="btn btn-primary" @click="openNew">+ 签发密钥</button>
+    </div>
+
+    <div v-if="error" class="alert alert-danger">{{ error }}</div>
+    <div v-if="copyNotice" class="copy-toast" :class="{ error: copyNotice.startsWith('复制失败') }">{{ copyNotice }}</div>
+    <div v-if="loading" class="empty">加载中…</div>
+
+    <div class="card" v-if="!loading">
+      <div class="status-tabs">
+        <button
+          v-for="tab in statusTabs"
+          :key="tab.value"
+          class="status-tab"
+          :class="{ active: activeTab === tab.value }"
+          @click="setTab(tab.value)"
+        >
+          <span>{{ tab.label }}</span>
+          <span class="count">{{ tab.count }}</span>
+        </button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>前缀</th>
+            <th>应用</th>
+            <th>Client Profile</th>
+            <th>归属用户</th>
+            <th>状态</th>
+            <th>预算</th>
+            <th>速率限制</th>
+            <th>到期</th>
+            <th>最后使用</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="k in filteredKeys" :key="k.id">
+            <td>
+              <div class="key-cell">
+                <code style="font-size:12px">{{ k.key_prefix }}***</code>
+                <button
+                  class="btn btn-ghost btn-xs"
+                  :class="{ 'btn-success': copiedId === `view-${k.id}` }"
+                  @click.stop="copyKey(k, `view-${k.id}`)"
+                  title="复制完整密钥"
+                >
+                  {{ copiedId === `view-${k.id}` ? '✓' : '📋' }}
+                </button>
+              </div>
+            </td>
+            <td>{{ k.application_code }}</td>
+            <td>
+              <code style="font-size:11px">{{ k.default_client_profile || '—' }}</code>
+              <button
+                class="btn btn-ghost btn-xs"
+                @click="profileEdit = { code: k.application_code, profile: k.default_client_profile || '' }"
+              >编辑</button>
+            </td>
+            <td>{{ k.owner_user ?? '—' }}</td>
+            <td>
+              <span class="badge"
+                :class="keyStateBadgeClass(k)"
+              >
+                {{ keyStateLabel(k) }}
+              </span>
+              <span v-if="(k as any).is_system" class="badge badge-system">系统</span>
+            </td>
+            <td>{{ k.budget_usd != null ? fmtCost(k.budget_usd) : '无限制' }}</td>
+            <td>{{ k.rate_limit_rpm != null ? k.rate_limit_rpm + ' RPM' : '无限制' }}</td>
+            <td style="font-size:12px;color:var(--muted)">{{ fmtDate(k.expires_at) }}</td>
+            <td style="font-size:12px;color:var(--muted)">{{ fmtDate(k.last_used_at) }}</td>
+            <td>
+              <div class="action-cell">
+                <button
+                  class="btn btn-secondary btn-sm"
+                  @click="viewStats(k)"
+                  title="查看使用统计"
+                >
+                  📊 统计
+                </button>
+                <button
+                  class="btn btn-success btn-sm"
+                  @click="approve(k)"
+                  v-if="k.status === 'pending'"
+                >审批</button>
+                <button
+                  @click="disable(k)"
+                  v-else-if="k.status === 'active'"
+                >禁用</button>
+                <button
+                  class="btn btn-secondary btn-sm"
+                  @click="enable(k)"
+                  v-else-if="k.status === 'disabled'"
+                >启用</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="!loading && filteredKeys.length === 0" class="empty">当前状态下没有密钥</div>
+    </div>
+
+    <!-- New Key Modal -->
+    <div v-if="profileEdit" class="modal-overlay" @click.self="profileEdit = null">
+      <div class="modal card" style="max-width:420px">
+        <h3>应用 Client Profile — {{ profileEdit.code }}</h3>
+        <input
+          v-model="profileEdit.profile"
+          class="input"
+          placeholder="cursor / roocode / cline"
+        />
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button class="btn btn-ghost" @click="profileEdit = null">取消</button>
+          <button class="btn btn-primary" @click="saveAppProfile" :disabled="profileSaving">
+            {{ profileSaving ? '保存中…' : '保存' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" v-if="showNew" @click.self="() => { if (!createdKey) showNew = false }">
+      <div class="modal">
+        <h3>签发新密钥</h3>
+
+        <!-- Show created key with copy button -->
+        <template v-if="createdKey">
+          <div class="alert alert-success">密钥已创建，请立即保存！关闭后无法再次查看完整密钥。</div>
+          <div class="key-display">
+            <code>{{ createdKey.api_key || '（密钥返回异常）' }}</code>
+          </div>
+          <div class="key-copy-row">
+            <button
+              class="btn btn-primary"
+              :class="{ 'btn-success': copiedId === 'new-key' }"
+              @click="copyCreatedKey('new-key')"
+              :disabled="!createdKey.api_key"
+            >
+              {{ copiedId === 'new-key' ? '✓ 已复制' : '📋 复制密钥' }}
+            </button>
+            <span class="hint">{{ createdKey.api_key ? '可多次点击复制' : '后端未返回有效密钥，请检查接口返回' }}</span>
+          </div>
+          <div style="text-align:right;margin-top:16px">
+            <button class="btn btn-primary" @click="showNew = false">我已保存，关闭</button>
+          </div>
+        </template>
+
+        <!-- Create form -->
+        <template v-else>
+          <div v-if="newErr" class="alert alert-danger">{{ newErr }}</div>
+          <div class="form-group">
+            <label>应用代码 *</label>
+            <input v-model="newApp" placeholder="如: default, portal, agent" />
+          </div>
+          <div class="form-group">
+            <label>归属用户（可选）</label>
+            <input v-model="newOwner" placeholder="如: admin" />
+          </div>
+          <div class="form-group">
+            <label>预算上限 USD（可选）</label>
+            <input v-model="newBudget" type="number" step="0.01" placeholder="留空不限制" />
+          </div>
+          <div class="form-group">
+            <label>每分钟请求数限制（可选）</label>
+            <input v-model="newRpm" type="number" placeholder="留空不限制" />
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button class="btn btn-ghost" @click="showNew = false">取消</button>
+            <button class="btn btn-primary" @click="submitNew" :disabled="newSaving">
+              {{ newSaving ? '签发中…' : '签发' }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.status-tab:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.status-tab.active {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.status-tab .count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bg-subtle, var(--bg));
+  color: var(--muted);
+  text-align: center;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.key-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-cell {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.key-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.key-display code {
+  flex: 1;
+  font-size: 12px;
+  color: var(--success);
+}
+
+.key-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.copy-toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--success);
+  color: white;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+}
+
+.copy-toast.error {
+  background: var(--danger);
+}
+</style>

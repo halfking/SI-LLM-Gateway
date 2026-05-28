@@ -1,0 +1,251 @@
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import {
+  getUsageSummary,
+  getUsageByModel,
+  getDashboardOverview,
+  getHotApiKeys,
+  getModelDiscoveryStatus,
+  type UsageSummary,
+  type ModelUsage,
+  type DashboardOverview,
+  type HotApiKeyEntry,
+  type ModelDiscoveryStatusResponse,
+} from '../api'
+
+const days    = ref(7)
+const summary = ref<UsageSummary | null>(null)
+const overview = ref<DashboardOverview | null>(null)
+const models  = ref<ModelUsage[]>([])
+const hotKeys = ref<HotApiKeyEntry[]>([])
+const discoveryStatus = ref<ModelDiscoveryStatusResponse | null>(null)
+const loading = ref(false)
+const error   = ref('')
+let discoveryPollTimer: ReturnType<typeof setInterval> | null = null
+
+async function load() {
+  loading.value = true
+  error.value = ''
+  try {
+    const [s, m, o, h] = await Promise.all([
+      getUsageSummary(days.value),
+      getUsageByModel(days.value),
+      getDashboardOverview(days.value),
+      getHotApiKeys(days.value, 10),
+    ])
+    summary.value = s
+    models.value  = m
+    overview.value = o
+    hotKeys.value = h
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+function fmt(n: number | undefined, decimals = 0) {
+  if (n === undefined || n === null) return '—'
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K'
+  return Number(n).toFixed(decimals)
+}
+
+function fmtCost(v: number | undefined) {
+  if (v === undefined || v === null) return '—'
+  return '$' + Number(v).toFixed(4)
+}
+
+function fmtPct(v: number | undefined) {
+  if (v === undefined || v === null) return '—'
+  return (Number(v) * 100).toFixed(1) + '%'
+}
+
+function fmtDate(v: string | null | undefined) {
+  if (!v) return '—'
+  return new Date(v).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+async function loadDiscoveryStatus() {
+  try {
+    discoveryStatus.value = await getModelDiscoveryStatus()
+  } catch {
+    /* non-blocking */
+  }
+}
+
+function scheduleDiscoveryPoll() {
+  if (discoveryPollTimer) clearInterval(discoveryPollTimer)
+  discoveryPollTimer = setInterval(() => {
+    void loadDiscoveryStatus()
+  }, 15000)
+}
+
+onMounted(() => {
+  void load()
+  void loadDiscoveryStatus()
+  scheduleDiscoveryPoll()
+})
+
+onUnmounted(() => {
+  if (discoveryPollTimer) clearInterval(discoveryPollTimer)
+})
+</script>
+
+<template>
+  <div>
+    <div class="page-header">
+      <h2>仪表盘</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select v-model.number="days" style="width:100px" @change="load">
+          <option :value="1">今日</option>
+          <option :value="7">近 7 天</option>
+          <option :value="30">近 30 天</option>
+          <option :value="90">近 90 天</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" @click="load" :disabled="loading">刷新</button>
+      </div>
+    </div>
+
+    <div v-if="error" class="alert alert-danger">{{ error }}</div>
+
+    <div
+      v-if="discoveryStatus?.running"
+      class="background-tasks-banner background-tasks-banner--active"
+    >
+      <strong>后台任务进行中</strong>
+      <span>模型发现（{{ discoveryStatus.running.trigger }}）</span>
+      <span>开始 {{ fmtDate(discoveryStatus.running.started_at) }}</span>
+      <span>心跳 {{ fmtDate(discoveryStatus.running.heartbeat_at) }}</span>
+      <span class="background-tasks-hint">管理页可能变慢</span>
+      <RouterLink to="/models">查看详情</RouterLink>
+    </div>
+    <div
+      v-else-if="discoveryStatus?.latest"
+      class="background-tasks-banner"
+    >
+      <span>最近模型发现：{{ discoveryStatus.latest.status }}</span>
+      <span>{{ fmtDate(discoveryStatus.latest.finished_at || discoveryStatus.latest.started_at) }}</span>
+      <RouterLink to="/models">模型页</RouterLink>
+    </div>
+
+    <div class="stat-grid" v-if="summary && overview">
+      <div class="stat-card">
+        <div class="label">总请求数</div>
+        <div class="value">{{ fmt(summary.total_requests) }}</div>
+        <div class="sub">近 {{ days }} 天</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">总 Token 用量</div>
+        <div class="value">{{ fmt((summary.total_prompt_tokens ?? 0) + (summary.total_completion_tokens ?? 0)) }}</div>
+        <div class="sub">提示 {{ fmt(summary.total_prompt_tokens) }} · 补全 {{ fmt(summary.total_completion_tokens) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">总费用</div>
+        <div class="value">{{ fmtCost(summary.total_cost_usd) }}</div>
+        <div class="sub">USD</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">成功率</div>
+        <div class="value" :style="{ color: (summary.success_rate ?? 1) > 0.95 ? 'var(--success)' : 'var(--warning)' }">
+          {{ fmtPct(summary.success_rate) }}
+        </div>
+        <div class="sub">平均延迟 {{ fmt(summary.avg_latency_ms) }} ms</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">接入 API Key</div>
+        <div class="value">{{ fmt(overview.total_api_keys) }}</div>
+        <div class="sub">启用 {{ fmt(overview.active_api_keys) }} · 活跃 {{ fmt(overview.active_api_keys_in_window) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">模型数量</div>
+        <div class="value">{{ fmt(overview.total_models) }}</div>
+        <div class="sub">近 {{ days }} 天活跃 {{ fmt(overview.active_models_in_window) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">供应商 / 凭据</div>
+        <div class="value">{{ fmt(overview.total_providers) }}</div>
+        <div class="sub">启用 {{ fmt(overview.active_providers) }} · 凭据 {{ fmt(overview.total_credentials) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">下线资源</div>
+        <div class="value">{{ fmt((overview.offline_models ?? 0) + (overview.offline_credentials ?? 0)) }}</div>
+        <div class="sub">模型 {{ fmt(overview.offline_models) }} · 凭据 {{ fmt(overview.offline_credentials) }}</div>
+      </div>
+    </div>
+    <div class="stat-grid" v-else-if="loading">
+      <div class="stat-card" v-for="i in 8" :key="i">
+        <div class="label" style="background:var(--border);height:12px;width:80px;border-radius:4px"></div>
+        <div class="value" style="background:var(--border);height:32px;width:60px;border-radius:4px;margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px" v-if="hotKeys.length > 0 || loading">
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px">高用量 API Key 排行</div>
+      <div v-if="loading" class="empty">加载中…</div>
+      <table v-else>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>应用</th>
+            <th>归属用户</th>
+            <th style="text-align:right">请求数</th>
+            <th style="text-align:right">Token 用量</th>
+            <th style="text-align:right">费用 (USD)</th>
+            <th>最后使用</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="k in hotKeys" :key="k.api_key_id">
+            <td><code style="font-size:12px">{{ k.key_prefix ?? '—' }}***</code></td>
+            <td>{{ k.application_code ?? '—' }}</td>
+            <td>{{ k.owner_user ?? '—' }}</td>
+            <td style="text-align:right">{{ fmt(k.request_count) }}</td>
+            <td style="text-align:right">{{ fmt(k.total_tokens) }}</td>
+            <td style="text-align:right">{{ fmtCost(k.total_cost_usd) }}</td>
+            <td>{{ fmtDate(k.last_used_at) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="!loading && hotKeys.length === 0" class="empty">该时段暂无 API Key 排行数据</div>
+    </div>
+
+    <div class="card" style="margin-top:20px" v-if="models.length > 0 || loading">
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px">按模型统计</div>
+      <div v-if="loading" class="empty">加载中…</div>
+      <table v-else>
+        <thead>
+          <tr>
+            <th>模型</th>
+            <th>提供商</th>
+            <th style="text-align:right">请求数</th>
+            <th style="text-align:right">Token 用量</th>
+            <th style="text-align:right">费用 (USD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="m in models" :key="m.model">
+            <td><code style="font-size:12px">{{ m.model }}</code></td>
+            <td><span class="badge badge-blue">{{ m.provider_code }}</span></td>
+            <td style="text-align:right">{{ fmt(m.total_requests) }}</td>
+            <td style="text-align:right">{{ fmt(m.total_tokens) }}</td>
+            <td style="text-align:right">{{ fmtCost(m.total_cost_usd) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="!loading && models.length === 0" class="empty">该时段暂无数据</div>
+    </div>
+    <div v-if="!loading && !error && (!summary || summary.total_requests === 0)" class="empty" style="margin-top:40px">
+      🚀 暂无请求数据。配置好提供商后，通过 <code>/v1/chat/completions</code> 发起调用吧。
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+</style>

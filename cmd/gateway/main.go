@@ -167,6 +167,13 @@ func main() {
 		listen = ":8781"
 	}
 
+	// ── Static files (Vue SPA) ───────────────────────────────────────────
+	staticDir := os.Getenv("LLM_GATEWAY_STATIC_DIR")
+	if staticDir == "" {
+		staticDir = "web/dist"
+	}
+	staticHandler := relay.NewStaticHandler(staticDir)
+
 	// ── Router ────────────────────────────────────────────────────────────
 	mux := http.NewServeMux()
 
@@ -186,16 +193,21 @@ func main() {
 	// Models listing
 	mux.Handle("/v1/models", modelsHandler)
 
-	// Legacy health endpoint
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"service":"llm-gateway-go","version":"0.2.0"}`))
-			return
-		}
-		http.NotFound(w, r)
-	})
+	// Static files / SPA fallback
+	if staticHandler != nil {
+		mux.Handle("/", staticHandler)
+		slog.Info("serving Vue SPA", "dir", staticDir)
+	} else {
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"service":"llm-gateway-go","version":"0.2.0"}`))
+				return
+			}
+			http.NotFound(w, r)
+		})
+	}
 
 	// ── Middleware stack ──────────────────────────────────────────────────
 	handler := middleware.APIKeyAuth(mux)

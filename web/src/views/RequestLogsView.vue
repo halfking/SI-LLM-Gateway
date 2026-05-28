@@ -1,0 +1,317 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { getRequestLogs, getRequestLogDetail, getKeys, type RequestLogRow, type RequestLogDetail, type ApiKey } from '../api'
+
+const rows = ref<RequestLogRow[]>([])
+const keys = ref<ApiKey[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+const apiKeyId = ref<number | ''>('')
+const keyword = ref('')
+const hours = ref(24)
+const limit = ref(100)
+
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detail = ref<RequestLogDetail | null>(null)
+const detailTab = ref<'request' | 'response'>('request')
+
+async function loadKeys() {
+  try {
+    keys.value = await getKeys()
+  } catch {
+    keys.value = []
+  }
+}
+
+async function load() {
+  loading.value = true
+  error.value = null
+  try {
+    const end = new Date()
+    const start = new Date(end.getTime() - hours.value * 3600 * 1000)
+    rows.value = await getRequestLogs({
+      api_key_id: apiKeyId.value === '' ? undefined : Number(apiKeyId.value),
+      from: start.toISOString(),
+      to: end.toISOString(),
+      q: keyword.value.trim() || undefined,
+      limit: limit.value,
+    })
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+function fmtTs(ts: string) {
+  return new Date(ts).toLocaleString('zh-CN', { hour12: false })
+}
+
+function token(v: number | null | undefined) {
+  return v == null ? '—' : v.toLocaleString()
+}
+
+function shortHash(v: string | null | undefined) {
+  return v ? `${v.slice(0, 12)}…` : '—'
+}
+
+async function showDetail(requestId: string) {
+  detailVisible.value = true
+  detailLoading.value = true
+  detail.value = null
+  detailTab.value = 'request'
+  try {
+    detail.value = await getRequestLogDetail(requestId)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+function closeDetail() {
+  detailVisible.value = false
+  detail.value = null
+}
+
+function formatJson(obj: any): string {
+  if (obj == null) return '(无数据)'
+  try {
+    return JSON.stringify(obj, null, 2)
+  } catch {
+    return String(obj)
+  }
+}
+
+function extractMessagesFromBody(body: any): any[] {
+  if (body == null) return []
+  if (Array.isArray(body)) return body
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body) } catch { return [] }
+  }
+  if (body.messages && Array.isArray(body.messages)) return body.messages
+  if (body.choices && Array.isArray(body.choices)) {
+    const msgs: any[] = []
+    for (const c of body.choices) {
+      if (c.message) msgs.push(c.message)
+    }
+    return msgs
+  }
+  return [body]
+}
+
+function roleColor(role: string): string {
+  switch (role) {
+    case 'user': return 'var(--info, #3b82f6)'
+    case 'assistant': return 'var(--success, #22c55e)'
+    case 'system': return 'var(--warning, #f59e0b)'
+    case 'tool': return 'var(--muted, #94a3b8)'
+    default: return 'inherit'
+  }
+}
+
+onMounted(async () => {
+  await loadKeys()
+  await load()
+})
+</script>
+
+<template>
+  <div>
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0">请求日志</h2>
+      <button class="btn btn-primary btn-sm" :disabled="loading" @click="load">刷新</button>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:13px;white-space:nowrap">API Key</label>
+        <select v-model="apiKeyId" style="min-width:180px">
+          <option value="">全部</option>
+          <option v-for="k in keys" :key="k.id" :value="k.id">{{ k.key_prefix }} ({{ k.application_code }})</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:13px;white-space:nowrap">时间段</label>
+        <select v-model="hours">
+          <option :value="1">1 小时</option>
+          <option :value="6">6 小时</option>
+          <option :value="24">24 小时</option>
+          <option :value="168">7 天</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px">
+        <label style="font-size:13px;white-space:nowrap">关键词</label>
+        <input v-model="keyword" type="text" placeholder="模型名 / 消息片段" style="flex:1" @keyup.enter="load" />
+      </div>
+      <button class="btn btn-primary btn-sm" @click="load">查询</button>
+    </div>
+
+    <p v-if="error" style="color:var(--danger);margin-bottom:12px">{{ error }}</p>
+
+    <div class="card" style="overflow-x:auto">
+      <table class="data-table" style="width:100%;font-size:12px">
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>Key</th>
+            <th>客户端模型</th>
+            <th>出站模型</th>
+            <th>出站供应商</th>
+            <th>出站凭据</th>
+            <th>模式</th>
+            <th>身份</th>
+            <th>流式</th>
+            <th>输入</th>
+            <th>输出</th>
+            <th>缓存读</th>
+            <th>缓存写</th>
+            <th>成本</th>
+            <th>延迟</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="loading"><td colspan="17">加载中…</td></tr>
+          <tr v-else-if="!rows.length"><td colspan="17">无记录</td></tr>
+          <tr v-for="r in rows" :key="r.request_id + r.ts" style="cursor:pointer" @click="showDetail(r.request_id)">
+            <td>{{ fmtTs(r.ts) }}</td>
+            <td>{{ r.api_key_id ?? '—' }}</td>
+            <td>{{ r.client_model ?? '—' }}</td>
+            <td>{{ r.outbound_model ?? '—' }}</td>
+            <td>
+              <div>{{ r.provider_name ?? '—' }}</div>
+              <div v-if="r.provider_id" style="color:var(--muted);font-size:11px">#{{ r.provider_id }} {{ r.provider_code ?? '' }}</div>
+            </td>
+            <td>
+              <div>{{ r.credential_label ?? '—' }}</div>
+              <div v-if="r.credential_id" style="color:var(--muted);font-size:11px">#{{ r.credential_id }}</div>
+            </td>
+            <td>{{ r.request_mode ?? r.client_profile ?? '—' }}</td>
+            <td>
+              <div>{{ shortHash(r.identity_hash) }}</div>
+              <div v-if="r.virtual_ip || r.affinity_hit != null" style="color:var(--muted);font-size:11px">
+                {{ r.virtual_ip ?? '—' }} / {{ r.affinity_hit ? 'affinity' : 'no-affinity' }}
+              </div>
+            </td>
+            <td>
+              <div v-if="r.stream_chunk_count != null">
+                {{ r.stream_chunk_count }} chunks
+              </div>
+              <div v-if="r.stream_first_chunk_ms != null" style="color:var(--muted);font-size:11px">
+                first {{ r.stream_first_chunk_ms }}ms / {{ r.stream_done_sent ? 'done' : (r.stream_interrupted ? 'interrupted' : 'pending') }}
+              </div>
+              <span v-if="r.stream_chunk_count == null">—</span>
+            </td>
+            <td>{{ token(r.prompt_tokens) }}</td>
+            <td>{{ token(r.completion_tokens) }}</td>
+            <td>{{ token(r.cache_read_tokens) }}</td>
+            <td>{{ token(r.cache_write_tokens) }}</td>
+            <td>{{ r.cost_usd != null ? Number(r.cost_usd).toFixed(6) : '—' }}</td>
+            <td>{{ r.latency_ms != null ? r.latency_ms + 'ms' : '—' }}</td>
+            <td :style="{ color: r.success ? 'var(--success)' : 'var(--danger)' }">{{ r.success ? '成功' : (r.error_kind ?? '失败') }}</td>
+            <td><button class="btn btn-sm" @click.stop="showDetail(r.request_id)">查看</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Detail Modal -->
+    <div v-if="detailVisible" class="modal-overlay" @click.self="closeDetail">
+      <div class="modal-content" style="max-width:900px;max-height:85vh;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="margin:0">请求详情</h3>
+          <button class="btn btn-sm" @click="closeDetail">关闭</button>
+        </div>
+
+        <div v-if="detailLoading" style="text-align:center;padding:40px">加载中…</div>
+
+        <template v-else-if="detail">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:12px">
+            <span><strong>请求ID:</strong> {{ detail.request_id }}</span>
+            <span><strong>时间:</strong> {{ fmtTs(detail.ts) }}</span>
+            <span><strong>客户端模型:</strong> {{ detail.client_model ?? '—' }}</span>
+            <span><strong>出站模型:</strong> {{ detail.outbound_model ?? '—' }}</span>
+            <span><strong>供应商:</strong> {{ detail.provider_name ?? '—' }}</span>
+            <span><strong>状态:</strong> <span :style="{ color: detail.success ? 'var(--success)' : 'var(--danger)' }">{{ detail.success ? '成功' : (detail.error_kind ?? '失败') }}</span></span>
+            <span><strong>延迟:</strong> {{ detail.latency_ms ?? '—' }}ms</span>
+            <span><strong>Token:</strong> {{ token(detail.prompt_tokens) }} / {{ token(detail.completion_tokens) }}</span>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="btn btn-sm" :class="{ 'btn-primary': detailTab === 'request' }" @click="detailTab = 'request'">请求消息</button>
+            <button class="btn btn-sm" :class="{ 'btn-primary': detailTab === 'response' }" @click="detailTab = 'response'">响应内容</button>
+          </div>
+
+          <div style="flex:1;overflow:auto;border:1px solid var(--border, #333);border-radius:6px;padding:12px;background:var(--surface-secondary, #1a1a2e);font-size:12px">
+            <template v-if="detailTab === 'request'">
+              <template v-if="extractMessagesFromBody(detail.request_body).length">
+                <div v-for="(msg, i) in extractMessagesFromBody(detail.request_body)" :key="i" style="margin-bottom:12px">
+                  <div style="margin-bottom:4px">
+                    <span :style="{ color: roleColor(msg.role || ''), fontWeight: 600 }">[{{ msg.role || 'unknown' }}]</span>
+                  </div>
+                  <pre style="margin:0;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;font-size:11px;line-height:1.5">{{ formatJson(msg.content ?? msg) }}</pre>
+                  <div v-if="msg.tool_calls" style="margin-top:6px">
+                    <div style="color:var(--muted);font-size:11px;margin-bottom:4px">工具调用:</div>
+                    <pre v-for="(tc, j) in msg.tool_calls" :key="j" style="margin:0 0 4px;white-space:pre-wrap;word-break:break-all;font-size:11px;padding:4px;background:var(--surface-primary, #16213e);border-radius:4px">{{ formatJson(tc) }}</pre>
+                  </div>
+                </div>
+              </template>
+              <div v-else style="color:var(--muted)">(无请求数据)</div>
+            </template>
+
+            <template v-else>
+              <template v-if="detail.response_body">
+                <template v-if="detail.response_body.choices">
+                  <div v-for="(choice, i) in detail.response_body.choices" :key="i" style="margin-bottom:12px">
+                    <div style="margin-bottom:4px">
+                      <span style="font-weight:600">Choice {{ i }}</span>
+                      <span v-if="choice.finish_reason" style="color:var(--muted);margin-left:8px">finish: {{ choice.finish_reason }}</span>
+                    </div>
+                    <div v-if="choice.message" style="margin-bottom:6px">
+                      <span :style="{ color: roleColor(choice.message.role || ''), fontWeight: 600 }">[{{ choice.message.role || 'unknown' }}]</span>
+                      <pre v-if="choice.message.content" style="margin:4px 0;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;font-size:11px;line-height:1.5">{{ choice.message.content }}</pre>
+                      <div v-if="choice.message.tool_calls" style="margin-top:6px">
+                        <div style="color:var(--muted);font-size:11px;margin-bottom:4px">工具调用:</div>
+                        <pre v-for="(tc, j) in choice.message.tool_calls" :key="j" style="margin:0 0 4px;white-space:pre-wrap;word-break:break-all;font-size:11px;padding:4px;background:var(--surface-primary, #16213e);border-radius:4px">{{ formatJson(tc) }}</pre>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="detail.response_body.usage" style="margin-top:8px;padding:8px;background:var(--surface-primary, #16213e);border-radius:4px">
+                    <strong>Usage:</strong> prompt={{ detail.response_body.usage.prompt_tokens }} completion={{ detail.response_body.usage.completion_tokens }} total={{ detail.response_body.usage.total_tokens }}
+                  </div>
+                </template>
+                <pre v-else style="white-space:pre-wrap;word-break:break-all;font-size:11px;line-height:1.5">{{ formatJson(detail.response_body) }}</pre>
+              </template>
+              <div v-else style="color:var(--muted)">(无响应数据 — 流式响应暂不记录完整内容)</div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: var(--surface-primary, #16213e);
+  border-radius: 8px;
+  padding: 20px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+</style>
