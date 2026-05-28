@@ -2,54 +2,135 @@ package relay
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// ModelsHandler serves the /v1/models endpoint.
+// It returns only models that have valid, active credentials.
 type ModelsHandler struct {
 	pythonEndpoint string
+	dbPool         *pgxpool.Pool
 	client         *http.Client
 }
 
+// NewModelsHandler creates a new models handler.
 func NewModelsHandler(pythonEndpoint string) *ModelsHandler {
-	endpoint := pythonEndpoint
-	if endpoint != "" {
-		for _, suffix := range []string{"/v1/chat/completions", "/v1/responses", "/v1/completions"} {
-			if len(endpoint) > len(suffix) && endpoint[len(endpoint)-len(suffix):] == suffix {
-				endpoint = endpoint[:len(endpoint)-len(suffix)]
-				break
-			}
-		}
-		if len(endpoint) > 3 && endpoint[len(endpoint)-3:] == "/v1" {
-			endpoint = endpoint[:len(endpoint)-3]
-		}
-		endpoint = strings.TrimRight(endpoint, "/")
-	}
 	return &ModelsHandler{
-		pythonEndpoint: endpoint,
+		pythonEndpoint: pythonEndpoint,
 		client: &http.Client{
 			Timeout: 15 * time.Second,
 		},
 	}
 }
 
+// SetDB sets the database pool for direct model queries.
+func (h *ModelsHandler) SetDB(pool *pgxpool.Pool) {
+	h.dbPool = pool
+}
+
 func (h *ModelsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Try to serve from database first (with filtered, normalized models)
+	if h.dbPool != nil {
+		h.serveFromDB(w, r)
+		return
+	}
+
+	// Fallback to Python control plane
+	if h.pythonEndpoint != "" {
+		h.serveFromPython(w, r)
+		return
+	}
+
+	// No backend available
+	writeJSON(w, http.StatusOK, map[string]any{
+		"object": "list",
+		"data":   []any{},
+	})
+}
+
+func (h *ModelsHandler) serveFromDB(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Query models that have at least one active, available credential
+	rows, err := h.dbPool.Query(ctx, `
+		SELECT DISTINCT
+			mc.canonical_name,
+			mc.family,
+			COALESCE(mc.modality, 'chat') AS modality
+		FROM models_canonical mc
+		JOIN model_offers mo ON mo.canonical_id = mc.id
+		JOIN credentials c ON c.id = mo.credential_id
+		JOIN providers p ON p.id = c.provider_id
+		WHERE mc.status = 'active'
+		  AND mo.available = TRUE
+		  AND c.lifecycle_status = 'active'
+		  AND c.availability_state = 'ready'
+		  AND c.quota_state NOT IN ('balance_exhausted', 'permanently_exhausted')
+		  AND p.status = 'active'
+		ORDER BY mc.family, mc.canonical_name
+	`)
+	if err != nil {
+		slog.Error("models: db query failed", "error", err)
+		h.serveFromPython(w, r)
+		return
+	}
+	defer rows.Close()
+
+	type modelEntry struct {
+		ID      string `json:"id"`
+		Object  string `json:"object"`
+		Family  string `json:"family,omitempty"`
+		Modality string `json:"modality,omitempty"`
+	}
+
+	var models []modelEntry
+	for rows.Next() {
+		var name, family, modality string
+		if err := rows.Scan(&name, &family, &modality); err != nil {
+			continue
+		}
+		models = append(models, modelEntry{
+			ID:       name,
+			Object:   "model",
+			Family:   family,
+			Modality: modality,
+		})
+	}
+
+	if models == nil {
+		models = []modelEntry{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"object": "list",
+		"data":   models,
+	})
+}
+
+func (h *ModelsHandler) serveFromPython(w http.ResponseWriter, r *http.Request) {
 	if h.pythonEndpoint == "" {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"object": "list",
 			"data":   []any{},
-			"models":  []string{},
-			"count":   0,
-			"mode":    "gateway",
 		})
 		return
 	}
 
-	target := h.pythonEndpoint + "/v1/models"
+	// Clean up endpoint
+	endpoint := h.pythonEndpoint
+	for _, suffix := range []string{"/v1/chat/completions", "/v1/responses", "/v1/completions"} {
+		if len(endpoint) > len(suffix) && endpoint[len(endpoint)-len(suffix):] == suffix {
+			endpoint = endpoint[:len(endpoint)-len(suffix)]
+			break
+		}
+	}
+
+	target := endpoint + "/v1/models"
 	if r.URL.RawQuery != "" {
 		target += "?" + r.URL.RawQuery
 	}
@@ -63,20 +144,20 @@ func (h *ModelsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"error": map[string]string{
 				"message": "failed to build models request",
-				"type":    "upstream_error",
+				"type":    "server_error",
 			},
 		})
 		return
 	}
 
-		for key, vals := range r.Header {
-			for _, val := range vals {
-				switch key {
-				case "X-Client-Profile", "X-Request-Id":
-					req.Header.Add(key, val)
-				}
+	for key, vals := range r.Header {
+		for _, val := range vals {
+			switch key {
+			case "X-Client-Profile", "X-Request-Id":
+				req.Header.Add(key, val)
 			}
 		}
+	}
 
 	resp, err := h.client.Do(req)
 	if err != nil {
@@ -84,27 +165,25 @@ func (h *ModelsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"error": map[string]string{
 				"message": "upstream models request failed",
-				"type":    "upstream_error",
+				"type":    "server_error",
 			},
 		})
 		return
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		slog.Error("models: read body failed", "error", err)
-		writeJSON(w, http.StatusBadGateway, map[string]any{
-			"error": map[string]string{
-				"message": "failed to read models response",
-				"type":    "upstream_error",
-			},
-		})
-		return
-	}
-
-	var payload json.RawMessage = body
+	// Forward the response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
-	w.Write(payload)
+
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			w.Write(buf[:n])
+		}
+		if err != nil {
+			break
+		}
+	}
 }

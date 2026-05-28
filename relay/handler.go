@@ -284,10 +284,12 @@ func (h *ChatHandler) serveWithExecutor(w http.ResponseWriter, r *http.Request) 
 			"model", clientModel,
 		)
 		if execErr, ok := execErr.(*routing.ExecuteError); ok && execErr.Exhausted {
-			writeErrorJSON(w, http.StatusBadGateway, requestID, "all providers unavailable", "upstream_error", "all_exhausted")
+			writeErrorJSON(w, http.StatusServiceUnavailable, requestID,
+				fmt.Sprintf("No available provider for model '%s'. All %d candidates failed.", clientModel, execErr.Tried),
+				"server_error", "model_not_found")
 			return
 		}
-		writeErrorJSON(w, http.StatusBadGateway, requestID, "upstream request failed", "upstream_error", "upstream_error")
+		writeErrorJSON(w, http.StatusBadGateway, requestID, "upstream request failed", "server_error", "provider_error")
 		return
 	}
 
@@ -392,15 +394,17 @@ func (h *ChatHandler) serveFallback(w http.ResponseWriter, r *http.Request) {
 	if !h.circuit.Allow(svc.ProviderID, svc.CredentialID) {
 		state := h.circuit.GetOrCreate(svc.ProviderID, svc.CredentialID).State()
 		status := http.StatusServiceUnavailable
-		code := "upstream_down"
+		code := "service_unavailable"
+		message := "Service temporarily unavailable due to provider issues. Please retry later."
 		if state == circuit.StateQuarantined {
 			status = http.StatusBadGateway
-			code = "credential_invalid"
+			code = "invalid_api_key"
+			message = "Provider credentials are invalid. Please check your configuration."
 		}
 		writeJSON(w, status, map[string]any{
 			"error": map[string]string{
-				"message": "circuit breaker open",
-				"type":    "circuit_open",
+				"message": message,
+				"type":    "server_error",
 				"code":    code,
 			},
 		})
@@ -662,9 +666,9 @@ func ChatCompletionsPhase3(
 		}
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"error": map[string]string{
-				"message": "upstream request failed",
-				"type":    "upstream_error",
-				"code":    string(errKind),
+				"message": "Provider service is currently unavailable. Please try again later.",
+				"type":    "server_error",
+				"code":    "provider_error",
 			},
 		})
 		released = true

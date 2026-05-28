@@ -34,6 +34,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/config"
 	"github.com/kaixuan/llm-gateway-go/credentialstate"
 	"github.com/kaixuan/llm-gateway-go/db"
+	"github.com/kaixuan/llm-gateway-go/discovery"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/middleware"
 	"github.com/kaixuan/llm-gateway-go/pool"
@@ -151,6 +152,15 @@ func main() {
 		slog.Info("telemetry emission enabled")
 	}
 
+	// ── Model Discovery ─────────────────────────────────────────────────
+	var discoverySvc *discovery.Service
+	if dbConn != nil && dbConn.Enabled() {
+		modelsHandler.SetDB(dbConn.Pool())
+		discoverySvc = discovery.NewService(dbConn.Pool(), 1*time.Hour)
+		discoverySvc.Start(context.Background())
+		slog.Info("model discovery service enabled")
+	}
+
 	// ── Listen address ────────────────────────────────────────────────────
 	listen := os.Getenv("LLM_GATEWAY_LISTEN")
 	if listen == "" {
@@ -217,6 +227,11 @@ func main() {
 
 	<-ctx.Done()
 	slog.Info("gateway shutting down")
+
+	// Stop discovery service first
+	if discoverySvc != nil {
+		discoverySvc.Stop()
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
