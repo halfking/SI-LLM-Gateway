@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -47,6 +48,7 @@ type TransformResult struct {
 
 // Matrix loads and evaluates request transform rules.
 type Matrix struct {
+	mu       sync.RWMutex
 	doc      map[string]any
 	rules    []map[string]any
 	defaults map[string]any
@@ -85,6 +87,8 @@ func DefaultMatrixPath() string {
 
 // Load reads the transform matrix from a YAML file.
 func (m *Matrix) Load(path string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.path = path
 	if path == "" {
 		m.doc = nil
@@ -127,6 +131,8 @@ func (m *Matrix) Load(path string) {
 
 // NormalizeMode normalizes a mode string.
 func (m *Matrix) NormalizeMode(value string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if value == "" {
 		v, _ := m.defaults["request_mode"].(string)
 		value = v
@@ -143,6 +149,42 @@ func (m *Matrix) NormalizeMode(value string) string {
 
 // NormalizeClient normalizes a client profile string.
 func (m *Matrix) NormalizeClient(value string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if value == "" {
+		v, _ := m.defaults["client"].(string)
+		value = v
+	}
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		value = "default"
+	}
+	if !validClients[value] {
+		return "default"
+	}
+	return value
+}
+
+// normalizeModeLocked is the internal version of NormalizeMode without lock acquisition.
+// Must be called with mu held.
+func (m *Matrix) normalizeModeLocked(value string) string {
+	if value == "" {
+		v, _ := m.defaults["request_mode"].(string)
+		value = v
+	}
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		value = "chat"
+	}
+	if !validModes[value] {
+		return "chat"
+	}
+	return value
+}
+
+// normalizeClientLocked is the internal version of NormalizeClient without lock acquisition.
+// Must be called with mu held.
+func (m *Matrix) normalizeClientLocked(value string) string {
 	if value == "" {
 		v, _ := m.defaults["client"].(string)
 		value = v
@@ -162,8 +204,8 @@ func (m *Matrix) ruleMatches(rule map[string]any, ctx *TransformContext) bool {
 	if match == nil {
 		return false
 	}
-	mode := m.NormalizeMode(ctx.RequestMode)
-	client := m.NormalizeClient(ctx.ClientProfile)
+	mode := m.normalizeModeLocked(ctx.RequestMode)
+	client := m.normalizeClientLocked(ctx.ClientProfile)
 
 	if v, ok := match["mode"]; ok {
 		if fmt.Sprint(v) != mode {
@@ -190,6 +232,8 @@ func (m *Matrix) ruleMatches(rule map[string]any, ctx *TransformContext) bool {
 
 // Resolve matches the context against rules and returns the result.
 func (m *Matrix) Resolve(ctx *TransformContext) *TransformResult {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	result := &TransformResult{
 		EgressPreference: []string{"openai-completions"},
 	}
