@@ -104,8 +104,11 @@ call_chat() {
     local tmp
     tmp=$(mktemp)
     local code
-    # 用 --http1.1 避免 HTTP/2 帧未对齐导致 curl 返回 HTTP 000
-    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 90 \
+    # Bounded timeout 150s: after the upstream-hang fix, sync_retry path still
+    # takes up to ~130s before returning 503; -m 90 was too tight and caused
+    # the test harness to report HTTP 000 (curl timeout). 150s comfortably
+    # covers both healthy and fixed-but-bounded error paths.
+    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 150 \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -X POST "$API_BASE/v1/chat/completions" \
@@ -123,7 +126,7 @@ call_chat_with_body() {
     local tmp
     tmp=$(mktemp)
     local code
-    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 60 \
+    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 150 \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -X POST "$API_BASE/v1/chat/completions" \
@@ -140,7 +143,7 @@ call_messages() {
     local tmp
     tmp=$(mktemp)
     local code
-    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 60 \
+    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 150 \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -H "anthropic-version: 2023-06-01" \
@@ -158,7 +161,7 @@ call_responses() {
     local tmp
     tmp=$(mktemp)
     local code
-    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 60 \
+    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 150 \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -X POST "$API_BASE/v1/responses" \
