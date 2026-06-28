@@ -354,14 +354,27 @@ func (e *Executor) executeOpenAI(
 			reqStart := time.Now()
 			var resp *http.Response
 			var uErr *upstreampkg.Error
+			// 2026-06-28 P0 fix: enforce upCtx as a hard wall-clock deadline on
+			// the upstream call. Previously this code relied on the underlying
+			// http.Client.Timeout (120s) and ResponseHeaderTimeout (60s); both
+			// can be silently bypassed by misbehaving upstreams (e.g. an HTTP
+			// proxy that accepts the connection, reads the request, then never
+			// writes back a single byte — symptom observed in production for
+			// qwen3-235b-a22b, mimo-v2.5-pro, kimi-k2.5/2.6, mistral-large, and
+			// the legacy /v1/completions endpoint). With maxRetries=2 the loop
+			// can stall a client for 3+ minutes — way past the 120s upstream
+			// budget, exhausting the limiter and holding client connections open.
+			//
+			// To bound the wait to upCtx we run the upstream call in a goroutine
+			// and a watcher that, on context expiry, closes the request's body
+			// (unblocks Do) and closes any partial response body. When upCtx
+			// fires first we synthesise a KindTimeout error so the executor
+			// treats it like any other upstream timeout (record failure, retry
+			// or fall through to the next candidate, eventually return 502).
 			if e.Upstream != nil {
-				resp, uErr = e.Upstream.Do(req)
+				resp, uErr = doUpstreamWithHardTimeout(req, upCtx, e.Upstream)
 			} else {
-				var doErr error
-				resp, doErr = httpClient.Do(req)
-				if doErr != nil {
-					uErr = &upstreampkg.Error{Kind: errorsx.ClassifyError(doErr, nil), Message: doErr.Error(), Err: doErr}
-				}
+				resp, uErr = doUpstreamRawWithHardTimeout(req, upCtx, httpClient)
 			}
 			upstreamLatency := time.Since(reqStart)
 
@@ -970,4 +983,139 @@ func (e *Executor) upstreamContext(params *ExecParams, timeout time.Duration) (c
 		return context.WithTimeout(context.Background(), timeout)
 	}
 	return context.WithTimeout(params.R.Context(), timeout)
+}
+
+// doUpstreamWithHardTimeout runs e.Upstream.Do(req) with a hard wall-clock
+// deadline equal to upCtx. If the call returns before upCtx fires, the result
+// passes through unchanged and the response's Request context is preserved
+// (so streaming readers that pull ctx from resp.Request.Context() keep
+// working). If upCtx fires first, we cancel the in-flight request via a
+// derived context to unblock net/http's blocking Do loop, then drain the
+// goroutine with a short safety watchdog.
+//
+// This is the layered defence for the 2026-06-28 P0 finding from the prod_e2e
+// test suite: certain foreign-via-proxy upstreams (nvidia-build, /v1/completions
+// pre-routing) silently accept the connection but never respond. The underlying
+// http.Client.Timeout / ResponseHeaderTimeout are observed to fail to fire
+// through the corporate proxy, so the executor was stalled for 3+ minutes per
+// request — exhausting the limiter and holding client connections open.
+//
+// CRITICAL: we must NOT cancel callCtx on the happy path. streaming/relay
+// reads `resp.Request.Context()` to derive its read-loop ctx (relay/stream.go:147);
+// if callCtx is canceled the streaming code sees context.Canceled on its
+// next read and emits a spurious first_byte_timeout. So the callCtx we
+// hand to net/http is decoupled from upCtx — it is only canceled by the
+// upCtx-watching goroutine, never by a `defer cancelCall()`.
+func doUpstreamWithHardTimeout(req *http.Request, upCtx context.Context, upstream *upstreampkg.Client) (*http.Response, *upstreampkg.Error) {
+	callCtx, cancelCall := context.WithCancel(context.Background())
+	// Note: NO `defer cancelCall()`. See CRITICAL note above.
+	cancelReq := req.WithContext(callCtx)
+
+	type result struct {
+		resp *http.Response
+		uErr *upstreampkg.Error
+	}
+	done := make(chan result, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				done <- result{nil, &upstreampkg.Error{
+					Kind:    errorsx.KindTransient,
+					Message: fmt.Sprintf("upstream panic: %v", r),
+				}}
+			}
+		}()
+		resp, uErr := upstream.Do(cancelReq)
+		done <- result{resp, uErr}
+	}()
+
+	// Bridge upCtx expiry into callCtx so Do unblocks. If the goroutine
+	// wins the race (Do returns first) the streaming reader is handed a
+	// still-alive callCtx — exactly what we want.
+	go func() {
+		select {
+		case <-upCtx.Done():
+			cancelCall()
+		case <-done:
+			// Goroutine won the race; leave callCtx alive so the streaming
+			// reader can use it.
+		}
+	}()
+
+	select {
+	case r := <-done:
+		return r.resp, r.uErr
+	case <-upCtx.Done():
+		// Force-cancel the in-flight Do (defensive; the bridge goroutine
+		// should have already called cancelCall).
+		cancelCall()
+		// Wait briefly for the goroutine to exit so we don't leak it. Cap
+		// at 5s so a truly broken upstream cannot stall the executor.
+		watchdog := time.NewTimer(5 * time.Second)
+		defer watchdog.Stop()
+		select {
+		case <-done:
+		case <-watchdog.C:
+		}
+		return nil, &upstreampkg.Error{
+			Kind:    errorsx.KindTimeout,
+			Message: fmt.Sprintf("upstream hard timeout: %v", upCtx.Err()),
+			Err:     upCtx.Err(),
+		}
+	}
+}
+
+// doUpstreamRawWithHardTimeout is the same layered-defence wrapper for the
+// non-Upstream path (when e.Upstream is nil). Uses httpClient.Do directly.
+func doUpstreamRawWithHardTimeout(req *http.Request, upCtx context.Context, httpClient *http.Client) (*http.Response, *upstreampkg.Error) {
+	callCtx, cancelCall := context.WithCancel(context.Background())
+	cancelReq := req.WithContext(callCtx)
+
+	type result struct {
+		resp *http.Response
+		uErr *upstreampkg.Error
+	}
+	done := make(chan result, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				done <- result{nil, &upstreampkg.Error{
+					Kind:    errorsx.KindTransient,
+					Message: fmt.Sprintf("upstream panic: %v", r),
+				}}
+			}
+		}()
+		resp, doErr := httpClient.Do(cancelReq)
+		var uErr *upstreampkg.Error
+		if doErr != nil {
+			uErr = &upstreampkg.Error{Kind: errorsx.ClassifyError(doErr, nil), Message: doErr.Error(), Err: doErr}
+		}
+		done <- result{resp, uErr}
+	}()
+
+	go func() {
+		select {
+		case <-upCtx.Done():
+			cancelCall()
+		case <-done:
+		}
+	}()
+
+	select {
+	case r := <-done:
+		return r.resp, r.uErr
+	case <-upCtx.Done():
+		cancelCall()
+		watchdog := time.NewTimer(5 * time.Second)
+		defer watchdog.Stop()
+		select {
+		case <-done:
+		case <-watchdog.C:
+		}
+		return nil, &upstreampkg.Error{
+			Kind:    errorsx.KindTimeout,
+			Message: fmt.Sprintf("upstream hard timeout: %v", upCtx.Err()),
+			Err:     upCtx.Err(),
+		}
+	}
 }

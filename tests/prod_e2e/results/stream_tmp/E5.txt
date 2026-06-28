@@ -1,0 +1,9 @@
+data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003e\nThe user is asking about","role":"assistant","name":"MiniMax AI","audio_content":""}}],"created":1782669766,"id":"069094c69e43579c8651963a800b19d0","input_sensitive":false,"input_sensitive_type":0,"model":"minimax-m3","object":"chat.completion.chunk","output_sensitive":false,"output_sensitive_int":0,"output_sensitive_type":0,"service_tier":"standard","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" the weather in Beijing. I'll use the get_weather tool to fetch this information.\n\u003c/think\u003e\n","role":"assistant","name":"MiniMax AI","audio_content":""}}],"created":1782669766,"id":"069094c69e43579c8651963a800b19d0","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"finish_reason":"tool_calls","index":0,"delta":{"role":"assistant","name":"MiniMax AI","tool_calls":[{"id":"call_function_5s9m5cb59blk_1","type":"function","function":{"name":"get_weather","arguments":"{\"city\": \"Beijing\"}"},"index":0}],"audio_content":""}}],"created":1782669766,"id":"069094c69e43579c8651963a800b19d0","model":"minimax-m3","usage":null}
+
+
+data: [DONE]
+

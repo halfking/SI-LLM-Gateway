@@ -1,0 +1,369 @@
+data: {"choices":[{"index":0,"delta":{"content":"","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe user is asking for a long story, but their message","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" is just the phrase \"Tell me a long story about\"","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" repeated many times, ending with \"the end.\" There's no actual subject or topic specified for","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" the story. I should interpret","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" this as a request for a long story, but since no","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" topic is given, I'll need to pick something interesting and craft","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a compelling, lengthy narrative. Let me write an original long","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" story with a clear theme, rich characters, and a satisfying arc. I'll make it engaging","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"with good prose.","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"\u003c/think\u003e\n\n# The Cartographer of Forgotten Places","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"\n\n## Part I: The Inheritance\n\nEleanor Ash","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"worth had not set foot in Hollow Creek for seventeen years when","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" she received the letter that would","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" change everything she understood about her","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" grandfather's life—and her own","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":".\n\nThe envelope had arrived on","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a Tuesday, slid through the mail slot of her Boston apartment with the particular heaviness of legal documents. The return address","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" bore the name of a solicitor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"'s office in a town she had tried very hard to forget: *Hargrove,","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" Beecham \u0026 Associates, Hollow Creek, Vermont.* The post","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"mark was dated three days earlier, and the letter inside was brief, formal, and utterly","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" bewildering.\n\n*Dear Ms","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":". Ashworth,*\n\n*It is with regret that we inform you of the passing of your grandfather, Mr. Edmund","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" Ashworth, on the 14th of September. As","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" you are named as the sole beneficiary of his estate, we","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" respectfully request your presence at the reading of his will on the 28th of this month. Please find enclosed travel arrangements","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" and accommodation details.*\n\n*Y","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"ours faithfully,*\n*Margaret","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" Beecham*\n\nEleanor sat on the edge of her kitchen table, the letter trembling","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" in her hands. Edmund Ash","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"worth. Grandfather. The","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" man she had loved above all","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" others as a child, the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" man who had raised her on","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" stories of mountains and rivers,","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" of forests so deep that sunlight","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" never touched their floors, of hidden valleys where time moved differently. The man who had taught","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" her that every rock had a story, every tree a memory, every shadow a secret worth","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" uncovering.\n\nAnd then, when she was twelve, he had vanished from her life as completely","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" as if he had been a character in one of his own tales. Her mother, Sarah","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", had given no explanation beyond","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a clipped \"he had to go away,\" and Eleanor had grown up filling the void with her own inventions. She had imagined him an explorer, a spy, a wanderer of","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" distant lands. She had imagined","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" him dead. She had imagined","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" him waiting, somewhere, for","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" her to come and find him.\n\nShe had never imagined him","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" simply... in Hollow Creek.","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" Just thirty miles from where Eleanor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" herself had grown up.\n\nThe next ten days passed in a blur of packing and second-guessing. Her colleague at the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" publishing house where she worked as an editor offered to cover for","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" her; her best friend, Priya, insisted on driving","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" her to the bus station in","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a blizzard of nervous energy","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" and well-meaning warnings. \"You don't have to do this,\" Priya said, hugging","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" her fiercely at the departure gate","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":". \"You can just let","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" it go.\"\n\nBut Eleanor knew","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" she could not. She had spent her entire adult life editing","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" other people's stories. Now,","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" it seemed, she was being","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" called to attend to one of her own.\n\nThe bus wound","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" through the Berkshire hills as afternoon","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" darkened into evening, and Eleanor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" watched the landscape transform. The orderly fields and tidy villages of Massachusetts gave way to something w","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"ilder, more primordial. The trees here were older, their","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" trunks thicker, their canopies deeper. The light took on","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a greenish cast, filtered","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" through millions of needles, and the air that seeped through the bus vents smelled of moss","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" and cold water and something else","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"—something Eleanor could not name but recognized immediately, like a half-remembered dream.\n\nIt was the smell of her","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" grandfather's house.\n\n## Part II: The House on Bear","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" Hollow Road\n\nHargrove, Beecham \u0026 Associates occupied","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a small brick building on the village green, and Margaret Beech","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"am—a woman in her sixties","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" with iron-gray hair and the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" measured kindness of a country doctor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"—greeted Eleanor with a warmth that felt almost familial","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":".\n\n\"Your grandfather spoke of you often,\" she said, settling","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" into her chair behind a desk piled high with folders and led","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"gers. \"He was very proud of the woman you became, even though he didn't know","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" the details of your life.\"\n\n","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"Eleanor's throat tightened. \"When did you last see him?\"\n\n\"Three weeks before","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" he passed. He was in","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" his workshop, as always. Mapping.\"\n\n\"Mapping what?\"\n\nMargaret smiled gently. \"That","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", my dear, is something","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" he left for you to discover","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":".\"\n\nShe handed Eleanor a key","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"—ancient brass, cold against","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" her palm—and a thick envelope","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" marked with her name in Edmund","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"'s careful, slanting script","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":". Then she produced another envelope","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", this one sealed with red","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" wax bearing the impression of a compass rose.\n\n\"This is his","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" will,\" Margaret said. \"But I am instructed not to open it until you have spent","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a night in the house. His words were: *She must see it by morning light, or the reading will mean","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" nothing.*\"\n\nEleanor took the envelope, feeling its","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" weight as if it contained not","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" paper but something heavier—something almost alive. \"I don't understand.\"\n\n\"Neither did I, my dear. But Edmund","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" was not a man whose instructions","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" one ignored. He paid my","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" firm a great deal of money over many years to ensure that","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" his final wishes were carried out","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" precisely. If he said you must see the house by morning light, then see it by morning light you shall.\"\n\nThe drive to Bear Hollow Road took Eleanor through deepening twilight. The road narrowed, then narrowed again","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", becoming barely more than a track through the trees. Her","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" rental car's headlights caught glimpses of stone walls crumbling under decades of moss, of rusted mail","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"boxes at the end of overgrown","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" drives, of houses that seemed","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" to lean away from the road","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" as if reluctant to be seen.\n\nThen, just as the last light was bleeding from the sky, the trees parted, and there it was.\n\nEd","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"mund Ashworth's house.\n\n","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"It was not the house Eleanor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" remembered—or rather, it was, but time had worked strange","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" alterations upon it. The white","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" clapboards were weathered to a soft gray. The porch sag","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"ged in the middle, its railings warped and curling. The windows, dark now, reflected nothing back but the glow","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" of Eleanor's headlights. And","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" yet there was something else, something that hadn't been there in","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" Eleanor's childhood memory: an","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" air of waiting, of patient attention, as if the house itself had been holding its breath for many years and was only","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" now allowing itself to exhale.\n\nShe turned off the engine. The silence that rushed in was immense—not empty, but full","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", dense with the small sounds of a forest at night.","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" Somewhere, an owl called.","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" Somewhere else, water ran over stones.\n\nEleanor opened","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" her door and stepped out onto","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" the gravel of the drive. The key in her pocket pulsed","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" with a warmth that had nothing","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" to do with her body heat","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":". She walked to the front","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" door, fitted the key to the lock, and felt it turn with a click that echoed","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" through the woods like a gunshot","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":".\n\nThe door swung open.\n\nInside, the house was not","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" as she expected. She had anticipated dust, decay, the abandoned stillness of a place long","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" unoccupied. Instead, the air smelled of woodsmoke and old books and beeswax polish. Lamps stood on tables, unlit but waiting","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":". The furniture—ancient wing","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" chairs, a horsehair sofa, a grandfather clock ticking softly","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" in the corner—glowed softly in the darkness, polished","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" to a deep luster.\n\n","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"On the wall opposite the door hung a frame, and within","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" it, a map.\n\nE","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"leanor crossed the room and stood before it, breath catching","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" in her throat. The map was not of any place she recognized. It showed a landscape rendered in exquisite detail: mountains and valleys, rivers and lakes","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", forests and meadows, all drawn with a precision that seemed","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" impossible for any human hand. But strangest of all was","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" the style—it looked simultaneously like","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a medieval illustration and a satellite","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" photograph, as if someone had photographed the world from a great","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" height and then colored it with inks that had been ground from","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" moonlight and amber.\n\nIn one","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" corner of the map, in","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" Edmund's hand, were the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" words: *The Known World","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", c. 1873","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":".*\n\nEleanor's hands trembled. The Known World. Her","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" grandfather had spoken of these words","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" when she was very young, whispering them as if they were a secret between them, a password to a club with only two members. She had thought","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" they were nonsense—a child's game","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", a private joke. Now","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", standing in this silent house with the map before her, she understood that they had been","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" neither.\n\nThey had been a promise.\n\nShe climbed the stairs to the room her grandfather had always insisted she stay in whenever","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" she visited as a child—\"","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"the blue room,\" he had","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" called it, because the wallpaper","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" was patterned with tiny forget-me","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"-nots and the curtains were the color of a summer sky. She found it exactly as she remembered it: the small","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" iron bed, the writing desk beneath the window, the shelves","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" lined with books whose spines she","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" had read a hundred times.\n\n","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"She lay down on the bed without undressing, without lighting","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a lamp. The envelope with","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" her name on it sat on","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" the desk beside her. She","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" would not open it tonight. She would not read the will until she had seen the house by morning light, as Edmund","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" had instructed.\n\nBut sleep did","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" not come easily. She lay","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" awake for hours, listening to","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" the house settle around her—the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" creak of floorboards, the whisper of wind through trees","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":", the distant sound of water","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" over stones. And once, just before she drifted into uneasy","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" dreams","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":"","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+
+
+data: [DONE]
+

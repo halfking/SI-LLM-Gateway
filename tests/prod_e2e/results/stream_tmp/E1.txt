@@ -1,0 +1,13 @@
+data: {"choices":[{"index":0,"delta":{"content":"","role":"assistant"}}],"created":1782669666,"id":"069094614cd78e8d39c3c649c5010c90","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe user has sent a very brief message: \"OK\". This is quite ambiguous. They","role":"assistant"}}],"created":1782669666,"id":"069094614cd78e8d39c3c649c5010c90","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" could be:\n1. Testing","role":"assistant"}}],"created":1782669666,"id":"069094614cd78e8d39c3c649c5010c90","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" to see if I'm responsive","role":"assistant"}}],"created":1782669666,"id":"069094614cd78e8d39c3c649c5010c90","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":"\u003c/think\u003e\n\n","role":"assistant"}}],"created":1782669666,"id":"069094614cd78e8d39c3c649c5010c90","model":"minimax-m3","usage":null}
+
+
+data: [DONE]
+

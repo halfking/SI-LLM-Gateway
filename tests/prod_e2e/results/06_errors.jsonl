@@ -1,0 +1,164 @@
+{
+  "ts": "F1",
+  "test_id": "F1",
+  "status": "PASS",
+  "message": "未知模型 → 503 (HTTP 503)",
+  "details": {
+    "expected": "503",
+    "actual": "503",
+    "body_preview": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'non-existent-fake-model-12345'\",\"request_id\":\"b1cb10fe9ec8ed3ceb95a60d359a4799\",\"type\":\"server_error\"}}"
+  }
+}
+{
+  "ts": "F1.b",
+  "test_id": "F1.b",
+  "status": "PASS",
+  "message": "error.code=no_candidate (got=no_candidate)",
+  "details": {
+    "expected": "no_candidate",
+    "actual": "no_candidate"
+  }
+}
+{
+  "ts": "F2",
+  "test_id": "F2",
+  "status": "FAIL",
+  "message": "缺 model → 400 (expected=400, got=503)",
+  "details": {
+    "expected": "400",
+    "actual": "503",
+    "body_preview": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model ''\",\"request_id\":\"87c7c6e25e4fc1b0512b4b31e773f17c\",\"type\":\"server_error\"}}"
+  }
+}
+{
+  "ts": "F2.b",
+  "test_id": "F2.b",
+  "status": "FAIL",
+  "message": "error.code=missing_model (expected=missing_model, got=no_candidate)",
+  "details": {
+    "expected": "missing_model",
+    "actual": "no_candidate"
+  }
+}
+{
+  "ts": "F3",
+  "test_id": "F3",
+  "status": "FAIL",
+  "message": "messages=[] → 400 (expected=400, got=000)",
+  "details": {
+    "expected": "400",
+    "actual": "000",
+    "body_preview": ""
+  }
+}
+{
+  "ts": "F4",
+  "test_id": "F4",
+  "status": "PASS",
+  "message": "body 过大 → 400",
+  "details": {
+    "http": "400",
+    "body": "{\"error\":{\"code\":\"json_parse_error\",\"message\":\"invalid JSON in request body\",\"type\":\"invalid_request\"}}"
+  }
+}
+{
+  "ts": "F5",
+  "test_id": "F5",
+  "status": "PASS",
+  "message": "非 JSON body → 400 (HTTP 400)",
+  "details": {
+    "expected": "400",
+    "actual": "400",
+    "body_preview": "{\"error\":{\"code\":\"json_parse_error\",\"message\":\"invalid JSON in request body\",\"type\":\"invalid_request\"}}"
+  }
+}
+{
+  "ts": "F6",
+  "test_id": "F6",
+  "status": "PASS",
+  "message": "GET /v1/chat/completions → 200 (intentional) (HTTP 200)",
+  "details": {
+    "expected": "200",
+    "actual": "200",
+    "body_preview": "{\"message\":\"Chat completions endpoint is available. Use POST to send requests.\",\"status\":\"ok\"}"
+  }
+}
+{
+  "ts": "F6.b",
+  "test_id": "F6.b",
+  "status": "PASS",
+  "message": "GET 返回健康探测消息",
+  "details": {
+    "body": "{\"message\":\"Chat completions endpoint is available. Use POST to send requests.\",\"status\":\"ok\"}"
+  }
+}
+{
+  "ts": "F6.c",
+  "test_id": "F6.c",
+  "status": "PASS",
+  "message": "PUT /v1/chat/completions → 405 (HTTP 405)",
+  "details": {
+    "expected": "405",
+    "actual": "405",
+    "body_preview": "{\"error\":{\"message\":\"Method not allowed\",\"type\":\"invalid_request\",\"code\":\"method_not_allowed\"}}"
+  }
+}
+{
+  "ts": "F7",
+  "test_id": "F7",
+  "status": "PASS",
+  "message": "model=null → 503",
+  "details": {
+    "http": "503",
+    "body": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model ''\",\"request_id\":\"c57d52f7ab328c8435207da8e3c5e7e0\",\"type\":\"server_error\"}}"
+  }
+}
+{
+  "ts": "F8",
+  "test_id": "F8",
+  "status": "PASS",
+  "message": "anthropic 缺 max_tokens → 400",
+  "details": {
+    "http": "400",
+    "body": "{\"error\":{\"message\":\"max_tokens must be \\u003e 0\",\"type\":\"invalid_request\"},\"type\":\"error\"}"
+  }
+}
+{
+  "ts": "F11",
+  "test_id": "F11",
+  "status": "PASS",
+  "message": "503 no_candidate (HTTP 503)",
+  "details": {
+    "expected": "503",
+    "actual": "503",
+    "body_preview": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'fake-model-99999'\",\"request_id\":\"07cd782fc9a80250120d6dba1d824acb\",\"type\":\"server_error\"}}"
+  }
+}
+{
+  "ts": "F11.b",
+  "test_id": "F11.b",
+  "status": "PASS",
+  "message": "error.code=no_candidate (got=no_candidate)",
+  "details": {
+    "expected": "no_candidate",
+    "actual": "no_candidate"
+  }
+}
+{
+  "ts": "F11.c",
+  "test_id": "F11.c",
+  "status": "PASS",
+  "message": "错误响应含 request_id",
+  "details": {
+    "request_id": "07cd782fc9a80250120d6dba1d824acb"
+  }
+}
+{
+  "ts": "F12",
+  "test_id": "F12",
+  "status": "SKIP",
+  "message": "50 个连续请求未触发 429（E2E key 可能 tier 高）",
+  "details": {
+    "last_code": "200"
+  }
+}

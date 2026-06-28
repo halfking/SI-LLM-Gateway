@@ -1,0 +1,76 @@
+{
+  "ts": "I1",
+  "test_id": "I1",
+  "status": "PASS",
+  "message": "同一 seed: 两次返回 request_id=0690a0ce8b04a7349705af10b10ea9da, 0690a0cf1dbbc39c5fe58bf02ae3479c (不同)，session=gw_9d5b5263-567b-47b0-9fbb-37e472f88423, gw_6a20b9db-7f0c-42bc-a342-cd31a7b95894",
+  "details": {
+    "request_id_1": "0690a0ce8b04a7349705af10b10ea9da",
+    "request_id_2": "0690a0cf1dbbc39c5fe58bf02ae3479c",
+    "session_1": "gw_9d5b5263-567b-47b0-9fbb-37e472f88423",
+    "session_2": "gw_6a20b9db-7f0c-42bc-a342-cd31a7b95894"
+  }
+}
+{
+  "ts": "I2",
+  "test_id": "I2",
+  "status": "PASS",
+  "message": "X-Machine-Id: 两次都成功 (request_id=0690a0d09994c33480d7a5c643123777, 0690a0d19cace52256d9c9c6c8b03047)",
+  "details": {
+    "request_id_1": "0690a0d09994c33480d7a5c643123777",
+    "request_id_2": "0690a0d19cace52256d9c9c6c8b03047",
+    "session_1": "gw_ff2e2cce-2c49-42b7-97bd-0bf955ff4a06",
+    "session_2": "gw_cf9988d4-53fa-404a-94e6-91df88cde039"
+  }
+}
+{
+  "ts": "I3",
+  "test_id": "I3",
+  "status": "PASS",
+  "message": "X-Forwarded-For: HTTP 200 (代理头不影响请求)",
+  "details": {
+    "http": "200"
+  }
+}
+{
+  "ts": "I4",
+  "test_id": "I4",
+  "status": "PASS",
+  "message": "User-Agent 自定义: HTTP 200",
+  "details": {
+    "http": "200"
+  }
+}
+{
+  "ts": "I5",
+  "test_id": "I5",
+  "status": "PASS",
+  "message": "X-Device-Seed + X-Machine-Id 同时: HTTP 200",
+  "details": {
+    "http": "200"
+  }
+}
+{
+  "ts": "I7",
+  "test_id": "I7",
+  "status": "PASS",
+  "message": "3 个独立 session 都成功: gw_eb5b1d34-7458-4824-9d56-e911ea4bcca1 gw_b21f76e6-fbac-4bd7-ae3d-b36d60a04ced gw_8ac255dc-e5b1-456c-9757-7b03c88d11dc",
+  "details": {}
+}
+{
+  "ts": "I8",
+  "test_id": "I8",
+  "status": "PASS",
+  "message": "流式 model 字段回填: minimax-m3",
+  "details": {
+    "model": "minimax-m3"
+  }
+}
+{
+  "ts": "I10",
+  "test_id": "I10",
+  "status": "PASS",
+  "message": "CORS 头存在: Access-Control-Allow-Origin: *",
+  "details": {
+    "cors": "Access-Control-Allow-Origin: *"
+  }
+}
