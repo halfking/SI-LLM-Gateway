@@ -1,0 +1,123 @@
+{
+  "ts": "D1",
+  "test_id": "D1",
+  "status": "PASS",
+  "message": "Q1 OpenAI→OpenAI: 200 OK, role=assistant, content_len=131",
+  "details": {
+    "role": "assistant",
+    "usage": {
+      "total_tokens": 216,
+      "total_characters": 0,
+      "prompt_tokens": 186,
+      "completion_tokens": 30,
+      "completion_tokens_details": {
+        "reasoning_tokens": 25
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      }
+    }
+  }
+}
+{
+  "ts": "D2",
+  "test_id": "D2",
+  "status": "SKIP",
+  "message": "claude-* 当前不可用",
+  "details": {
+    "body": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'claude-3-5-sonnet-20241022'\",\"request_id\":\"2f7225b4cd26e12ad3efb6f894114cca\",\"type\":\"server_error\"}}"
+  }
+}
+{
+  "ts": "D3",
+  "test_id": "D3",
+  "status": "PASS",
+  "message": "Q2 /v1/messages: 200 OK, role=assistant, model=minimax-m3, content_len=0",
+  "details": {
+    "role": "assistant",
+    "model": "minimax-m3",
+    "usage": {
+      "input_tokens": 177,
+      "output_tokens": 41
+    }
+  }
+}
+{
+  "ts": "D4",
+  "test_id": "D4",
+  "status": "SKIP",
+  "message": "claude-* 当前不可用",
+  "details": {
+    "http": "503",
+    "body": "{\"error\":{\"message\":\"No available provider for model 'claude-3-5-sonnet-20241022'\",\"type\":\"overloaded_error\"},\"type\":\"error\"}"
+  }
+}
+{
+  "ts": "D5",
+  "test_id": "D5",
+  "status": "PASS",
+  "message": "Responses API: 200 OK, status=incomplete, output_type=message, text_len=155",
+  "details": {
+    "status": "incomplete",
+    "output_type": "message",
+    "output_preview": "<think>\nThe user is simply asking me to reply \"OK\". This is a straightforward request with no issues"
+  }
+}
+{
+  "ts": "D6",
+  "test_id": "D6",
+  "status": "FAIL",
+  "message": "Legacy /v1/completions: HTTP 000",
+  "details": {
+    "http": "000",
+    "body": ""
+  }
+}
+{
+  "ts": "D7",
+  "test_id": "D7",
+  "status": "PASS",
+  "message": "多轮对话: 200 OK, prompt_tokens=190",
+  "details": {
+    "prompt_tokens": 190,
+    "content": "2"
+  }
+}
+{
+  "ts": "D8",
+  "test_id": "D8",
+  "status": "PASS",
+  "message": "长 prompt: prompt_tokens=5164",
+  "details": {
+    "prompt_tokens": 5164
+  }
+}
+{
+  "ts": "D9",
+  "test_id": "D9",
+  "status": "PASS",
+  "message": "system prompt 起作用: content=2",
+  "details": {
+    "content": "2"
+  }
+}
+{
+  "ts": "D10",
+  "test_id": "D10",
+  "status": "PASS",
+  "message": "tool_calls: 调用了 get_weather, finish_reason=tool_calls",
+  "details": {
+    "tool_name": "get_weather",
+    "finish": "tool_calls",
+    "calls": [
+      {
+        "id": "call-48d163d4-90cc-4712-93cc-e7a0e90ca5ed",
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "arguments": "{\"city\":\"Beijing\"}"
+        }
+      }
+    ]
+  }
+}

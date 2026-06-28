@@ -1,0 +1,24 @@
+event: response.created
+data: {"response":{"created_at":1782669773,"id":"resp_4a247878690a173d9a15a0ed","model":"minimax-m3","object":"response","output":[],"status":"in_progress"},"type":"response.created"}
+
+event: response.output_item.added
+data: {"item":{"content":[],"id":"msg_690a173d9a15a0ed","role":"assistant","status":"in_progress","type":"message"},"output_index":0,"type":"response.output_item.added"}
+
+event: response.content_part.added
+data: {"content_index":0,"item_id":"msg_690a173d9a15a0ed","output_index":0,"part":{"annotations":[],"text":"","type":"output_text"},"type":"response.content_part.added"}
+
+event: response.output_text.delta
+data: {"content_index":0,"delta":"\u003cthink\u003e\nThe user simply","item_id":"msg_690a173d9a15a0ed","output_index":0,"type":"response.output_text.delta"}
+
+event: response.output_text.delta
+data: {"content_index":0,"delta":" asked me to reply \"OK\". This is a straightforward request. I should respond with OK as requested.\n\u003c/think\u003e\nOK","item_id":"msg_690a173d9a15a0ed","output_index":0,"type":"response.output_text.delta"}
+
+event: response.output_text.done
+data: {"content_index":0,"item_id":"msg_690a173d9a15a0ed","output_index":0,"text":"\u003cthink\u003e\nThe user simply asked me to reply \"OK\". This is a straightforward request. I should respond with OK as requested.\n\u003c/think\u003e\nOK","type":"response.output_text.done"}
+
+event: response.output_item.done
+data: {"item":{"content":[{"annotations":[],"text":"\u003cthink\u003e\nThe user simply asked me to reply \"OK\". This is a straightforward request. I should respond with OK as requested.\n\u003c/think\u003e\nOK","type":"output_text"}],"id":"msg_690a173d9a15a0ed","role":"assistant","status":"completed","type":"message"},"output_index":0,"type":"response.output_item.done"}
+
+event: response.completed
+data: {"response":{"created_at":1782669773,"id":"resp_4a247878690a173d9a15a0ed","model":"minimax-m3","object":"response","output":[{"content":[{"annotations":[],"text":"\u003cthink\u003e\nThe user simply asked me to reply \"OK\". This is a straightforward request. I should respond with OK as requested.\n\u003c/think\u003e\nOK","type":"output_text"}],"id":"msg_690a173d9a15a0ed","role":"assistant","status":"completed","type":"message"}],"status":"completed"},"type":"response.completed"}
+

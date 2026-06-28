@@ -1,0 +1,47 @@
+{
+  "ts": "J1",
+  "test_id": "J1",
+  "status": "PASS",
+  "message": "X-Request-Id 存在: ecbeacb554c27034ffcfaa40f6cdfbe1 (len=32)",
+  "details": {
+    "request_id": "ecbeacb554c27034ffcfaa40f6cdfbe1"
+  }
+}
+{
+  "ts": "J2",
+  "test_id": "J2",
+  "status": "PASS",
+  "message": "5 个不同 request_id",
+  "details": {}
+}
+{
+  "ts": "J3",
+  "test_id": "J3",
+  "status": "PASS",
+  "message": "non-stream: 30 tokens; stream 内容存在 (head=<think>The user just said \"OK\"...)",
+  "details": {
+    "non_stream_tokens": 30,
+    "total": "216",
+    "prompt": "186",
+    "streamed_preview": "<think>The user just said \"OK\". This is a very brief message without any specific request or questio",
+    "non_stream_preview": "<think>The user is asking me to reply with a single word \"OK\" and nothing else. This is a simple, st"
+  }
+}
+{
+  "ts": "J4",
+  "test_id": "J4",
+  "status": "PASS",
+  "message": "错误响应含 request_id=3a2190257394ce08291278ba18bf4a20",
+  "details": {
+    "request_id": "3a2190257394ce08291278ba18bf4a20"
+  }
+}
+{
+  "ts": "J5",
+  "test_id": "J5",
+  "status": "PASS",
+  "message": "错误响应不含供应商/API key 关键字",
+  "details": {
+    "body": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"content\":\"\\u003cthink\\u003e\\nThe user has sent a system message and a developer message but no actual user message. The system message just describes the model version and company. The developer message says \\\"You are a helpful assistant.\\\" T"
+  }
+}

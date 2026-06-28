@@ -1,0 +1,8 @@
+data: {"choices":[{"index":0,"delta":{"role":"assistant"}}],"created":1782669771,"id":"069094ca330b9dab8c4a1affbdace6e9","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe","role":"assistant"}}],"created":1782669771,"id":"069094ca330b9dab8c4a1affbdace6e9","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" user wants an extremely long story about AI that takes at least 60","role":"assistant"}}],"created":1782669771,"id":"069094ca330b9dab8c4a1affbdace6e9","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" seconds to read. I need to craft a narrative that's substantial","role":"assistant"}}],"created":1782669771,"id":"069094ca330b9dab8c4a1affbdace6e9","model":"minimax-m3","usage":null}
+
