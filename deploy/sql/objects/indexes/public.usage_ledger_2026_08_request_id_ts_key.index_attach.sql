@@ -1,0 +1,13 @@
+-- ===========================================================================
+-- Object:   usage_ledger_2026_08_request_id_ts_key
+-- Type:     INDEX ATTACH
+-- Schema:   public
+-- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- ===========================================================================
+-- Name: usage_ledger_2026_08_request_id_ts_key; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.usage_ledger_partitioned_request_id_ts_key ATTACH PARTITION public.usage_ledger_2026_08_request_id_ts_key;
+
+
+--

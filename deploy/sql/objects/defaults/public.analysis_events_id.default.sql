@@ -1,0 +1,13 @@
+-- ===========================================================================
+-- Object:   analysis_events id
+-- Type:     DEFAULT
+-- Schema:   public
+-- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- ===========================================================================
+-- Name: analysis_events id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_events ALTER COLUMN id SET DEFAULT nextval('public.analysis_events_id_seq'::regclass);
+
+
+--
