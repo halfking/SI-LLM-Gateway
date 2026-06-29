@@ -17,7 +17,7 @@ import (
 // 2026-06-19 incident: T-NEW-7 added the upstream_finish_reason column
 // to the SQL ($65) and to the bind list — but the bind-list patch
 // was missed on the FIRST insertRequestLog (the UPDATE merge was
-// fine). The unit test suite passed; only a live 184 k3s
+// fine). The unit test suite passed; only a live [SERVER] k3s
 // deployment surfaced "mismatched param and argument count" with
 // every POST /v1/chat/completions. This test exercises the live
 // path against a real Postgres so the regression cannot recur.

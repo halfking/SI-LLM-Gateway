@@ -12,7 +12,7 @@ import (
 // TTL = 10 minutes by default (configurable via Decider.IntentCacheTTL).
 //
 // The cache is process-local (in-memory). In multi-instance deployments
-// (184 k3s + 71 docker), each instance maintains its own cache — this
+// ([SERVER] k3s + [SERVER] docker), each instance maintains its own cache — this
 // is acceptable because the sticky credential layer (routing/sticky.go)
 // already handles cross-instance credential stickiness via DB.
 type CachedIntent struct {

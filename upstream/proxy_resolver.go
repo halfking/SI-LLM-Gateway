@@ -33,8 +33,8 @@ var defaultDomesticDomains = []string{
 	"api.lkeap.cloud.tencent.com",
 	"aip.baidubce.com",
 	"mg-new.evolai.cn",
-	"llm.kxpms.cn",
-	"kxpms.cn",
+	"[PROD_DOMAIN]",
+	"[INTERNAL_DOMAIN]",
 	"localhost",
 	"127.0.0.1",
 }

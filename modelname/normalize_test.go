@@ -259,7 +259,7 @@ func TestNormalizeRouteKeyAliases(t *testing.T) {
 		input    string
 		mustHave []string
 	}{
-		// Real DB canonical names observed on 184 (2026-06-19 probe)
+		// Real DB canonical names observed on [SERVER] (2026-06-19 probe)
 		{"claude-sonnet-4.6", []string{"claude-sonnet-4.6", "claude-sonnet-4-6"}},
 		{"claude-sonnet-4-6", []string{"claude-sonnet-4-6", "claude-sonnet-4.6"}},
 		{"claude-opus-4.8", []string{"claude-opus-4.8", "claude-opus-4-8"}},

@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-REDIS_HOST="${REDIS_HOST:-172.31.0.4}"
+REDIS_HOST="${REDIS_HOST:-[INTERNAL_DB_HOST]}"
 CREDENTIAL_ID=6
 OUTPUT_DIR="/tmp/fpslot-diagnosis-$(date +%Y%m%d-%H%M%S)"
 

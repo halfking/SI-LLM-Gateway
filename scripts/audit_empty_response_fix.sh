@@ -45,26 +45,26 @@ if docker ps | grep -q r112_postgres; then
     
     # 创建测试数据库
     echo "  - 创建测试数据库: llm_gateway_audit_test"
-    PGPASSWORD=kxpass psql -h 127.0.0.1 -p 5432 -U kxuser -d postgres \
+    PGPASSWORD=kxpass psql -h 127.0.0.1 -p 5432 -U [DB_USER] -d postgres \
         -c "DROP DATABASE IF EXISTS llm_gateway_audit_test;" 2>&1 > /dev/null
-    PGPASSWORD=kxpass psql -h 127.0.0.1 -p 5432 -U kxuser -d postgres \
+    PGPASSWORD=kxpass psql -h 127.0.0.1 -p 5432 -U [DB_USER] -d postgres \
         -c "CREATE DATABASE llm_gateway_audit_test;" 2>&1 > /dev/null
     
     # 初始化 schema
     echo "  - 初始化 schema (bootstrap_full_schema.sql)"
-    PGPASSWORD=kxpass psql -h 127.0.0.1 -p 5432 -U kxuser -d llm_gateway_audit_test \
+    PGPASSWORD=kxpass psql -h 127.0.0.1 -p 5432 -U [DB_USER] -d llm_gateway_audit_test \
         -f scripts/bootstrap_full_schema.sql 2>&1 > /dev/null
     
     # 运行集成测试
     echo "  - 运行集成测试"
-    export LLM_GATEWAY_PG_URL="postgres://kxuser:kxpass@127.0.0.1:5432/llm_gateway_audit_test?sslmode=disable"
+    export LLM_GATEWAY_PG_URL="postgres://[DB_USER]:kxpass@127.0.0.1:5432/llm_gateway_audit_test?sslmode=disable"
     go test -tags=integration ./tests/integration -v -run TestEmptyResponseAudit 2>&1 | tee /tmp/audit-integration.log
     INTEGRATION_RESULT=$(grep -c "PASS" /tmp/audit-integration.log | head -1 || echo "0")
     echo -e "${GREEN}✓ 集成测试: ${INTEGRATION_RESULT}/5 场景 PASS${NC}"
     
     # 清理
     echo "  - 清理测试数据库"
-    PGPASSWORD=kxpass psql -h 127.0.0.1 -p 5432 -U kxuser -d postgres \
+    PGPASSWORD=kxpass psql -h 127.0.0.1 -p 5432 -U [DB_USER] -d postgres \
         -c "DROP DATABASE llm_gateway_audit_test;" 2>&1 > /dev/null
 else
     echo -e "${YELLOW}  ⚠ 未找到本地 PostgreSQL，跳过集成测试${NC}"
@@ -101,7 +101,7 @@ echo "  ✓ 回归测试: relay + audit + ir 包"
 echo ""
 echo "部署建议:"
 echo "  1. Staging 验证 (1 小时观察 empty_response 计数)"
-echo "  2. 生产灰度 (184 单 replica)"
+echo "  2. 生产灰度 ([SERVER] 单 replica)"
 echo "  3. 监控指标: empty_response ⬇️ 50-80%, success ⬆️"
 echo ""
 echo -e "${GREEN}✓ 审计结论: 修复有效，测试通过，可部署${NC}"

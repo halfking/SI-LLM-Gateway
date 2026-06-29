@@ -37,7 +37,7 @@ type ClientConfig struct {
 	// mode). When set, Search() and Add() still use BaseURL but
 	// SmartSearch() hits this URL instead. This lets the gateway point
 	// legacy MemOS calls at the MemOS service and the new 5-step pipeline
-	// at the kxmemory Dashboard (which proxies to MemOS + Qdrant).
+	// at the [KMEMORY] Dashboard (which proxies to MemOS + Qdrant).
 	SmartSearchBaseURL string
 	// SmartSearchAPIKey (2026-06-20) is the API key for the Dashboard
 	// smart_search route. Empty = reuse APIKey (when SmartSearchBaseURL
@@ -226,7 +226,7 @@ func (c *Client) Search(ctx context.Context, userID, query string, topK int) ([]
 // SmartSearch is the M1 (2026-06-19) high-recall retrieval entry point.
 //
 // As of 2026-06-20, Memora's Dashboard /api/smart_search route (see
-// services/kxmemory/dashboard/backend/routes/smart_search.py) accepts
+// services/[KMEMORY]/dashboard/backend/routes/smart_search.py) accepts
 // an optional `user_id` query parameter and threads it through to a
 // Qdrant Filter(must=[FieldCondition(key=user_id, match=MatchValue(...))]).
 // This makes the 5-step RRF+MMR pipeline safe to use for per-tenant v3

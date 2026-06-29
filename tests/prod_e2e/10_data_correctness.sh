@@ -117,7 +117,7 @@ RESP=$(call_chat_with_body "$BAD_BODY")
 BODY=$(echo "$RESP" | tail -n +2)
 # 检查是否含敏感关键字
 SENSITIVE_FOUND=""
-for keyword in "sk-e2e-1781897808" "api.minimax" "dashscope" "kxpms.cn" "open.bigmodel" "api.deepseek"; do
+for keyword in "sk-e2e-1781897808" "api.minimax" "dashscope" "[INTERNAL_DOMAIN]" "open.bigmodel" "api.deepseek"; do
     if echo "$BODY" | grep -q "$keyword"; then
         SENSITIVE_FOUND="$SENSITIVE_FOUND $keyword"
     fi

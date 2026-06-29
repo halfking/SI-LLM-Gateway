@@ -1,6 +1,6 @@
 -- ============================================================================
 -- llm-gateway-go 提供商和模型相关表结构
--- Source of truth: 184 / llm_gateway / pg_dump --schema-only (2026-06-27)
+-- Source of truth: [SERVER] / llm_gateway / pg_dump --schema-only (2026-06-27)
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -294,7 +294,7 @@ ALTER SEQUENCE public.providers_id_seq OWNED BY public.providers.id;
 ALTER TABLE ONLY public.providers ALTER COLUMN id SET DEFAULT nextval('public.providers_id_seq'::regclass);
 
 -- ----------------------------------------------------------------------------
--- Key constraints from 184 baseline
+-- Key constraints from [SERVER] baseline
 -- ----------------------------------------------------------------------------
 DO $$
 BEGIN

@@ -137,7 +137,7 @@ func TestDetectEmptyStreamResponse_EdgeCase_FourChunks(t *testing.T) {
 
 // 2026-06-26 regression tests.
 //
-// Symptom: server-184 request_logs accumulated many rows with
+// Symptom: server-[SERVER] request_logs accumulated many rows with
 // error_kind='empty_response' on successful requests. Root cause was that
 // detectEmptyStreamResponse's "upstream finish_reason" check read
 // reqLog.UpstreamFinishReason, which is still nil at the call site (it's

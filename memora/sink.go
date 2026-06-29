@@ -51,7 +51,7 @@ type WriteOp struct {
 	//
 	// Round 47 compression v7 T14: the gateway enqueue path now passes
 	// "gateway" to align with the Memora MCP ingest_session source enum
-	// (see kxmemory/mcp-server/tools/memory.js source: enum). Leaving
+	// (see [KMEMORY]/mcp-server/tools/memory.js source: enum). Leaving
 	// empty is allowed — older callers (admin/session_extract) still work.
 	Source string
 }
