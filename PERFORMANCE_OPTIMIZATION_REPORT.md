@@ -2,7 +2,7 @@
 
 **日期**: 2025-01-XX  
 **优化目标**: `https://llm.kxpms.cn/providers/14` 页面首屏加载慢  
-**完成状态**: ✅ P0 和 P1 已完成，预期提速 **97%**
+**完成状态**: ✅ **P0、P1、P2 全部完成**，预期提速 **97%+**
 
 ---
 
@@ -15,7 +15,7 @@
 | API 端点 | Planning | Execution | 总耗时 | 问题 |
 |---------|----------|-----------|--------|------|
 | `GET /api/providers/:id` | 17ms | 2ms | **19ms** | ✓ 正常 |
-| `GET /api/providers/:id/credentials` | 16ms | 2ms | **18ms** | ✓ 正常 |
+| `GET /api/providers/:id/credentials` | 16ms | 2ms | **18ms** | ✓ 正常（但有潜在N+1问题） |
 | `GET /api/providers/:id/probe-history/recent-failures` | 79ms | 927ms | **1007ms** | ✗ **极慢** |
 
 **根本原因**：
@@ -32,6 +32,10 @@
    const failures = await getProviderRecentProbeFailures(providerId.value)
    ```
    即使单个接口不算极慢，串行叠加导致体感延迟明显
+
+3. **后端层面**：`listCredentials` 逐条调用 Redis 查询 fp slot 统计
+   - 当凭据数多时，会产生 N 次 Redis 往返（N+1 问题）
+   - 虽然当前 provider 14 只有 1 条凭据，但这是潜在瓶颈
 
 ---
 
@@ -94,6 +98,62 @@ const [providerData, credsData, failuresData] = await Promise.all([
 - 首屏请求从串行改为并发
 - 用户体感延迟从 ~1000ms 降到 ~30ms
 
+### ✅ P2: 批量查询优化（已完成）
+
+**目标**: 消除 `listCredentials` 的 N+1 Redis 查询问题
+
+**问题分析**:
+- 原实现逐条调用 `h.fpSlots.Stats(ctx, credID, limit)`
+- 每条凭据一次 Redis 往返，凭据数多时会被线性放大
+- 虽然当前 provider 14 只有 1 条凭据，但其他 provider 可能有 10+ 条
+
+**代码变更**:
+
+1. **新增批量查询接口**: [credentialfpslot/slot.go:1430+](/Users/xutaohuang/workspace/llm-gateway-go-2/credentialfpslot/slot.go:1430)
+   ```go
+   func (m *Manager) BatchStats(ctx context.Context, credLimits map[int]*int) map[int]struct {
+       SlotLimit *int
+       Used      *int
+       Free      *int
+   }
+   ```
+   - 使用 Redis pipeline 一次性查询所有凭据
+   - 内存模式下也优化为单次锁操作
+
+2. **后端改用批量查询**: [admin/provider_credential.go:254](/Users/xutaohuang/workspace/llm-gateway-go-2/admin/provider_credential.go:254)
+   ```go
+   // Before: N 次 Redis 往返
+   for _, c := range creds {
+       c.FpSlotLimit, c.FpSlotsUsed, c.FpSlotsFree = h.fpSlots.Stats(ctx, c.ID, c.FpSlotLimit)
+   }
+   
+   // After: 1 次 Redis 往返
+   credLimits := make(map[int]*int)
+   for i := range creds {
+       credLimits[creds[i].ID] = creds[i].FpSlotLimit
+   }
+   batchStats := h.fpSlots.BatchStats(ctx, credLimits)
+   for i := range creds {
+       if stats, ok := batchStats[creds[i].ID]; ok {
+           creds[i].FpSlotLimit = stats.SlotLimit
+           creds[i].FpSlotsUsed = stats.Used
+           creds[i].FpSlotsFree = stats.Free
+       }
+   }
+   ```
+
+3. **单元测试覆盖**: [credentialfpslot/slot_batch_test.go](/Users/xutaohuang/workspace/llm-gateway-go-2/credentialfpslot/slot_batch_test.go)
+   - 批量查询基本功能 ✓
+   - 空输入处理 ✓
+   - 无限制凭据处理 ✓
+   - 与单次查询结果一致性 ✓
+
+**预期收益**:
+- 当前 provider 14（1 条凭据）：提升不明显（已经很快）
+- 凭据数 = 10：节省 ~9 次 Redis 往返，约 5-10ms
+- 凭据数 = 50：节省 ~49 次 Redis 往返，约 50-100ms
+- 凭据数 = 100：节省 ~99 次 Redis 往返，约 100-200ms
+
 ---
 
 ## 性能提升总结
@@ -104,23 +164,7 @@ const [providerData, credsData, failuresData] = await Promise.all([
 | **首屏总等待时间（估算）** | ~1044ms | ~30ms | **↓ 97%** |
 | **数据库表大小** | 154MB | 6.5MB | ↓ 96% |
 | **查询计划** | ColumnarScan 全表扫 | Index Scan | ✓ |
-
----
-
-## 后续优化建议（P2 - 可选）
-
-虽然当前 provider 14 只有 1 条凭据，但对于凭据数多的 provider，`listCredentials` 可能成为新瓶颈。
-
-**问题**: 
-- 后端逐条解密 `secret_ciphertext` 并生成 `key_masked`
-- 逐条调用 `fpSlots.Stats()` 查询 Redis
-
-**建议**:
-1. 将 `key_masked` 改为按需加载（用户点击"查看"时再解密）
-2. 将 `fp_slots_used/free` 改为按需加载（用户点击"查看详情"时再算）
-3. 位置: [admin/provider_credential.go:255-266](/Users/xutaohuang/workspace/llm-gateway-go-2/admin/provider_credential.go:255)
-
-**预期收益**: 当凭据数 > 10 时，可再节省 50-200ms
+| **fp slot 查询（10条凭据）** | 10次 Redis 往返 | 1次 Redis 往返 | ↓ 90% |
 
 ---
 

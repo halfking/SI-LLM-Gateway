@@ -261,15 +261,29 @@ func (h *Handler) listCredentials(w http.ResponseWriter, r *http.Request, provid
 				c.KeyMasked = &masked
 			}
 		}
-		if h.fpSlots != nil {
-			c.FpSlotLimit, c.FpSlotsUsed, c.FpSlotsFree = h.fpSlots.Stats(ctx, c.ID, c.FpSlotLimit)
-			c.EffectiveFpSlotLimit = credentialfpslot.EffectiveFpSlotLimit(c.FpSlotLimit, h.fpSlotsDefaultLimit())
-		}
 		creds = append(creds, c)
 	}
 	if creds == nil {
 		creds = []cred{}
 	}
+
+	// Batch query fp slot stats for all credentials in one round-trip
+	if h.fpSlots != nil && len(creds) > 0 {
+		credLimits := make(map[int]*int)
+		for i := range creds {
+			credLimits[creds[i].ID] = creds[i].FpSlotLimit
+		}
+		batchStats := h.fpSlots.BatchStats(ctx, credLimits)
+		for i := range creds {
+			if stats, ok := batchStats[creds[i].ID]; ok {
+				creds[i].FpSlotLimit = stats.SlotLimit
+				creds[i].FpSlotsUsed = stats.Used
+				creds[i].FpSlotsFree = stats.Free
+			}
+			creds[i].EffectiveFpSlotLimit = credentialfpslot.EffectiveFpSlotLimit(creds[i].FpSlotLimit, h.fpSlotsDefaultLimit())
+		}
+	}
+
 	writeJSON(w, http.StatusOK, creds)
 }
 
