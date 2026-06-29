@@ -2,16 +2,16 @@
   "ts": "D1",
   "test_id": "D1",
   "status": "PASS",
-  "message": "Q1 OpenAI→OpenAI: 200 OK, role=assistant, content_len=131",
+  "message": "Q1 OpenAI→OpenAI: 200 OK, role=assistant, content_len=122",
   "details": {
     "role": "assistant",
     "usage": {
-      "total_tokens": 216,
+      "total_tokens": 212,
       "total_characters": 0,
       "prompt_tokens": 186,
-      "completion_tokens": 30,
+      "completion_tokens": 26,
       "completion_tokens_details": {
-        "reasoning_tokens": 25
+        "reasoning_tokens": 22
       },
       "prompt_tokens_details": {
         "cached_tokens": 128
@@ -25,7 +25,7 @@
   "status": "SKIP",
   "message": "claude-* 当前不可用",
   "details": {
-    "body": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'claude-3-5-sonnet-20241022'\",\"request_id\":\"2f7225b4cd26e12ad3efb6f894114cca\",\"type\":\"server_error\"}}"
+    "body": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'claude-3-5-sonnet-20241022'\",\"request_id\":\"5bdec1cc8a3be5085dd066515580d876\",\"type\":\"server_error\"}}"
   }
 }
 {
@@ -38,7 +38,7 @@
     "model": "minimax-m3",
     "usage": {
       "input_tokens": 177,
-      "output_tokens": 41
+      "output_tokens": 42
     }
   }
 }
@@ -56,11 +56,11 @@
   "ts": "D5",
   "test_id": "D5",
   "status": "PASS",
-  "message": "Responses API: 200 OK, status=incomplete, output_type=message, text_len=155",
+  "message": "Responses API: 200 OK, status=incomplete, output_type=message, text_len=161",
   "details": {
     "status": "incomplete",
     "output_type": "message",
-    "output_preview": "<think>\nThe user is simply asking me to reply \"OK\". This is a straightforward request with no issues"
+    "output_preview": "<think>\nThe user is asking for a simple \"OK\" reply. This is a basic conversational request that does"
   }
 }
 {
@@ -77,28 +77,28 @@
   "ts": "D7",
   "test_id": "D7",
   "status": "PASS",
-  "message": "多轮对话: 200 OK, prompt_tokens=190",
+  "message": "多轮对话: 200 OK, prompt_tokens=203",
   "details": {
-    "prompt_tokens": 190,
-    "content": "2"
+    "prompt_tokens": 203,
+    "content": "<think>\nThe user is asking a simple math question: 1+1.\n</think>"
   }
 }
 {
   "ts": "D8",
   "test_id": "D8",
   "status": "PASS",
-  "message": "长 prompt: prompt_tokens=5164",
+  "message": "长 prompt: prompt_tokens=5177",
   "details": {
-    "prompt_tokens": 5164
+    "prompt_tokens": 5177
   }
 }
 {
   "ts": "D9",
   "test_id": "D9",
   "status": "PASS",
-  "message": "system prompt 起作用: content=2",
+  "message": "system prompt: 200 OK, content=<think>The user is asking a simple math question: 1+1.</think>",
   "details": {
-    "content": "2"
+    "content": "<think>The user is asking a simple math question: 1+1.</think>"
   }
 }
 {
@@ -111,7 +111,7 @@
     "finish": "tool_calls",
     "calls": [
       {
-        "id": "call-48d163d4-90cc-4712-93cc-e7a0e90ca5ed",
+        "id": "call_019f100afbc377d3ab63955b",
         "type": "function",
         "function": {
           "name": "get_weather",

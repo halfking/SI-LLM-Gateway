@@ -2,24 +2,24 @@
   "ts": "I1",
   "test_id": "I1",
   "status": "PASS",
-  "message": "同一 seed: 两次返回 request_id=0690a0ce8b04a7349705af10b10ea9da, 0690a0cf1dbbc39c5fe58bf02ae3479c (不同)，session=gw_9d5b5263-567b-47b0-9fbb-37e472f88423, gw_6a20b9db-7f0c-42bc-a342-cd31a7b95894",
+  "message": "同一 seed: 两次返回 request_id=0690bf97d2a87f41dfc797850c132ab1, 0690bf983ecd08458019ba3da3b1b629 (不同)，session=gw_95074179-34d4-490c-a791-9771712fa04c, gw_68ba5b79-3dd1-4630-bed8-c5b0eb055cfd",
   "details": {
-    "request_id_1": "0690a0ce8b04a7349705af10b10ea9da",
-    "request_id_2": "0690a0cf1dbbc39c5fe58bf02ae3479c",
-    "session_1": "gw_9d5b5263-567b-47b0-9fbb-37e472f88423",
-    "session_2": "gw_6a20b9db-7f0c-42bc-a342-cd31a7b95894"
+    "request_id_1": "0690bf97d2a87f41dfc797850c132ab1",
+    "request_id_2": "0690bf983ecd08458019ba3da3b1b629",
+    "session_1": "gw_95074179-34d4-490c-a791-9771712fa04c",
+    "session_2": "gw_68ba5b79-3dd1-4630-bed8-c5b0eb055cfd"
   }
 }
 {
   "ts": "I2",
   "test_id": "I2",
   "status": "PASS",
-  "message": "X-Machine-Id: 两次都成功 (request_id=0690a0d09994c33480d7a5c643123777, 0690a0d19cace52256d9c9c6c8b03047)",
+  "message": "X-Machine-Id: 两次都成功 (request_id=0690bf9c876820a2516850bd68020870, 0690bf9d32a042458a1dd6ff882fbc44)",
   "details": {
-    "request_id_1": "0690a0d09994c33480d7a5c643123777",
-    "request_id_2": "0690a0d19cace52256d9c9c6c8b03047",
-    "session_1": "gw_ff2e2cce-2c49-42b7-97bd-0bf955ff4a06",
-    "session_2": "gw_cf9988d4-53fa-404a-94e6-91df88cde039"
+    "request_id_1": "0690bf9c876820a2516850bd68020870",
+    "request_id_2": "0690bf9d32a042458a1dd6ff882fbc44",
+    "session_1": "gw_c43d6303-88f6-4132-8888-97900c28a6ae",
+    "session_2": "gw_2de9cde8-ab6b-4a02-b70f-b8381b69fc13"
   }
 }
 {
@@ -53,7 +53,7 @@
   "ts": "I7",
   "test_id": "I7",
   "status": "PASS",
-  "message": "3 个独立 session 都成功: gw_eb5b1d34-7458-4824-9d56-e911ea4bcca1 gw_b21f76e6-fbac-4bd7-ae3d-b36d60a04ced gw_8ac255dc-e5b1-456c-9757-7b03c88d11dc",
+  "message": "3 个独立 session 都成功: gw_c66b17fa-c226-45df-ac69-50feffc03799 gw_c71f1704-4fcc-4fb9-a154-a9c4ddc65c66 gw_183d9e6c-eaff-45a7-9718-05f0066a4d99",
   "details": {}
 }
 {

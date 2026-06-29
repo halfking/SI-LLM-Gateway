@@ -1,6 +1,10 @@
-data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003e\nThe user is asking a","role":"assistant","name":"MiniMax AI","audio_content":""}}],"created":1782669774,"id":"069094cea9fb94e6d2549ebb835b2009","input_sensitive":false,"input_sensitive_type":0,"model":"minimax-m3","object":"chat.completion.chunk","output_sensitive":false,"output_sensitive_int":0,"output_sensitive_type":0,"service_tier":"standard","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"","role":"assistant"}}],"created":1782680700,"id":"0690bf7cafe3244c16829f435c453a88","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
 
-data: {"choices":[{"finish_reason":"stop","index":0,"delta":{"content":" simple math question. 1+1=2.\n\u003c/think\u003e\n1+1 = 2","role":"assistant","name":"MiniMax AI","audio_content":""}}],"created":1782669774,"id":"069094cea9fb94e6d2549ebb835b2009","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe user is asking a simple math question and wants me to think briefly.","role":"assistant"}}],"created":1782680700,"id":"0690bf7cafe3244c16829f435c453a88","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"\u003c/think\u003e\n\n1 + 1 = 2.","role":"assistant"}}],"created":1782680700,"id":"0690bf7cafe3244c16829f435c453a88","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"finish_reason":"stop","index":0,"delta":{"content":"","role":"assistant"}}],"created":1782680700,"id":"0690bf7cafe3244c16829f435c453a88","model":"minimax-m3","usage":null}
 
 
 data: [DONE]

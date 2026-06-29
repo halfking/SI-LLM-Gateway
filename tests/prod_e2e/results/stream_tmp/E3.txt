@@ -1,8 +1,10 @@
-data: {"choices":[{"index":0,"delta":{"content":"","role":"assistant"}}],"created":1782669763,"id":"069094c2304c78d67f4091a8d947c6db","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"","role":"assistant"}}],"created":1782680692,"id":"0690bf74d2d3f1350950d5f1572fa264","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe user just said \"OK\" - this is a very brief message","role":"assistant"}}],"created":1782669763,"id":"069094c2304c78d67f4091a8d947c6db","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe user just said \"OK\" which is very brief.","role":"assistant"}}],"created":1782680692,"id":"0690bf74d2d3f1350950d5f1572fa264","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":"\u003c/think\u003e\n\n","role":"assistant"}}],"created":1782669763,"id":"069094c2304c78d67f4091a8d947c6db","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" I should","role":"assistant"}}],"created":1782680692,"id":"0690bf74d2d3f1350950d5f1572fa264","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":"\u003c/think\u003e\n\n","role":"assistant"}}],"created":1782680692,"id":"0690bf74d2d3f1350950d5f1572fa264","model":"minimax-m3","usage":null}
 
 
 data: [DONE]

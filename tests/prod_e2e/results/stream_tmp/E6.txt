@@ -1,6 +1,6 @@
-data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003e\nThe user is asking me to reply with","role":"assistant","name":"MiniMax AI","audio_content":""}}],"created":1782669768,"id":"069094c817f128a6a8d44ea3ef1be571","input_sensitive":false,"input_sensitive_type":0,"model":"minimax-m3","object":"chat.completion.chunk","output_sensitive":false,"output_sensitive_int":0,"output_sensitive_type":0,"service_tier":"standard","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003e\nThe user is","role":"assistant","name":"MiniMax AI","audio_content":""}}],"created":1782680695,"id":"0690bf77b904cb972a5ff48254611575","input_sensitive":false,"input_sensitive_type":0,"model":"minimax-m3","object":"chat.completion.chunk","output_sensitive":false,"output_sensitive_int":0,"output_sensitive_type":0,"service_tier":"standard","usage":null}
 
-data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":" just\n\u003c/think\u003e\n","role":"assistant","name":"MiniMax AI","audio_content":""}}],"created":1782669768,"id":"069094c817f128a6a8d44ea3ef1be571","model":"minimax-m3","usage":null}
+data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":" asking me to reply with just\n\u003c/think\u003e\n","role":"assistant","name":"MiniMax AI","audio_content":""}}],"created":1782680695,"id":"0690bf77b904cb972a5ff48254611575","model":"minimax-m3","usage":null}
 
 
 data: [DONE]
