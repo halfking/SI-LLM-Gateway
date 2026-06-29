@@ -13,16 +13,16 @@ LLM Gateway Go 数据面 — 高性能身份感知 LLM 请求代理网关。
 
 ### 数据库资产全面集中
 
-- **184 生产库逐对象 SQL 导出**：从生产 PostgreSQL 拉取 `pg_dump --schema-only` 输出，自动化解析为 **933 个独立 SQL 文件**，每个表/视图/函数/索引/触发器/策略单独成文件
+- **生产数据库逐对象 SQL 导出**：从生产 PostgreSQL 拉取 `pg_dump --schema-only` 输出，自动化解析为 **933 个独立 SQL 文件**，每个表/视图/函数/索引/触发器/策略单独成文件
   - 138 表 / 413 索引 / 88 约束 / 65 序列 / 64 默认值 / 64 RLS 策略 / 37 函数 / 17 视图 / 16 触发器 / 8 外键 / 4 扩展 / 2 物化视图
-- **完整参考快照**：`deploy/sql/00_schema/184_full_schema.sql`（11,477 行）作为 184 实时结构的权威镜像
+- **完整参考快照**：`deploy/sql/00_schema/full_schema.sql`（11,477 行）作为生产数据库实时结构的权威镜像
 - **拆分工具**：`deploy/sql/scripts/split_pg_dump.py` 支持任意时刻重新同步生产 schema
 - **统一目录**：所有 SQL 资产（迁移、初始化、运维、文档、临时）集中到 `deploy/sql/` 下按职能分子目录
   - `00_schema/` 初始化结构
   - `01_functions/` 函数与触发器
   - `02_seed_data/` 最小初始化数据
   - `migrations/` 历史迁移（按编号顺序）
-  - `objects/` 逐对象导出（来自 184）
+  - `objects/` 逐对象导出（来自生产数据库）
   - `db_scripts/` 运维脚本
   - `adhoc/` 临时/诊断脚本
   - `docs/` 文档 SQL
@@ -183,10 +183,15 @@ go vet ./...
 
 ## 更新历史
 
-| 时间 | 内容 |
-|---|---|
-| 2026-06-29 | 数据库资产全面集中：184 生产库逐对象 SQL 导出（933 个独立文件），统一迁移到 `deploy/sql/` 目录；新增 `split_pg_dump.py` 自动同步工具 |
-| 2026-06-29 | 文档精简：根目录精简到 4 个文档（README / ARCHITECTURE / CHANGELOG / DEPLOYMENT），删除 ~150 详细过程文档，敏感信息脱敏 |
-| 2026-06-29 | 在 README 中加入本批提交特性总结与更新历史 |
+### 2026-06-29 修正总览
+
+| 提交 | 类型 | 内容 |
+|---|---|---|
+| `ea85b04e` | chore(sql) | **数据库资产全面集中** — 生产数据库逐对象 SQL 导出（933 个独立文件：138 表 / 413 索引 / 88 约束 / 64 策略 / 37 函数 / 17 视图 / 16 触发器 等），统一迁移到 `deploy/sql/` 目录；新增 `split_pg_dump.py` 自动同步工具；生成 372KB 完整参考快照 `full_schema.sql` |
+| `a474bc14` | docs | **文档精简** — 根目录精简到 4 个文档（README / ARCHITECTURE / CHANGELOG / DEPLOYMENT）；删除 ~150 详细过程文档（CHANGELOG_*、AUDIT_*、DEPLOYMENT_*、HOTFIX_*、DIAGNOSIS_*、*_FIX.md、*_REPORT.md、*_SUMMARY.md、*_ANALYSIS.md 等）；敏感信息脱敏（IP、主机名、邮箱、密钥、URL）；删除整个 `docs/` 目录（~90 文件含 473KB OpenRouter 定价数据）与 `memory-bank/` |
+| `fcf20039` | docs(readme) | **README 加入本批特性总结** — 新增「本批提交特性总结」章节，集中介绍 SQL 整合与文档精简两个工作 |
+| `901c7a22` | docs(readme) | **README 加入更新历史** — 新增「更新历史」表格，按时间倒序记录本批主要变更 |
+| `fc968edb` | merge | PR #1 (ea85b04e + a474bc14) 合并到 main |
+| `555060d3` | merge | PR #2 (fcf20039 + 901c7a22) 合并到 main |
 
 详细变更见 [CHANGELOG.md](./CHANGELOG.md)；架构说明见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
