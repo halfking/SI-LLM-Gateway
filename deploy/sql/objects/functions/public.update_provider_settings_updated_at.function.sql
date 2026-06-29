@@ -1,0 +1,20 @@
+-- ===========================================================================
+-- Object:   update_provider_settings_updated_at()
+-- Type:     FUNCTION
+-- Schema:   public
+-- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- ===========================================================================
+-- Name: update_provider_settings_updated_at(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_provider_settings_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--

@@ -1,0 +1,13 @@
+-- ===========================================================================
+-- Object:   provider_scores id
+-- Type:     DEFAULT
+-- Schema:   public
+-- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- ===========================================================================
+-- Name: provider_scores id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_scores ALTER COLUMN id SET DEFAULT nextval('public.provider_scores_id_seq'::regclass);
+
+
+--

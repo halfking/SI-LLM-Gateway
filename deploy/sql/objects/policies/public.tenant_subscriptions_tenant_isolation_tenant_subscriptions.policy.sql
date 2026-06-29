@@ -1,0 +1,13 @@
+-- ===========================================================================
+-- Object:   tenant_subscriptions tenant_isolation_tenant_subscriptions
+-- Type:     POLICY
+-- Schema:   public
+-- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- ===========================================================================
+-- Name: tenant_subscriptions tenant_isolation_tenant_subscriptions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation_tenant_subscriptions ON public.tenant_subscriptions USING (((tenant_id)::text = public.get_current_tenant()));
+
+
+--

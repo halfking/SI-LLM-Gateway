@@ -1,0 +1,13 @@
+-- ===========================================================================
+-- Object:   idx_passive_probe_reviewing
+-- Type:     INDEX
+-- Schema:   public
+-- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- ===========================================================================
+-- Name: idx_passive_probe_reviewing; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_passive_probe_reviewing ON public.passive_probe_state USING btree (in_reviewing, reviewing_until) WHERE (in_reviewing = true);
+
+
+--
