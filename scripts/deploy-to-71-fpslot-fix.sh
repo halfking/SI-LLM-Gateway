@@ -76,12 +76,13 @@ SERVICE_NAME="llm-gateway"
 echo "[远程] 开始部署..."
 cd "$REMOTE_DIR"
 
-# 备份当前版本
+# 备份当前版本（与 systemd ExecStart 同目录）
 echo "[远程] 备份当前版本..."
 BACKUP_NAME="llm-gateway.backup-$(date +%Y%m%d-%H%M%S)"
-if [ -f "/usr/local/bin/$SERVICE_NAME" ]; then
-    cp "/usr/local/bin/$SERVICE_NAME" "/usr/local/bin/$BACKUP_NAME"
-    echo "[远程] ✓ 备份完成: $BACKUP_NAME"
+TARGET="$REMOTE_DIR/$SERVICE_NAME"
+if [ -f "$TARGET" ]; then
+    cp "$TARGET" "$REMOTE_DIR/$BACKUP_NAME"
+    echo "[远程] ✓ 备份完成: $REMOTE_DIR/$BACKUP_NAME"
 else
     echo "[远程] ! 未找到现有二进制文件，跳过备份"
 fi
@@ -101,8 +102,8 @@ echo "[远程] ✓ 服务已停止"
 
 # 部署新版本
 echo "[远程] 部署新版本..."
-cp "$BINARY_NAME" "/usr/local/bin/$SERVICE_NAME"
-chmod +x "/usr/local/bin/$SERVICE_NAME"
+cp "$BINARY_NAME" "$TARGET"
+chmod +x "$TARGET"
 echo "[远程] ✓ 新版本已部署"
 
 # 启动服务
@@ -197,7 +198,7 @@ minimax-prod-1 fp_slot 修复部署报告
 4. 回滚步骤（如需要）:
    ssh $SERVER_71 << 'ROLLBACK'
    systemctl stop llm-gateway
-   cp /usr/local/bin/llm-gateway.backup-* /usr/local/bin/llm-gateway
+   cp $REMOTE_DIR/llm-gateway.backup-* $REMOTE_DIR/llm-gateway
    systemctl start llm-gateway
    ROLLBACK
 

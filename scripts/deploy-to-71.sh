@@ -99,10 +99,11 @@ log() {
 
 cd "$REMOTE_DIR"
 
-# 备份当前版本
-if [ -f "/usr/local/bin/$SERVICE_NAME" ]; then
+# 备份当前版本（与 systemd ExecStart 同目录，避免路径错位导致备份/回滚失效）
+TARGET="$REMOTE_DIR/$SERVICE_NAME"
+if [ -f "$TARGET" ]; then
   log "备份当前版本..."
-  cp "/usr/local/bin/$SERVICE_NAME" "/usr/local/bin/${SERVICE_NAME}.bak.$(date +%Y%m%d_%H%M%S)"
+  cp "$TARGET" "${TARGET}.bak.$(date +%Y%m%d_%H%M%S)"
 fi
 
 # 停止服务
@@ -112,8 +113,8 @@ sleep 5
 
 # 部署新版本
 log "部署新版本..."
-cp "$BINARY_NAME" "/usr/local/bin/$SERVICE_NAME"
-chmod +x "/usr/local/bin/$SERVICE_NAME"
+cp "$BINARY_NAME" "$TARGET"
+chmod +x "$TARGET"
 
 # 启动服务
 log "启动服务..."
@@ -164,5 +165,5 @@ log "2. 测试会话管理: 参考 DEPLOYMENT_2026-06-29.md"
 log "3. 监控 request_logs 覆盖率"
 log ""
 log "回滚命令（如需）:"
-log "  ssh $SERVER_71 'systemctl stop $SERVICE_NAME && cp /usr/local/bin/${SERVICE_NAME}.bak.* /usr/local/bin/$SERVICE_NAME && systemctl start $SERVICE_NAME'"
+log "  ssh $SERVER_71 'systemctl stop $SERVICE_NAME && cp ${REMOTE_DIR}/${SERVICE_NAME}.bak.* ${REMOTE_DIR}/$SERVICE_NAME && systemctl start $SERVICE_NAME'"
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
