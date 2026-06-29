@@ -180,3 +180,13 @@ go vet ./...
 - PostgreSQL 15
 - Redis
 - Go 1.21+
+
+## 更新历史
+
+| 时间 | 内容 |
+|---|---|
+| 2026-06-29 | 数据库资产全面集中：184 生产库逐对象 SQL 导出（933 个独立文件），统一迁移到 `deploy/sql/` 目录；新增 `split_pg_dump.py` 自动同步工具 |
+| 2026-06-29 | 文档精简：根目录精简到 4 个文档（README / ARCHITECTURE / CHANGELOG / DEPLOYMENT），删除 ~150 详细过程文档，敏感信息脱敏 |
+| 2026-06-29 | 在 README 中加入本批提交特性总结与更新历史 |
+
+详细变更见 [CHANGELOG.md](./CHANGELOG.md)；架构说明见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
