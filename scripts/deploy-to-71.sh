@@ -12,9 +12,19 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SERVER_71="root@<71服务器IP>"
+# 生产服务器配置（敏感信息已占位化）
+# 实际值通过环境变量注入：DEPLOY_HOST / DEPLOY_HOST_IP / SSHPASS
+# 推荐改用 SSH 密钥认证：DEPLOY_SSH_KEY=/path/to/key
+SERVER_71="${DEPLOY_HOST:-root@<PROD_HOST>}"
+SERVER_71_IP="${DEPLOY_HOST_IP:-<PROD_HOST_IP>}"
 REMOTE_DIR="/opt/llm-gateway-go"
 SERVICE_NAME="llm-gateway"
+
+# SSH 认证配置（敏感信息已占位化）
+# 必须通过环境变量 SSHPASS 注入真实密码；推荐改用 SSH 密钥（删除 SSHPASS 即可）
+export SSHPASS="${SSHPASS:-<YOUR_SSHPASS_PLACEHOLDER>}"
+SSH_CMD="${DEPLOY_SSH_CMD:-sshpass -e ssh -o StrictHostKeyChecking=no}"
+SCP_CMD="${DEPLOY_SSH_CMD:-sshpass -e scp -o StrictHostKeyChecking=no}"
 
 DRY_RUN=false
 SKIP_TESTS=false
@@ -69,8 +79,8 @@ BINARY_NAME="llm-gateway-$(git rev-parse --short HEAD)"
 log "✓ 编译完成: $BINARY_NAME"
 
 # 3. 上传到服务器
-log "上传二进制到服务器 71..."
-run_cmd "scp $BINARY_NAME ${SERVER_71}:${REMOTE_DIR}/"
+log "上传二进制到服务器 71 (${SERVER_71_IP})..."
+run_cmd "$SCP_CMD $BINARY_NAME ${SERVER_71}:${REMOTE_DIR}/"
 log "✓ 上传完成"
 
 # 4. 远程部署
@@ -142,7 +152,7 @@ if [ "$DRY_RUN" = true ]; then
   echo "[DRY-RUN] 将在服务器 71 上执行远程部署脚本"
   echo "$REMOTE_SCRIPT"
 else
-  ssh "$SERVER_71" "bash -s" "$BINARY_NAME" "$REMOTE_DIR" "$SERVICE_NAME" <<< "$REMOTE_SCRIPT"
+  $SSH_CMD "$SERVER_71" "bash -s" "$BINARY_NAME" "$REMOTE_DIR" "$SERVICE_NAME" <<< "$REMOTE_SCRIPT"
 fi
 
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
