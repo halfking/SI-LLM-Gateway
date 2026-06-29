@@ -184,6 +184,14 @@ type RequestLogEntry struct {
 	// non-streaming (extracted from response_body.choices[0].message.tool_calls).
 	// OpenAI format: [{id, type, function: {name, arguments}}].
 	ToolCalls json.RawMessage `json:"tool_calls,omitempty"`
+
+	// 2026-06-26: client-supplied X-Request-Id. Persisted in
+	// request_logs.client_request_id for debug / cross-system tracing.
+	// Distinct from RequestID (which is now ALWAYS a server-generated
+	// UUID, see migration 054 and the requestid_mw / handler fixes) so
+	// that client retries reusing the same id do not collapse into a
+	// single audit row.
+	ClientRequestID *string `json:"client_request_id,omitempty"`
 }
 
 func NewClient() *Client {
