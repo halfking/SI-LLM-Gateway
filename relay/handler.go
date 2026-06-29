@@ -3017,15 +3017,22 @@ func mapExecuteErrorToKind(err *routing.ExecuteError) string {
 	return "unknown"
 }
 
-// errorKindOrFallback (2026-06-20) returns the real underlying error
-// kind for request_logs.error_kind. Falls back to "model_not_found"
-// when the kind is empty or "unknown" so we never write a misleading
-// empty/garbage value to the database. The HTTP error.code is handled
-// separately (see serveWithExecutor's Exhausted branch) and stays
-// "model_not_found" for backward compatibility.
+// errorKindOrFallback returns the real underlying error kind for
+// request_logs.error_kind. Previously this returned "model_not_found"
+// when the kind was empty or "unknown", which caused operators to see
+// ~65 "model_not_found" rows per day that were actually transient / 5xx /
+// 429 failures (2026-06-29 minimax-m3 incident). Now we return
+// "unknown" so SQL queries like `WHERE error_kind='unknown'` can find
+// genuinely unclassified rows; combined with the new upstream_status_code
+// + response_body columns added in 2026-06-30 migration 055, those
+// "unknown" rows are now actually diagnosable.
+//
+// The HTTP error.code stays "model_not_found" in the Exhausted branch
+// (relay/handler.go ~line 1510) for backward compatibility with old
+// clients that pattern-match on the JSON error.code.
 func errorKindOrFallback(kind string) string {
 	if kind == "" || kind == "unknown" {
-		return "model_not_found"
+		return "unknown"
 	}
 	return kind
 }
