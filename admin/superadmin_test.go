@@ -167,16 +167,16 @@ func TestAdminMiddleware_RejectsExpiredJWT(t *testing.T) {
 func TestRateLimiter_Allows5ThenBlocks(t *testing.T) {
 	rl := NewRateLimiter(5, time.Minute)
 	for i := 1; i <= 5; i++ {
-		if !rl.Allow("192.168.[NETWORK].[HOST]") {
+		if !rl.Allow("192.168.1.100") {
 			t.Errorf("attempt %d: should be allowed", i)
 		}
 	}
 	// 6th attempt should be blocked
-	if rl.Allow("192.168.[NETWORK].[HOST]") {
+	if rl.Allow("192.168.1.100") {
 		t.Error("6th attempt should be blocked")
 	}
 	// Different IP should be allowed
-	if !rl.Allow("192.168.[NETWORK].[HOST]") {
+	if !rl.Allow("192.168.2.100") {
 		t.Error("different IP should be allowed")
 	}
 }

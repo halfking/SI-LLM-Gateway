@@ -634,7 +634,7 @@ var (
 	probePrivateNets = []*net.IPNet{
 		mustCIDR("10.0.0.0/8"),
 		mustCIDR("172.16.0.0/12"),
-		mustCIDR("192.168.[NETWORK].[HOST]/16"),
+		mustCIDR("192.168.0.0/16"),
 		mustCIDR("127.0.0.0/8"),
 	}
 )
