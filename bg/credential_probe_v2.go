@@ -369,10 +369,7 @@ func (c *CredentialProbeV2) probeCredential(ctx context.Context, s v2Snapshot) (
 		return ok, errMsg
 	}
 
-	var (
-		errMsg  string
-		lastErr string
-	)
+	var lastErr string
 	for _, delay := range probeutil.ProbeRetryDelays {
 		if !probeutil.SleepWithCtx(ctx, delay) {
 			return false, "ctx canceled during step2 retry: " + ctx.Err().Error()
@@ -381,12 +378,11 @@ func (c *CredentialProbeV2) probeCredential(ctx context.Context, s v2Snapshot) (
 		if ok {
 			return true, ""
 		}
-		errMsg = e
 		lastErr = e
 		// Network / 5xx / 408 / 425 / 429 → retry next loop.
 		// Anything else (400, 401, 402, 403, 404, 422) → fail fast.
-		if !shouldRetryChatErrMsg(errMsg) {
-			return false, errMsg
+		if !shouldRetryChatErrMsg(lastErr) {
+			return false, lastErr
 		}
 	}
 	return false, fmt.Sprintf("chat unreachable (after %d attempts): %s",
