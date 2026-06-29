@@ -97,3 +97,7 @@ version.json
 web/public/version.json
 web-vue/tsconfig.tsbuildinfo
 traffic-replay-bin
+
+# 编译产物（go build 输出，按 commit-sha / 版本 / 日期后缀命名）
+llm-gateway-*
+!llm-gateway-go/
