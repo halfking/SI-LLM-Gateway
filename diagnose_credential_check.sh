@@ -11,7 +11,7 @@ echo "${LOG_PREFIX} ============================================="
 
 if [ -z "${LLM_GATEWAY_DATABASE_URL:-}" ]; then
     echo "${LOG_PREFIX} ERROR: LLM_GATEWAY_DATABASE_URL not set"
-    echo "${LOG_PREFIX} Please set it to: postgresql://user:pass@host:port/dbname"
+    echo "${LOG_PREFIX} Please set it to: postgresql://user:[REDACTED_PASSWORD]@host:port/dbname"
     exit 1
 fi
 

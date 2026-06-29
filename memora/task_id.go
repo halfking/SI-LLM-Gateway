@@ -56,7 +56,7 @@ func TaskID(r *http.Request, body []byte, apiKeyID int) string {
 // Round 47 (2026-06-18) compression v7 T13: per docs/multi-tenant-standards.md
 // §3.2 Pattern A, every Memora user_id must be tenant-namespaced so cross-
 // tenant Memora search/ingest cannot leak facts. The "t:" prefix is what
-// Memora already uses for tenant-scoped keys (see kxmemory/mcp-server/tools/
+// Memora already uses for tenant-scoped keys (see [KMEMORY]/mcp-server/tools/
 // memory.js ingest_session source enum).
 //
 // Empty taskID returns "" so the caller can short-circuit the entire

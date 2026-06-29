@@ -87,9 +87,12 @@ logs/
 *.bak
 *.backup
 
-# prod_e2e test artifacts (SSE streaming capture)
+# prod_e2e test artifacts (SSE streaming capture, summary, jsonl)
 tests/prod_e2e/results/stream_tmp/
 tests/prod_e2e/results/concurrency_tmp/
+tests/prod_e2e/results/*.jsonl
+tests/prod_e2e/results/*.summary
+tests/prod_e2e/results/*.failures.log
 
 # Vendored kx-design (use services/shared/kx-design instead)
 kx-design/

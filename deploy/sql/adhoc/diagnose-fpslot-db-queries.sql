@@ -1,5 +1,5 @@
 -- minimax-prod-1 fp_slot 问题诊断 SQL 查询
--- 连接到 184 数据库执行
+-- 连接到 [SERVER] 数据库执行
 
 \echo '=== 1. 检查凭据配置 ==='
 SELECT 

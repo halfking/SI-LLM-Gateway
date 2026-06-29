@@ -27,6 +27,6 @@
 - `xiaomi_tokenplan_tier2.sql` — 5 `INSERT pricing_plans` (token_plan) + 5 `UPDATE credential_model_bindings`
 
 ## Final state
-- `pricing_plans`: 14 (tier_1) + 5 (tier_2) = **19 token_plan** + tier_1's existing 52 token = 71 rows
-- `credential_model_bindings`: 100% covered (priced_in=184, free=5)
+- `pricing_plans`: 14 (tier_1) + 5 (tier_2) = **19 token_plan** + tier_1's existing 52 token = [SERVER] rows
+- `credential_model_bindings`: 100% covered (priced_in=[SERVER], free=5)
 - `pricing_plans.source = 'scraped'`: 19 rows; phase E bulk had 66 token rows for tier_1 + 14 token_plan for tier_1 (8 was 14 already in DB before)

@@ -272,7 +272,7 @@ func TestHandleAudit_PreservesFieldSet(t *testing.T) {
 }
 
 // TestBuildAuditTaskDistributionQuery_GroupByExpression guards against
-// the bug we hit during initial 184 deploy: a SELECT expression that
+// the bug we hit during initial [SERVER] deploy: a SELECT expression that
 // references is_auto_request inside a CASE branch (via the
 // effectiveTaskExpr) requires GROUP BY to also reference the same
 // expression — not just the raw task_type column. PostgreSQL would

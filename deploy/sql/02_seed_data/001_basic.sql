@@ -1,6 +1,6 @@
 -- ============================================================================
 -- llm-gateway-go 基础数据初始化
--- Source: 184 / sanitized
+-- Source: [SERVER] / sanitized
 -- 说明: 仅保留 default 租户和 admin 用户，其他租户和用户不初始化
 -- ============================================================================
 
@@ -14,7 +14,7 @@ ON CONFLICT (code) DO NOTHING;
 -- ----------------------------------------------------------------------------
 -- 用户数据（仅保留 default 租户的 admin 用户）
 -- ----------------------------------------------------------------------------
--- 注意：password_hash 来自 184 当前 admin 记录；如用于新环境，请上线前重置密码。
+-- 注意：password_hash 来自 [SERVER] 当前 admin 记录；如用于新环境，请上线前重置密码。
 INSERT INTO public.users (id, tenant_id, username, password_hash, display_name, email, role, enabled)
 VALUES (1, 'default', 'admin', '$2a$10$CDoD6XNSX95kax/obEo6r.cfgdoctcX/N51cH2DOcASUuGefo7QFK', '系统管理员', '', 'super_admin', true)
 ON CONFLICT (username) DO NOTHING;
@@ -23,7 +23,7 @@ SELECT setval('public.users_id_seq', COALESCE((SELECT MAX(id) FROM users), 1), t
 
 -- ----------------------------------------------------------------------------
 -- 应用数据（仅保留基础管理应用）
--- Source: 184 / applications where code in ('admin', 'applicant')
+-- Source: [SERVER] / applications where code in ('admin', 'applicant')
 -- ----------------------------------------------------------------------------
 INSERT INTO public.applications (id, tenant_id, code, display_name, owner_user, data_sensitivity, enabled)
 VALUES

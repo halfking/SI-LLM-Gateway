@@ -1502,9 +1502,9 @@ onMounted(async () => {
    Different color palette from v7 to make them visually distinguishable
    in the logs table. */
 .compression-badge.strategy-delta_append {
-  background: rgba(20, 184, 166, 0.12);
+  background: rgba(20, [SERVER], 166, 0.12);
   color: #0f766e;
-  border: 1px solid rgba(20, 184, 166, 0.3);
+  border: 1px solid rgba(20, [SERVER], 166, 0.3);
 }
 .compression-badge.strategy-sliding_window_token,
 .compression-badge.strategy-sliding_window_count,
@@ -1525,7 +1525,7 @@ onMounted(async () => {
   font-size: 10px;
   font-weight: 500;
   margin-left: 6px;
-  background: rgba(20, 184, 166, 0.1);
+  background: rgba(20, [SERVER], 166, 0.1);
   color: #0f766e;
 }
 .outbound-diff-badge.unchanged {

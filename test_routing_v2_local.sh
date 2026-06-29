@@ -23,7 +23,7 @@ echo ""
 if [ -z "$DATABASE_URL" ]; then
     echo -e "${RED}错误：DATABASE_URL 环境变量未设置${NC}"
     echo "请设置 DATABASE_URL，例如："
-    echo "export DATABASE_URL='postgresql://user:pass@localhost:5432/dbname'"
+    echo "export DATABASE_URL='postgresql://user:[REDACTED_PASSWORD]@localhost:5432/dbname'"
     exit 1
 fi
 

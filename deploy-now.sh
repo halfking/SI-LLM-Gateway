@@ -1,5 +1,5 @@
 #!/bin/bash
-# 部署到 71 机器 - minimax-prod-1 fp_slot 修复
+# 部署到 [SERVER] 机器 - minimax-prod-1 fp_slot 修复
 # 使用最新编译的二进制文件
 
 set -euo pipefail
@@ -7,7 +7,7 @@ set -euo pipefail
 cd /Users/xutaohuang/workspace/llm-gateway-go-2
 
 BINARY_NAME="llm-gateway-0c75b62a-fpslot-fix-20260629-185854"
-SERVER_71="root@llm.kxpms.cn"
+SERVER_71="root@[PROD_DOMAIN]"
 REMOTE_DIR="/opt/llm-gateway-go"
 SERVICE_NAME="llm-gateway"
 
@@ -30,7 +30,7 @@ log_error() {
 }
 
 echo "======================================"
-echo "部署到 71 机器 (llm.kxpms.cn)"
+echo "部署到 [SERVER] 机器 ([PROD_DOMAIN])"
 echo "======================================"
 echo ""
 echo "二进制文件: $BINARY_NAME"
@@ -164,7 +164,7 @@ echo ""
 echo "接下来请："
 echo "1. 运行诊断脚本: ./scripts/diagnose-fpslot-issue.sh"
 echo "2. 监控失败率（至少 1 小时）:"
-echo "   watch -n 10 'curl -s http://llm.kxpms.cn/api/credentials/monitor-summary | jq \".credentials[] | select(.id==6)\"'"
+echo "   watch -n 10 'curl -s http://[PROD_DOMAIN]/api/credentials/monitor-summary | jq \".credentials[] | select(.id==6)\"'"
 echo ""
 echo "回滚命令（如需要）:"
 echo "   ssh $SERVER_71 'systemctl stop llm-gateway && cp /opt/llm-gateway-go/llm-gateway.backup-* /opt/llm-gateway-go/llm-gateway && systemctl start llm-gateway'"

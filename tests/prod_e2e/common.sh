@@ -14,7 +14,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # === 全局配置 ===
-API_BASE="${API_BASE:-https://llm.kxpms.cn}"
+API_BASE="${API_BASE:-https://[PROD_DOMAIN]}"
 API_KEY="${API_KEY:-sk-e2e-1781897808-B-3322}"
 RESULTS_DIR="${RESULTS_DIR:-$(dirname "${BASH_SOURCE[0]}")/results}"
 
