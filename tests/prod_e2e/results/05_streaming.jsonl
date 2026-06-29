@@ -2,11 +2,11 @@
   "ts": "E1",
   "test_id": "E1",
   "status": "PASS",
-  "message": "基础 SSE: 6 chunks, [DONE]=1, duration=2.175s",
+  "message": "基础 SSE: 6 chunks, [DONE]=1, duration=1.638s",
   "details": {
     "chunks": 6,
     "done_markers": 1,
-    "duration": "2.175"
+    "duration": "1.638"
   }
 }
 {
@@ -20,9 +20,9 @@
   "ts": "E3",
   "test_id": "E3",
   "status": "PASS",
-  "message": "first-byte 延迟=1.364s (< 30s)",
+  "message": "first-byte 延迟=0.005s (< 30s)",
   "details": {
-    "first_byte_seconds": "1.364"
+    "first_byte_seconds": "0.005"
   }
 }
 {
@@ -83,16 +83,16 @@
   "status": "SKIP",
   "message": "未触发 thinking 块（可能 prompt 简单）",
   "details": {
-    "preview": "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\\u003cthink\\u003e\\nThe user is asking a\",\"role\":\"assistant\",\"name\":\"MiniMax AI\",\"audio_content\":\"\"}}],\"created\":1782669774,\"id\":\"069094cea9fb94e6d2549e"
+    "preview": "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"}}],\"created\":1782680700,\"id\":\"0690bf7cafe3244c16829f435c453a88\",\"model\":\"minimax-m3\",\"object\":\"chat.completion.chunk\",\"service_tie"
   }
 }
 {
   "ts": "E14",
   "test_id": "E14",
   "status": "PASS",
-  "message": "大响应流: 26 chunks, 14.061s",
+  "message": "大响应流: 33 chunks, 12.329s",
   "details": {
-    "chunks": 26,
-    "duration": "14.061"
+    "chunks": 33,
+    "duration": "12.329"
   }
 }

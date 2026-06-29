@@ -1,10 +1,10 @@
-data: {"choices":[{"index":0,"delta":{"content":"","role":"assistant"}}],"created":1782672865,"id":"0690a0e0957fdf84dad43b684b7dbb36","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"","role":"assistant"}}],"created":1782680755,"id":"0690bfb21bb4dd25664d3feb6b32b6e3","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe user just said \"OK\". This is a very brief","role":"assistant"}}],"created":1782672865,"id":"0690a0e0957fdf84dad43b684b7dbb36","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe user just said \"OK\". This is a very brief message with no clear request or","role":"assistant"}}],"created":1782680755,"id":"0690bfb21bb4dd25664d3feb6b32b6e3","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" message without any specific request or question. I should respond in a friendly, open-ended","role":"assistant"}}],"created":1782672865,"id":"0690a0e0957fdf84dad43b684b7dbb36","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" question. I should respond in a friendly, open way","role":"assistant"}}],"created":1782680755,"id":"0690bfb21bb4dd25664d3feb6b32b6e3","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":"\u003c/think\u003e\n\n","role":"assistant"}}],"created":1782672865,"id":"0690a0e0957fdf84dad43b684b7dbb36","model":"minimax-m3","usage":null}
+data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":"\u003c/think\u003e\n\n","role":"assistant"}}],"created":1782680755,"id":"0690bfb21bb4dd25664d3feb6b32b6e3","model":"minimax-m3","usage":null}
 
 
 data: [DONE]

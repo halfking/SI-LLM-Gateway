@@ -6,7 +6,7 @@
   "details": {
     "expected": "503",
     "actual": "503",
-    "body_preview": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'non-existent-fake-model-12345'\",\"request_id\":\"b1cb10fe9ec8ed3ceb95a60d359a4799\",\"type\":\"server_error\"}}"
+    "body_preview": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'non-existent-fake-model-12345'\",\"request_id\":\"6bfb50e162ff1f1d7b757feb7ebf4493\",\"type\":\"server_error\"}}"
   }
 }
 {
@@ -22,22 +22,22 @@
 {
   "ts": "F2",
   "test_id": "F2",
-  "status": "FAIL",
-  "message": "缺 model → 400 (expected=400, got=503)",
+  "status": "PASS",
+  "message": "缺 model → 400 (HTTP 400)",
   "details": {
     "expected": "400",
-    "actual": "503",
-    "body_preview": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model ''\",\"request_id\":\"87c7c6e25e4fc1b0512b4b31e773f17c\",\"type\":\"server_error\"}}"
+    "actual": "400",
+    "body_preview": "{\"error\":{\"code\":\"missing_model\",\"message\":\"model is required\",\"request_id\":\"6ead770b9cd04fba73d63cb7e69a76a1\",\"type\":\"invalid_request\"}}"
   }
 }
 {
   "ts": "F2.b",
   "test_id": "F2.b",
-  "status": "FAIL",
-  "message": "error.code=missing_model (expected=missing_model, got=no_candidate)",
+  "status": "PASS",
+  "message": "error.code=missing_model (got=missing_model)",
   "details": {
     "expected": "missing_model",
-    "actual": "no_candidate"
+    "actual": "missing_model"
   }
 }
 {
@@ -107,10 +107,10 @@
   "ts": "F7",
   "test_id": "F7",
   "status": "PASS",
-  "message": "model=null → 503",
+  "message": "model=null → 400",
   "details": {
-    "http": "503",
-    "body": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model ''\",\"request_id\":\"c57d52f7ab328c8435207da8e3c5e7e0\",\"type\":\"server_error\"}}"
+    "http": "400",
+    "body": "{\"error\":{\"code\":\"missing_model\",\"message\":\"model is required\",\"request_id\":\"2bd950fc64ebc9277805fdb8918e7338\",\"type\":\"invalid_request\"}}"
   }
 }
 {
@@ -131,7 +131,7 @@
   "details": {
     "expected": "503",
     "actual": "503",
-    "body_preview": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'fake-model-99999'\",\"request_id\":\"07cd782fc9a80250120d6dba1d824acb\",\"type\":\"server_error\"}}"
+    "body_preview": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'fake-model-99999'\",\"request_id\":\"572cb69522c0179bae5f77e0a402736e\",\"type\":\"server_error\"}}"
   }
 }
 {
@@ -150,7 +150,7 @@
   "status": "PASS",
   "message": "错误响应含 request_id",
   "details": {
-    "request_id": "07cd782fc9a80250120d6dba1d824acb"
+    "request_id": "572cb69522c0179bae5f77e0a402736e"
   }
 }
 {

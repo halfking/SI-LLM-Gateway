@@ -7,59 +7,59 @@
     "provider": "minimax",
     "returned_model": "minimax-m3",
     "prompt_tokens": 186,
-    "completion_tokens": 18,
-    "total_tokens": 204,
-    "content": "<think>The user wants me to reply with \"OK\" and nothing else.</think>\n\nOK",
-    "finish_reason": "stop",
-    "request_id": "06909e926d6ea320dd4c5f4e7691c597"
+    "completion_tokens": 30,
+    "total_tokens": 216,
+    "content": "<think>The user is asking me to reply with a single word \"OK\" and nothing else. This is a simple instruction. I should comply with this</think>",
+    "finish_reason": "length",
+    "request_id": "0690b7724bd3449f8ff927ceda60fd8f"
   }
 }
 {
   "ts": "B-minimax-m3.tokens",
   "test_id": "B-minimax-m3.tokens",
   "status": "PASS",
-  "message": "minimax-m3: usage.total_tokens=204",
+  "message": "minimax-m3: usage.total_tokens=216",
   "details": {
     "provider": "minimax",
     "returned_model": "minimax-m3",
     "prompt_tokens": 186,
-    "completion_tokens": 18,
-    "total_tokens": 204,
-    "content": "<think>The user wants me to reply with \"OK\" and nothing else.</think>\n\nOK",
-    "finish_reason": "stop",
-    "request_id": "06909e926d6ea320dd4c5f4e7691c597"
+    "completion_tokens": 30,
+    "total_tokens": 216,
+    "content": "<think>The user is asking me to reply with a single word \"OK\" and nothing else. This is a simple instruction. I should comply with this</think>",
+    "finish_reason": "length",
+    "request_id": "0690b7724bd3449f8ff927ceda60fd8f"
   }
 }
 {
   "ts": "B-minimax-m3.content",
   "test_id": "B-minimax-m3.content",
   "status": "PASS",
-  "message": "minimax-m3: content 非空 (len=73)",
+  "message": "minimax-m3: content 非空 (len=143)",
   "details": {
     "provider": "minimax",
     "returned_model": "minimax-m3",
     "prompt_tokens": 186,
-    "completion_tokens": 18,
-    "total_tokens": 204,
-    "content": "<think>The user wants me to reply with \"OK\" and nothing else.</think>\n\nOK",
-    "finish_reason": "stop",
-    "request_id": "06909e926d6ea320dd4c5f4e7691c597"
+    "completion_tokens": 30,
+    "total_tokens": 216,
+    "content": "<think>The user is asking me to reply with a single word \"OK\" and nothing else. This is a simple instruction. I should comply with this</think>",
+    "finish_reason": "length",
+    "request_id": "0690b7724bd3449f8ff927ceda60fd8f"
   }
 }
 {
   "ts": "B-minimax-m3.finish",
   "test_id": "B-minimax-m3.finish",
   "status": "PASS",
-  "message": "minimax-m3: finish_reason=stop",
+  "message": "minimax-m3: finish_reason=length",
   "details": {
     "provider": "minimax",
     "returned_model": "minimax-m3",
     "prompt_tokens": 186,
-    "completion_tokens": 18,
-    "total_tokens": 204,
-    "content": "<think>The user wants me to reply with \"OK\" and nothing else.</think>\n\nOK",
-    "finish_reason": "stop",
-    "request_id": "06909e926d6ea320dd4c5f4e7691c597"
+    "completion_tokens": 30,
+    "total_tokens": 216,
+    "content": "<think>The user is asking me to reply with a single word \"OK\" and nothing else. This is a simple instruction. I should comply with this</think>",
+    "finish_reason": "length",
+    "request_id": "0690b7724bd3449f8ff927ceda60fd8f"
   }
 }
 {
@@ -73,9 +73,9 @@
     "prompt_tokens": 53,
     "completion_tokens": 30,
     "total_tokens": 83,
-    "content": "<think>We need to parse the request: The user says \"Reply with the single word OK and nothing else.\"\n\nWe have to comply with that. There's no</think>",
+    "content": "<think>We need to respond with the single word \"OK\" and nothing else. The user says: \"Reply with the single word OK and nothing else.\"</think>",
     "finish_reason": "length",
-    "request_id": "06909e94ee684e3a3f3960744260e9b6"
+    "request_id": "0690b774acfacdfa0583d7838433a6fd"
   }
 }
 {
@@ -89,25 +89,25 @@
     "prompt_tokens": 53,
     "completion_tokens": 30,
     "total_tokens": 83,
-    "content": "<think>We need to parse the request: The user says \"Reply with the single word OK and nothing else.\"\n\nWe have to comply with that. There's no</think>",
+    "content": "<think>We need to respond with the single word \"OK\" and nothing else. The user says: \"Reply with the single word OK and nothing else.\"</think>",
     "finish_reason": "length",
-    "request_id": "06909e94ee684e3a3f3960744260e9b6"
+    "request_id": "0690b774acfacdfa0583d7838433a6fd"
   }
 }
 {
   "ts": "B-minimax-m2.7.content",
   "test_id": "B-minimax-m2.7.content",
   "status": "PASS",
-  "message": "minimax-m2.7: content 非空 (len=149)",
+  "message": "minimax-m2.7: content 非空 (len=142)",
   "details": {
     "provider": "minimax",
     "returned_model": "minimax-m2.7",
     "prompt_tokens": 53,
     "completion_tokens": 30,
     "total_tokens": 83,
-    "content": "<think>We need to parse the request: The user says \"Reply with the single word OK and nothing else.\"\n\nWe have to comply with that. There's no</think>",
+    "content": "<think>We need to respond with the single word \"OK\" and nothing else. The user says: \"Reply with the single word OK and nothing else.\"</think>",
     "finish_reason": "length",
-    "request_id": "06909e94ee684e3a3f3960744260e9b6"
+    "request_id": "0690b774acfacdfa0583d7838433a6fd"
   }
 }
 {
@@ -121,73 +121,20 @@
     "prompt_tokens": 53,
     "completion_tokens": 30,
     "total_tokens": 83,
-    "content": "<think>We need to parse the request: The user says \"Reply with the single word OK and nothing else.\"\n\nWe have to comply with that. There's no</think>",
+    "content": "<think>We need to respond with the single word \"OK\" and nothing else. The user says: \"Reply with the single word OK and nothing else.\"</think>",
     "finish_reason": "length",
-    "request_id": "06909e94ee684e3a3f3960744260e9b6"
+    "request_id": "0690b774acfacdfa0583d7838433a6fd"
   }
 }
 {
-  "ts": "B-minimax-text-01.model",
-  "test_id": "B-minimax-text-01.model",
-  "status": "PASS",
-  "message": "minimax-text-01: response.model 回填正确",
+  "ts": "B-minimax-text-01",
+  "test_id": "B-minimax-text-01",
+  "status": "SKIP",
+  "message": "模型 minimax-text-01 当前不可用 (no_candidate)",
   "details": {
-    "provider": "minimax",
-    "returned_model": "minimax-text-01",
-    "prompt_tokens": 564,
-    "completion_tokens": 1,
-    "total_tokens": 565,
-    "content": "OK",
-    "finish_reason": "stop",
-    "request_id": "06909e95d6e965ae4c0329fb5b2e1001"
-  }
-}
-{
-  "ts": "B-minimax-text-01.tokens",
-  "test_id": "B-minimax-text-01.tokens",
-  "status": "PASS",
-  "message": "minimax-text-01: usage.total_tokens=565",
-  "details": {
-    "provider": "minimax",
-    "returned_model": "minimax-text-01",
-    "prompt_tokens": 564,
-    "completion_tokens": 1,
-    "total_tokens": 565,
-    "content": "OK",
-    "finish_reason": "stop",
-    "request_id": "06909e95d6e965ae4c0329fb5b2e1001"
-  }
-}
-{
-  "ts": "B-minimax-text-01.content",
-  "test_id": "B-minimax-text-01.content",
-  "status": "PASS",
-  "message": "minimax-text-01: content 非空 (len=2)",
-  "details": {
-    "provider": "minimax",
-    "returned_model": "minimax-text-01",
-    "prompt_tokens": 564,
-    "completion_tokens": 1,
-    "total_tokens": 565,
-    "content": "OK",
-    "finish_reason": "stop",
-    "request_id": "06909e95d6e965ae4c0329fb5b2e1001"
-  }
-}
-{
-  "ts": "B-minimax-text-01.finish",
-  "test_id": "B-minimax-text-01.finish",
-  "status": "PASS",
-  "message": "minimax-text-01: finish_reason=stop",
-  "details": {
-    "provider": "minimax",
-    "returned_model": "minimax-text-01",
-    "prompt_tokens": 564,
-    "completion_tokens": 1,
-    "total_tokens": 565,
-    "content": "OK",
-    "finish_reason": "stop",
-    "request_id": "06909e95d6e965ae4c0329fb5b2e1001"
+    "http_code": "503",
+    "error_code": "no_candidate",
+    "body": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'minimax-text-01'\",\"request_id\":\"9ad1c1ca470ff42f98d562cbc9639bd8\",\"type\":\"server_error\"}}"
   }
 }
 {
@@ -199,27 +146,27 @@
     "provider": "zhipu",
     "returned_model": "glm-4.5-air",
     "prompt_tokens": 15,
-    "completion_tokens": 45,
-    "total_tokens": 60,
+    "completion_tokens": 232,
+    "total_tokens": 247,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "2026062902443889f637ca99b049f1"
+    "request_id": "2026062904304506707bf9cfbf4c44"
   }
 }
 {
   "ts": "B-glm-4.5-air.tokens",
   "test_id": "B-glm-4.5-air.tokens",
   "status": "PASS",
-  "message": "glm-4.5-air: usage.total_tokens=60",
+  "message": "glm-4.5-air: usage.total_tokens=247",
   "details": {
     "provider": "zhipu",
     "returned_model": "glm-4.5-air",
     "prompt_tokens": 15,
-    "completion_tokens": 45,
-    "total_tokens": 60,
+    "completion_tokens": 232,
+    "total_tokens": 247,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "2026062902443889f637ca99b049f1"
+    "request_id": "2026062904304506707bf9cfbf4c44"
   }
 }
 {
@@ -231,11 +178,11 @@
     "provider": "zhipu",
     "returned_model": "glm-4.5-air",
     "prompt_tokens": 15,
-    "completion_tokens": 45,
-    "total_tokens": 60,
+    "completion_tokens": 232,
+    "total_tokens": 247,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "2026062902443889f637ca99b049f1"
+    "request_id": "2026062904304506707bf9cfbf4c44"
   }
 }
 {
@@ -247,22 +194,75 @@
     "provider": "zhipu",
     "returned_model": "glm-4.5-air",
     "prompt_tokens": 15,
-    "completion_tokens": 45,
-    "total_tokens": 60,
+    "completion_tokens": 232,
+    "total_tokens": 247,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "2026062902443889f637ca99b049f1"
+    "request_id": "2026062904304506707bf9cfbf4c44"
   }
 }
 {
-  "ts": "B-glm-4.5-flash",
-  "test_id": "B-glm-4.5-flash",
-  "status": "SKIP",
-  "message": "模型 glm-4.5-flash 当前不可用 (no_candidate)",
+  "ts": "B-glm-4.5-flash.model",
+  "test_id": "B-glm-4.5-flash.model",
+  "status": "PASS",
+  "message": "glm-4.5-flash: response.model 回填正确",
   "details": {
-    "http_code": "503",
-    "error_code": "no_candidate",
-    "body": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'glm-4.5-flash'\",\"request_id\":\"76c7ed1f7090ac50f7c65511efe61087\",\"type\":\"server_error\"}}"
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-flash",
+    "prompt_tokens": 15,
+    "completion_tokens": 30,
+    "total_tokens": 45,
+    "content": "",
+    "finish_reason": "length",
+    "request_id": "20260629043050bbfcbed7edc141f7"
+  }
+}
+{
+  "ts": "B-glm-4.5-flash.tokens",
+  "test_id": "B-glm-4.5-flash.tokens",
+  "status": "PASS",
+  "message": "glm-4.5-flash: usage.total_tokens=45",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-flash",
+    "prompt_tokens": 15,
+    "completion_tokens": 30,
+    "total_tokens": 45,
+    "content": "",
+    "finish_reason": "length",
+    "request_id": "20260629043050bbfcbed7edc141f7"
+  }
+}
+{
+  "ts": "B-glm-4.5-flash.content",
+  "test_id": "B-glm-4.5-flash.content",
+  "status": "FAIL",
+  "message": "glm-4.5-flash: content 为空",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-flash",
+    "prompt_tokens": 15,
+    "completion_tokens": 30,
+    "total_tokens": 45,
+    "content": "",
+    "finish_reason": "length",
+    "request_id": "20260629043050bbfcbed7edc141f7"
+  }
+}
+{
+  "ts": "B-glm-4.5-flash.finish",
+  "test_id": "B-glm-4.5-flash.finish",
+  "status": "PASS",
+  "message": "glm-4.5-flash: finish_reason=length",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-flash",
+    "prompt_tokens": 15,
+    "completion_tokens": 30,
+    "total_tokens": 45,
+    "content": "",
+    "finish_reason": "length",
+    "request_id": "20260629043050bbfcbed7edc141f7"
   }
 }
 {
@@ -274,27 +274,27 @@
     "provider": "zhipu",
     "returned_model": "glm-4.6",
     "prompt_tokens": 15,
-    "completion_tokens": 143,
-    "total_tokens": 158,
+    "completion_tokens": 140,
+    "total_tokens": 155,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "2026062902444146b2d80597d048c4"
+    "request_id": "20260629043051f36d1b68a9a14148"
   }
 }
 {
   "ts": "B-glm-4.6.tokens",
   "test_id": "B-glm-4.6.tokens",
   "status": "PASS",
-  "message": "glm-4.6: usage.total_tokens=158",
+  "message": "glm-4.6: usage.total_tokens=155",
   "details": {
     "provider": "zhipu",
     "returned_model": "glm-4.6",
     "prompt_tokens": 15,
-    "completion_tokens": 143,
-    "total_tokens": 158,
+    "completion_tokens": 140,
+    "total_tokens": 155,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "2026062902444146b2d80597d048c4"
+    "request_id": "20260629043051f36d1b68a9a14148"
   }
 }
 {
@@ -306,11 +306,11 @@
     "provider": "zhipu",
     "returned_model": "glm-4.6",
     "prompt_tokens": 15,
-    "completion_tokens": 143,
-    "total_tokens": 158,
+    "completion_tokens": 140,
+    "total_tokens": 155,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "2026062902444146b2d80597d048c4"
+    "request_id": "20260629043051f36d1b68a9a14148"
   }
 }
 {
@@ -322,11 +322,11 @@
     "provider": "zhipu",
     "returned_model": "glm-4.6",
     "prompt_tokens": 15,
-    "completion_tokens": 143,
-    "total_tokens": 158,
+    "completion_tokens": 140,
+    "total_tokens": 155,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "2026062902444146b2d80597d048c4"
+    "request_id": "20260629043051f36d1b68a9a14148"
   }
 }
 {
@@ -338,27 +338,27 @@
     "provider": "zhipu",
     "returned_model": "glm-4.7",
     "prompt_tokens": 15,
-    "completion_tokens": 339,
-    "total_tokens": 354,
+    "completion_tokens": 208,
+    "total_tokens": 223,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "202606290244442d54f59416bc461b"
+    "request_id": "20260629043056bc20a9d6966b4c71"
   }
 }
 {
   "ts": "B-glm-4.7.tokens",
   "test_id": "B-glm-4.7.tokens",
   "status": "PASS",
-  "message": "glm-4.7: usage.total_tokens=354",
+  "message": "glm-4.7: usage.total_tokens=223",
   "details": {
     "provider": "zhipu",
     "returned_model": "glm-4.7",
     "prompt_tokens": 15,
-    "completion_tokens": 339,
-    "total_tokens": 354,
+    "completion_tokens": 208,
+    "total_tokens": 223,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "202606290244442d54f59416bc461b"
+    "request_id": "20260629043056bc20a9d6966b4c71"
   }
 }
 {
@@ -370,11 +370,11 @@
     "provider": "zhipu",
     "returned_model": "glm-4.7",
     "prompt_tokens": 15,
-    "completion_tokens": 339,
-    "total_tokens": 354,
+    "completion_tokens": 208,
+    "total_tokens": 223,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "202606290244442d54f59416bc461b"
+    "request_id": "20260629043056bc20a9d6966b4c71"
   }
 }
 {
@@ -386,11 +386,11 @@
     "provider": "zhipu",
     "returned_model": "glm-4.7",
     "prompt_tokens": 15,
-    "completion_tokens": 339,
-    "total_tokens": 354,
+    "completion_tokens": 208,
+    "total_tokens": 223,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "202606290244442d54f59416bc461b"
+    "request_id": "20260629043056bc20a9d6966b4c71"
   }
 }
 {
@@ -460,7 +460,7 @@
     "total_tokens": 21,
     "content": " OK",
     "finish_reason": "stop",
-    "request_id": "chatcmpl-d88a2bc4b254cb22bd09252a4ba189e6"
+    "request_id": "chatcmpl-9c171754458413b2c0da76004c27b85f"
   }
 }
 {
@@ -476,7 +476,7 @@
     "total_tokens": 21,
     "content": " OK",
     "finish_reason": "stop",
-    "request_id": "chatcmpl-d88a2bc4b254cb22bd09252a4ba189e6"
+    "request_id": "chatcmpl-9c171754458413b2c0da76004c27b85f"
   }
 }
 {
@@ -492,7 +492,7 @@
     "total_tokens": 21,
     "content": " OK",
     "finish_reason": "stop",
-    "request_id": "chatcmpl-d88a2bc4b254cb22bd09252a4ba189e6"
+    "request_id": "chatcmpl-9c171754458413b2c0da76004c27b85f"
   }
 }
 {
@@ -508,7 +508,7 @@
     "total_tokens": 21,
     "content": " OK",
     "finish_reason": "stop",
-    "request_id": "chatcmpl-d88a2bc4b254cb22bd09252a4ba189e6"
+    "request_id": "chatcmpl-9c171754458413b2c0da76004c27b85f"
   }
 }
 {
@@ -566,7 +566,7 @@
     "total_tokens": 47,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "chatcmpl-4565845b6e150fd4b2afd2d24451ab8d"
+    "request_id": "chatcmpl-496bdbc0587ca39f9695e12ceab2e050"
   }
 }
 {
@@ -582,7 +582,7 @@
     "total_tokens": 47,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "chatcmpl-4565845b6e150fd4b2afd2d24451ab8d"
+    "request_id": "chatcmpl-496bdbc0587ca39f9695e12ceab2e050"
   }
 }
 {
@@ -598,7 +598,7 @@
     "total_tokens": 47,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "chatcmpl-4565845b6e150fd4b2afd2d24451ab8d"
+    "request_id": "chatcmpl-496bdbc0587ca39f9695e12ceab2e050"
   }
 }
 {
@@ -614,16 +614,6 @@
     "total_tokens": 47,
     "content": "OK",
     "finish_reason": "stop",
-    "request_id": "chatcmpl-4565845b6e150fd4b2afd2d24451ab8d"
-  }
-}
-{
-  "ts": "B-mistral-large",
-  "test_id": "B-mistral-large",
-  "status": "FAIL",
-  "message": "模型 mistral-large 返回 HTTP 000",
-  "details": {
-    "http_code": "000",
-    "body": ""
+    "request_id": "chatcmpl-496bdbc0587ca39f9695e12ceab2e050"
   }
 }

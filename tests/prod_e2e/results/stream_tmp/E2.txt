@@ -1,368 +1,408 @@
-data: {"choices":[{"index":0,"delta":{"content":"","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","object":"chat.completion.chunk","service_tier":"standard","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe user is asking for a long story, but their message","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"\u003cthink\u003eThe user's message is a repetitive","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" is just the phrase \"Tell me a long story about\"","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" loop of \"Tell me a long story about\" followed by \"the end.\" This seems","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" repeated many times, ending with \"the end.\" There's no actual subject or topic specified for","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" like a prompt that got stuck","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" the story. I should interpret","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" or was spammed. I should interpret the intent as:","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" this as a request for a long story, but since no","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the user wants a long story that ends with \"the end.\" I'll write a long, original story with a proper narrative arc - characters, setting, conflict, resolution - and end","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" topic is given, I'll need to pick something interesting and craft","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" it with \"The end.\" I'll make it engaging and substantial","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" a compelling, lengthy narrative. Let me write an original long","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" since they asked for a long","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" story with a clear theme, rich characters, and a satisfying arc. I'll make it engaging","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"story.","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"with good prose.","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"\u003c/think\u003e\n\n# The Lighthouse","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"\u003c/think\u003e\n\n# The Cartographer of Forgotten Places","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" Keeper's Final Watch\n\nOn","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"\n\n## Part I: The Inheritance\n\nEleanor Ash","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the farthest edge of the A","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"worth had not set foot in Hollow Creek for seventeen years when","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"elorian Coast, where the","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" she received the letter that would","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" cliffs dropped two hundred feet into a churning gray sea, stood the Saltwind Lighthouse. It had been guiding ships for one","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" change everything she understood about her","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" hundred and forty-seven years,","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" grandfather's life—and her own","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" and old Captain Henrik Voss had been its keeper for nearly","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":".\n\nThe envelope had arrived on","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" half of those.\n\nHenrik was seventy-three years old.","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" a Tuesday, slid through the mail slot of her Boston apartment with the particular heaviness of legal documents. The return address","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" His hands were cracked like the","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" bore the name of a solicitor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" hull of an abandoned boat, his beard was white as sea","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"'s office in a town she had tried very hard to forget: *Hargrove,","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" foam, and his left knee","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" Beecham \u0026 Associates, Hollow Creek, Vermont.* The post","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" clicked like a snapping shrimp every","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"mark was dated three days earlier, and the letter inside was brief, formal, and utterly","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" time he climbed the lighthouse stairs","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" bewildering.\n\n*Dear Ms","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":". But his eyes—p","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":". Ashworth,*\n\n*It is with regret that we inform you of the passing of your grandfather, Mr. Edmund","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"ale blue, the color of winter ice—were still sharp","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" Ashworth, on the 14th of September. As","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" enough to spot a single lantern","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" you are named as the sole beneficiary of his estate, we","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" flame three miles out across the water.\n\nHe lived alone.","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" respectfully request your presence at the reading of his will on the 28th of this month. Please find enclosed travel arrangements","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" His wife, Maren, had passed in the autumn of","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" and accommodation details.*\n\n*Y","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" nineteen years ago, and his son, Edrik, had left for the mainland at seventeen","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"ours faithfully,*\n*Margaret","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", chasing a life that had","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" Beecham*\n\nEleanor sat on the edge of her kitchen table, the letter trembling","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" nothing to do with lighth","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" in her hands. Edmund Ash","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"ouses or salt. Henrik never","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"worth. Grandfather. The","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" blamed him. A boy shouldn't","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" man she had loved above all","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" have to inherit a life spent","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" others as a child, the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" listening to the wind argue with","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" man who had raised her on","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the rocks.\n\nBut tonight, something was different.\n\n---\n\nThe storm had been building for three days. It came from the north, dragging black clouds low","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" stories of mountains and rivers,","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" across the sky like wet blankets","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" of forests so deep that sunlight","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", and the barometer in Henrik's kitchen had dropped lower","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" never touched their floors, of hidden valleys where time moved differently. The man who had taught","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" than he'd ever seen. The","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" her that every rock had a story, every tree a memory, every shadow a secret worth","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" fishermen in the village of Hollow","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" uncovering.\n\nAnd then, when she was twelve, he had vanished from her life as completely","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" Cove had all pulled their boats","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" as if he had been a character in one of his own tales. Her mother, Sarah","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" ashore and battened down their homes. The road out","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", had given no explanation beyond","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" of town had been blocked by a fallen elm since yesterday morning","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" a clipped \"he had to go away,\" and Eleanor had grown up filling the void with her own inventions. She had imagined him an explorer, a spy, a wanderer of","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":".\n\nHenrik had climbed to","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" distant lands. She had imagined","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the top of the lighthouse at","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" him dead. She had imagined","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" dusk, as he did every evening, and lit the great","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" him waiting, somewhere, for","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" lamp—a brass beast of a","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" her to come and find him.\n\nShe had never imagined him","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" thing, four feet tall, with a Fresnel lens that could throw a beam thirty miles on a clear night. Tonight","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" simply... in Hollow Creek.","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", the beam cut through rain","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" Just thirty miles from where Eleanor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" and fog like a sword through","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" herself had grown up.\n\nThe next ten days passed in a blur of packing and second-guessing. Her colleague at the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" cloth, sweeping the darkness in slow, patient arcs.\n\nHe","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" publishing house where she worked as an editor offered to cover for","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" sat in his wooden chair by","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" her; her best friend, Priya, insisted on driving","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the lamp, wrapped in his","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" her to the bus station in","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" oilskin coat, and waited","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" a blizzard of nervous energy","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":". Not for ships—he knew","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" and well-meaning warnings. \"You don't have to do this,\" Priya said, hugging","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" there would be no ships tonight","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" her fiercely at the departure gate","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":". He waited because he always","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":". \"You can just let","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" waited. It was what a lighthouse keeper did.\n\n---\n\nAt","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" it go.\"\n\nBut Eleanor knew","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" half past nine, he saw the light.\n\nIt wasn't a ship's lantern. It was smaller","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" she could not. She had spent her entire adult life editing","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", and it moved strangely—drifting toward the rocks below","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" other people's stories. Now,","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the lighthouse rather than away from them. Henrik squinted,","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" it seemed, she was being","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" pressed his face against the wet","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" called to attend to one of her own.\n\nThe bus wound","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" glass of the lamp room, and watched.\n\nA small row","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" through the Berkshire hills as afternoon","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"boat. There was a figure","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" darkened into evening, and Eleanor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" inside, slumped over the o","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" watched the landscape transform. The orderly fields and tidy villages of Massachusetts gave way to something w","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"ars.\n\nHenrik's heart","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"ilder, more primordial. The trees here were older, their","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", which had grown old and","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" trunks thicker, their canopies deeper. The light took on","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" lazy over the decades, suddenly","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" a greenish cast, filtered","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" hammered against his ribs like a","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" through millions of needles, and the air that seeped through the bus vents smelled of moss","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" trapped bird. He scrambled down the spiral staircase as fast as his clicking knee would allow,","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" and cold water and something else","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" grabbed the lantern from the hook","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"—something Eleanor could not name but recognized immediately, like a half-remembered dream.\n\nIt was the smell of her","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" by the door, and made","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" grandfather's house.\n\n## Part II: The House on Bear","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" his way down the cliff path—narrow, treacherous, slick with rain.\n\nThe wind tried to push him off the cliff three times. He leaned","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" Hollow Road\n\nHargrove, Beecham \u0026 Associates occupied","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" into it, low and stubborn","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" a small brick building on the village green, and Margaret Beech","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", and kept going.\n\n---\n\n","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"am—a woman in her sixties","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"When he reached the small dock","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" with iron-gray hair and the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" at the base of the cliff, the rowboat was already being tossed against the rocks. The figure inside was a young woman—couldn't have been more than twenty-five—her","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" measured kindness of a country doctor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" dark hair plastered to her face, her eyes half-closed","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"—greeted Eleanor with a warmth that felt almost familial","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":". She was shivering so hard","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":".\n\n\"Your grandfather spoke of you often,\" she said, settling","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" her teeth were chattering like","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" into her chair behind a desk piled high with folders and led","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" castanets.\n\n\"Don't move","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"gers. \"He was very proud of the woman you became, even though he didn't know","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":",\" Henrik shouted over the wind","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" the details of your life.\"\n\n","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":". \"I'm coming.\"\n\nHe waded into the water, which was numbingly cold, and grabbed the rope tied to the bow of the boat.","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"Eleanor's throat tightened. \"When did you last see him?\"\n\n\"Three weeks before","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" With effort that cost him more","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" he passed. He was in","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" than he'd ever admit, he hauled it to the dock and","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" his workshop, as always. Mapping.\"\n\n\"Mapping what?\"\n\nMargaret smiled gently. \"That","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" reached in for the woman.","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", my dear, is something","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" She was light as driftwood, half-frozen, and didn't resist as he lifted her","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" he left for you to discover","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" out.\n\n\"What's your name?\" he asked, carrying her toward","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":".\"\n\nShe handed Eleanor a key","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the lighthouse.\n\nShe tried to speak. Only a whisper came out: \"Lira.\"\n\n---\n\nInside, Henrik built up","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"—ancient brass, cold against","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the fire in the great iron","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" her palm—and a thick envelope","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" stove until the kitchen was almost","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" marked with her name in Edmund","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" too warm. He wrapped Lira","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"'s careful, slanting script","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" in every blanket he owned—which","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":". Then she produced another envelope","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" was a lot, because Maren had been a knitter","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", this one sealed with red","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"—and made her drink hot broth","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" wax bearing the impression of a compass rose.\n\n\"This is his","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" from a pot that was always simmering on the back of the stove, no matter the season.\n\nColor slowly returned to her face. Her shivering eased. After an hour, she looked","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" will,\" Margaret said. \"But I am instructed not to open it until you have spent","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" up at him with eyes the","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" a night in the house. His words were: *She must see it by morning light, or the reading will mean","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" color of wet slate.\n\n\"Thank","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" nothing.*\"\n\nEleanor took the envelope, feeling its","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" you,\" she said.\n\nHen","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" weight as if it contained not","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"rik shrugged, embarrassed by gratitude","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" paper but something heavier—something almost alive. \"I don't understand.\"\n\n\"Neither did I, my dear. But Edmund","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":". \"A keeper's job is to bring people in from the dark. Even if they","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" was not a man whose instructions","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" come in rowboats in storms","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" one ignored. He paid my","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":".\"\n\n---\n\nShe told him her","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" firm a great deal of money over many years to ensure that","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" story in pieces, over the course of the night. She","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" his final wishes were carried out","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" was from the eastern islands, three days' sail south. She had been betrothed to a man she did not love, a merchant twice her","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" precisely. If he said you must see the house by morning light, then see it by morning light you shall.\"\n\nThe drive to Bear Hollow Road took Eleanor through deepening twilight. The road narrowed, then narrowed again","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" age with cold hands and colder","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", becoming barely more than a track through the trees. Her","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" eyes. She had escaped with","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" rental car's headlights caught glimpses of stone walls crumbling under decades of moss, of rusted mail","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the help of a sympathetic servant","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"boxes at the end of overgrown","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", taking the smallest boat from","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" drives, of houses that seemed","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" her father's harbor in the dark","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" to lean away from the road","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" of early morning.\n\nShe had","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" as if reluctant to be seen.\n\nThen, just as the last light was bleeding from the sky, the trees parted, and there it was.\n\nEd","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" rowed for two days,","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"mund Ashworth's house.\n\n","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" running out of food and water, before the storm caught her. She had aimed for Hollow","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"It was not the house Eleanor","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" Cove, knowing the lighthouse would","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" remembered—or rather, it was, but time had worked strange","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" be there, hoping against hope","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" alterations upon it. The white","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" that someone would see her.\n\n\"I didn't think anyone would,\"","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" clapboards were weathered to a soft gray. The porch sag","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" she admitted. \"I thought","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"ged in the middle, its railings warped and curling. The windows, dark now, reflected nothing back but the glow","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" I'd die on those rocks.\"\n\nHenrik nodded slowly. \"The sea takes most of the ones who come like this. You're lucky, girl. The","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" of Eleanor's headlights. And","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" kind of lucky that only comes","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" yet there was something else, something that hadn't been there in","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" once.\"\n\n---\n\nBy dawn, the storm had not relented","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" Eleanor's childhood memory: an","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":". If anything, it had grown worse—gale-force","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" air of waiting, of patient attention, as if the house itself had been holding its breath for many years and was only","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" winds now, the kind that","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" now allowing itself to exhale.\n\nShe turned off the engine. The silence that rushed in was immense—not empty, but full","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" could rip shingles from rooftops and snap trees like matchsticks. Henrik knew he could not send her back down the cliff","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", dense with the small sounds of a forest at night.","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", and he could not row","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" Somewhere, an owl called.","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" her to Hollow Cove himself,","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" Somewhere else, water ran over stones.\n\nEleanor opened","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" not in this.\n\n\"She'll wait,\" he said, mostly","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" her door and stepped out onto","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" to himself.\n\n\"Who?\" Lira","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" the gravel of the drive. The key in her pocket pulsed","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" asked.\n\n\"The storm. She'll get tired eventually. They","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" with a warmth that had nothing","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" all do.\"\n\n---\n\nThey spent","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" to do with her body heat","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" three days together in the lighthouse.\n\nHenrik told her about","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":". She walked to the front","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" Maren, who had loved","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" door, fitted the key to the lock, and felt it turn with a click that echoed","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" to paint pictures of the sea even though she was afraid of it. He showed her the","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" through the woods like a gunshot","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" paintings, still hung on the walls—dozens of them","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":".\n\nThe door swung open.\n\nInside, the house was not","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", oils and watercolors, all of waves and gulls and horizons.\n\nLira told","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" as she expected. She had anticipated dust, decay, the abandoned stillness of a place long","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" him about her mother, who had died when she was young","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" unoccupied. Instead, the air smelled of woodsmoke and old books and beeswax polish. Lamps stood on tables, unlit but waiting","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", and about her brother, who had gone to sea years","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":". The furniture—ancient wing","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" ago and never returned. She cried, just once, when","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" chairs, a horsehair sofa, a grandfather clock ticking softly","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" she spoke of him. Henrik","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" in the corner—glowed softly in the darkness, polished","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" pretended not to notice. That","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" to a deep luster.\n\n","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" was the kindest thing he","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"On the wall opposite the door hung a frame, and within","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" could do.\n\nOn the second","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" it, a map.\n\nE","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" day, she helped him clean","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"leanor crossed the room and stood before it, breath catching","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the lamp—a task he usually","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" in her throat. The map was not of any place she recognized. It showed a landscape rendered in exquisite detail: mountains and valleys, rivers and lakes","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" did alone, but his knee","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", forests and meadows, all drawn with a precision that seemed","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" had swollen up so badly he could barely climb the stairs.","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" impossible for any human hand. But strangest of all was","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" She was a quick learner, and didn't complain about the work","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" the style—it looked simultaneously like","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", and didn't ask him to do the parts she could manage","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" a medieval illustration and a satellite","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":".\n\nOn the third day,","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" photograph, as if someone had photographed the world from a great","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the storm broke.\n\n---\n\nThe morning came soft and pale, the way mornings do after long","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" height and then colored it with inks that had been ground from","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" violence. The wind dropped to","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" moonlight and amber.\n\nIn one","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" a whisper. The sea,","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" corner of the map, in","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" still rough, settled into long","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" Edmund's hand, were the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", tired swells. Sun","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" words: *The Known World","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"light broke through the clouds and","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", c. 1873","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" turned the wet rocks to silver","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":".*\n\nEleanor's hands trembled. The Known World. Her","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":".\n\nHenrik and Lira walked","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" grandfather had spoken of these words","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" down the cliff path together. She carried a small pack—he","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" when she was very young, whispering them as if they were a secret between them, a password to a club with only two members. She had thought","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" had given her food for the journey, a wool sweater of","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" they were nonsense—a child's game","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" Maren's that had never been worn, and a brass compass he'd kept since his own seaf","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", a private joke. Now","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"aring days.\n\nAt the dock","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", standing in this silent house with the map before her, she understood that they had been","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", the rowboat still floated","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" neither.\n\nThey had been a promise.\n\nShe climbed the stairs to the room her grandfather had always insisted she stay in whenever","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", though it had taken some","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" she visited as a child—\"","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" damage. Henrik helped her patch","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"the blue room,\" he had","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the worst of it with tar","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" called it, because the wallpaper","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" and canvas from his shed.\n\n\"How will I repay you?\" she asked, standing in the boat, the oars in","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" was patterned with tiny forget-me","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" her hands.\n\nHenrik shook","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"-nots and the curtains were the color of a summer sky. She found it exactly as she remembered it: the small","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" his head. \"Don't repay","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" iron bed, the writing desk beneath the window, the shelves","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" me. Just live well,","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" lined with books whose spines she","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" and be brave, and don't","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" had read a hundred times.\n\n","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" let anyone tell you who you have to be.\"\n\nShe looked at him for a long moment","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":"She lay down on the bed without undressing, without lighting","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":". Then she rowed away","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" a lamp. The envelope with","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":", toward Hollow Cove, where","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" her name on it sat on","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the villagers would take her in","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" the desk beside her. She","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" and find her passage to whatever","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" would not open it tonight. She would not read the will until she had seen the house by morning light, as Edmund","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" life she chose next.\n\nHen","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" had instructed.\n\nBut sleep did","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"rik stood on the dock and watched her go until she was a speck, and then until","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" not come easily. She lay","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" she was gone entirely.\n\n---\n\nHe climbed back up to the lighthouse and lit the lamp that","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" awake for hours, listening to","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" evening, as he had every","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" the house settle around her—the","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" evening for forty-seven years.\n\n","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" creak of floorboards, the whisper of wind through trees","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":"But the next morning, when","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":", the distant sound of water","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" the relief keeper came up the","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" over stones. And once, just before she drifted into uneasy","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" road from Hollow Cove—young","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"index":0,"delta":{"content":" dreams","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" Tomas, who took the day","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
-data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":"","role":"assistant"}}],"created":1782669726,"id":"0690949e211151c81b86b30edec3e99f","model":"minimax-m3","usage":null}
+data: {"choices":[{"index":0,"delta":{"content":" shift—Henrik was waiting","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" for him on the porch with his bag already packed.\n\n\"I'm","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" going down to the village,\" Henrik said. \"I'm going to see my son.\"\n\nT","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"omas blinked. \"Edrik? You haven't seen him in—how long?\"\n\n\"Thirty","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"-one years,\" Henrik said.\n\n","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"\"Do you think he'll want to","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" see you?\"\n\nHenrik looked","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" out at the sea. The sun was rising over it, gold and red, and the gulls were wheeling above","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" the cliffs like thrown confetti.\n\n\"I think,\" he said slowly, \"that it's better","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" to find out than to spend","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" the rest of my life wondering.\"\n\nHe picked up his bag, nodded to Tomas, and began the walk down the cliff","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" road. His knee clicked with","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" every step, but he didn't mind. Some sounds, after","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" a while, become part of you.\n\n---\n\nHe made it","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" to Hollow Cove by noon,","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" hired a cart to take him","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" to the mainland, and three","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" days later stood in front of a small house on a quiet street in a town he had","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":" never visited.\n\nHe knocked.\n\n","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"index":0,"delta":{"content":"A woman answered—middle-aged, with Edrik's eyes.","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
+
+data: {"choices":[{"finish_reason":"length","index":0,"delta":{"content":"","role":"assistant"}}],"created":1782680657,"id":"0690bf512ed491276185df3b49d22805","model":"minimax-m3","usage":null}
 
 
 data: [DONE]
