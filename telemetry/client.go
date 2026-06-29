@@ -1096,10 +1096,10 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 			$43, COALESCE(NULLIF($44, ''), NULL), COALESCE(NULLIF($45, ''), NULL),
 			CAST(NULLIF($46, '') AS jsonb), $47,
 			COALESCE(NULLIF($48, ''), NULL), $49,
-			COALESCE(NULLIF($50, ''), NULL),
-			$51,
-			$52,
-			CAST(NULLIF($53, '') AS jsonb), $54, $55, CAST(NULLIF($56, '') AS jsonb)
+COALESCE(NULLIF($50, ''), NULL),
+		$51,
+		$52,
+		CAST(NULLIF($53, '') AS jsonb), $54, $55, CAST(NULLIF($56, '') AS jsonb)
 		)
 		-- 2026-06-27 REVERT: ON CONFLICT back to (request_id, ts) for partitioned table compatibility
 		ON CONFLICT (request_id, ts) DO UPDATE SET
