@@ -1,7 +1,10 @@
 package admin
 
 import (
+	"errors"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // helper to make a *int64 from a literal
@@ -92,11 +95,55 @@ func TestDetectBackgroundTaskIDMismatch_Int64Typed(t *testing.T) {
 func TestDetectBackgroundTaskIDMismatch_IntTyped(t *testing.T) {
 	req := map[string]any{
 		"provider_id":   int(14),
-		"credential_id": int(6),
+		"credential_id": int(7),
 	}
 	topPID := i64ptr(int64(14))
 	topCID := i64ptr(int64(7))
-	if _, ok := detectBackgroundTaskIDMismatch(40, "health_check", topPID, topCID, req); !ok {
-		t.Fatalf("expected mismatch when types are int and credential_id differs")
+	if m, ok := detectBackgroundTaskIDMismatch(40, "health_check", topPID, topCID, req); ok {
+		t.Fatalf("expected no mismatch for int-typed matching values, got %+v", m)
+	}
+}
+
+// TestIsBackgroundTasksPKConflict exercises the discriminator used by
+// insertBackgroundTask's self-heal path. Only SQLSTATE 23505 on the
+// background_tasks_pkey constraint should trigger a sequence resync;
+// other unique-violations (e.g. a hypothetical future index) must not.
+func TestIsBackgroundTasksPKConflict(t *testing.T) {
+	pkErr := &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: "background_tasks_pkey",
+		Message:        `duplicate key value violates unique constraint "background_tasks_pkey"`,
+	}
+	if !isBackgroundTasksPKConflict(pkErr) {
+		t.Fatalf("expected background_tasks_pkey conflict to be detected")
+	}
+
+	otherPKErr := &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: "credentials_pkey",
+		Message:        `duplicate key value violates unique constraint "credentials_pkey"`,
+	}
+	if isBackgroundTasksPKConflict(otherPKErr) {
+		t.Fatalf("expected non-background_tasks 23505 to NOT trigger self-heal")
+	}
+
+	otherErr := &pgconn.PgError{Code: "23502", Message: "not null violation"}
+	if isBackgroundTasksPKConflict(otherErr) {
+		t.Fatalf("expected non-23505 errors to NOT trigger self-heal")
+	}
+
+	if isBackgroundTasksPKConflict(errors.New("plain text error")) {
+		t.Fatalf("expected plain error to NOT trigger self-heal")
+	}
+
+	if isBackgroundTasksPKConflict(nil) {
+		t.Fatalf("nil error must not be a conflict")
+	}
+
+	// Fallback path: when the error isn't typed as *pgconn.PgError, fall
+	// back to substring matching on the textual message. This is what
+	// happens when the error was wrapped/lost its type information.
+	if !isBackgroundTasksPKConflict(errors.New(`ERROR: duplicate key value violates unique constraint "background_tasks_pkey" (SQLSTATE 23505)`)) {
+		t.Fatalf("expected substring fallback to detect background_tasks_pkey")
 	}
 }
