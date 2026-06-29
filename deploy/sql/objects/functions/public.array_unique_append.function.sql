@@ -2,7 +2,7 @@
 -- Object:   array_unique_append(text[], text)
 -- Type:     FUNCTION
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: array_unique_append(text[], text); Type: FUNCTION; Schema: public; Owner: -
 --

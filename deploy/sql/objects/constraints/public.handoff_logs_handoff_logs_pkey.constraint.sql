@@ -2,7 +2,7 @@
 -- Object:   handoff_logs handoff_logs_pkey
 -- Type:     CONSTRAINT
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: handoff_logs handoff_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --

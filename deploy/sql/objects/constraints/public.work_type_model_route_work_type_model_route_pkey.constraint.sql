@@ -2,7 +2,7 @@
 -- Object:   work_type_model_route work_type_model_route_pkey
 -- Type:     CONSTRAINT
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: work_type_model_route work_type_model_route_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --

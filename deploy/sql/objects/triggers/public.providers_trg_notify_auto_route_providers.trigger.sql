@@ -2,7 +2,7 @@
 -- Object:   providers trg_notify_auto_route_providers
 -- Type:     TRIGGER
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: providers trg_notify_auto_route_providers; Type: TRIGGER; Schema: public; Owner: -
 --

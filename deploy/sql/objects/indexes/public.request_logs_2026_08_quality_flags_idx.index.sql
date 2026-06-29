@@ -2,7 +2,7 @@
 -- Object:   request_logs_2026_08_quality_flags_idx
 -- Type:     INDEX
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: request_logs_2026_08_quality_flags_idx; Type: INDEX; Schema: public; Owner: -
 --

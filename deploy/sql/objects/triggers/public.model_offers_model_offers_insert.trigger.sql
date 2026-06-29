@@ -2,7 +2,7 @@
 -- Object:   model_offers model_offers_insert
 -- Type:     TRIGGER
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: model_offers model_offers_insert; Type: TRIGGER; Schema: public; Owner: -
 --

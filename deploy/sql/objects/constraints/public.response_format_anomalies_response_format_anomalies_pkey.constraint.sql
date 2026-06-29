@@ -2,7 +2,7 @@
 -- Object:   response_format_anomalies response_format_anomalies_pkey
 -- Type:     CONSTRAINT
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: response_format_anomalies response_format_anomalies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --

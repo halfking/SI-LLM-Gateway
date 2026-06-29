@@ -2,7 +2,7 @@
 -- Object:   recent_success_rate(bigint, text, integer, integer)
 -- Type:     FUNCTION
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: recent_success_rate(bigint, text, integer, integer); Type: FUNCTION; Schema: public; Owner: -
 --

@@ -512,11 +512,12 @@ type ExecuteResult struct {
 }
 
 type AttemptRecord struct {
-	ProviderID   int               `json:"provider_id"`
-	CredentialID int               `json:"credential_id"`
-	RawModel     string            `json:"raw_model"`
-	Kind         errorsx.ErrorKind `json:"kind"`
-	Reason       string            `json:"reason,omitempty"`
+	ProviderID         int               `json:"provider_id"`
+	CredentialID       int               `json:"credential_id"`
+	RawModel           string            `json:"raw_model"`
+	Kind               errorsx.ErrorKind `json:"kind"`
+	Reason             string            `json:"reason,omitempty"`
+	UpstreamStatusCode *int              `json:"upstream_status_code,omitempty"`
 }
 
 type ExecuteError struct {
@@ -554,6 +555,13 @@ func (e *ExecuteError) Error() string {
 	}
 	return fmt.Sprintf("all %d candidates failed", e.Tried)
 }
+
+// Unwrap returns the last attempt's underlying error so errors.Unwrap can
+// walk the chain to *upstream.Error / *modelNotFoundError / etc. Without
+// this, extractUpstreamError in relay/handler.go can't see the vendor
+// response body for Exhausted (multi-credential fall-through) requests.
+// (2026-06-30, Phase 2 P1 of the minimax-m3 transient-error fix.)
+func (e *ExecuteError) Unwrap() error { return e.LastErr }
 
 func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 	// V3.1 (2026-06-26): 同会话切模型检测。
@@ -1111,12 +1119,39 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 			)
 		}
 
+		// 2026-06-30 (Phase 2 P1): when execErr is a typed *upstream.Error,
+		// lift its Body and StatusCode onto the AttemptRecord so the
+		// Exhausted relay branch can read them via ExecuteError.Attempts.
+		// Without this, multi-credential fall-through failures lose all
+		// vendor diagnostics (status code + response body).
+		var (
+			attemptStatusCode *int
+			attemptBodySnip   string
+		)
+		if ue, ok := execErr.(*upstreampkg.Error); ok {
+			if ue.StatusCode > 0 {
+				sc := ue.StatusCode
+				attemptStatusCode = &sc
+			}
+			if len(ue.Body) > 0 {
+				b := string(ue.Body)
+				if len(b) > 1024 {
+					b = b[:1024]
+				}
+				attemptBodySnip = b
+			}
+		}
+		attemptReason := execErr.Error()
+		if attemptBodySnip != "" {
+			attemptReason = attemptReason + " | body=" + attemptBodySnip
+		}
 		attempts = append(attempts, AttemptRecord{
-			ProviderID:   cand.ProviderID,
-			CredentialID: cand.CredentialID,
-			RawModel:     cand.RawModel,
-			Kind:         kind,
-			Reason:       execErr.Error(),
+			ProviderID:         cand.ProviderID,
+			CredentialID:       cand.CredentialID,
+			RawModel:           cand.RawModel,
+			Kind:               kind,
+			Reason:             attemptReason,
+			UpstreamStatusCode: attemptStatusCode,
 		})
 		e.recordStickyFailure(params, cand.CredentialID, kind)
 		// V3.1 (2026-06-26): 同步 RouteNodeState 失败计数
@@ -2404,6 +2439,12 @@ type retryableError struct {
 }
 
 func (e *retryableError) Error() string { return e.err.Error() }
+
+// Unwrap exposes the inner error so errors.Unwrap / extractUpstreamError
+// can reach the typed *upstream.Error (which carries Body + StatusCode)
+// even when the executor wraps a retryable attempt in this thin shim.
+// (2026-06-30.)
+func (e *retryableError) Unwrap() error { return e.err }
 
 // contextLengthHTTPError signals the upstream rejected the request because
 // the prompt exceeded the model context window. executeAnthropic uses this

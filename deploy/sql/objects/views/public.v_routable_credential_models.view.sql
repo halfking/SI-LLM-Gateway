@@ -2,7 +2,7 @@
 -- Object:   v_routable_credential_models
 -- Type:     VIEW
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: v_routable_credential_models; Type: VIEW; Schema: public; Owner: -
 --
