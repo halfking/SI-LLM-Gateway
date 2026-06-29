@@ -91,7 +91,7 @@ def comment_block(name: str, obj_type: str, schema: str) -> str:
     lines.append(f"-- Object:   {name}")
     lines.append(f"-- Type:     {obj_type}")
     lines.append(f"-- Schema:   {schema}")
-    lines.append('-- Source:   184_full_schema.sql (pg_dump --schema-only)')
+    lines.append('-- Source:   full_schema.sql (pg_dump --schema-only)')
     lines.append('-- =' + '=' * 74)
     lines.append('')
     return '\n'.join(lines)

@@ -20,7 +20,7 @@ deploy/sql/
 │   ├── 006_request_logs.sql                # request_logs (分区表)
 │   ├── 007_archive_and_ledger.sql          # request_logs_archive, credit_ledger, usage_ledger
 │   ├── 008_tools_registry.sql              # tool_registry, tool_call_events, tool_usage_stats
-│   └── 184_full_schema.sql                 # 🔗 184 服务器 pg_dump --schema-only 实时快照
+│   └── full_schema.sql                      # 🔗 生产数据库 pg_dump --schema-only 实时快照
 │
 ├── 01_functions/                           # 函数/触发器（可执行初始化）
 │   └── functions.sql
@@ -30,7 +30,7 @@ deploy/sql/
 │   ├── 002_providers.sql
 │   └── 003_work_types.sql
 │
-├── objects/                                # 📦 逐对象拆分（来自 184 的 pg_dump 解析）
+├── objects/                                # 📦 逐对象拆分（来自生产数据库的 pg_dump 解析）
 │   ├── tables/                             #   138 个表，每文件一个 CREATE TABLE
 │   ├── indexes/                            #   413 个索引
 │   ├── constraints/                        #   88 个约束（CHECK, UNIQUE, PK）
@@ -114,12 +114,12 @@ deploy/sql/
 ### 00_schema/ （可执行初始化）
 按功能拆分的表结构，用于**单机目标库初始化**，包含完整的 CREATE TABLE/INDEX 语句。配合 `01_functions/` 和 `02_seed_data/` 可完成全量初始化。
 
-### 184_full_schema.sql
-来自 184 服务器（k8s pms-test 命名空间）的 `pg_dump --schema-only --no-owner --no-privileges --no-comments` 实时快照。
-**这是 184 生产数据库当前结构的权威参考。**
+### full_schema.sql
+来自生产 PostgreSQL 数据库（Kubernetes 命名空间）的 `pg_dump --schema-only --no-owner --no-privileges --no-comments` 实时快照。
+**这是生产数据库当前结构的权威参考。**
 
 ### objects/（逐对象拆分）
-由 `scripts/split_pg_dump.py` 从 `184_full_schema.sql` 解析生成，**每文件一个数据库对象**。
+由 `scripts/split_pg_dump.py` 从 `full_schema.sql` 解析生成，**每文件一个数据库对象**。
 - 文件命名: `{schema}.{object_name}.{type?}.sql`
 - 每个文件包含源出处注释
 - 包含 933 个文件，覆盖 154 个表/视图 + 索引/函数/触发器/策略等
@@ -174,20 +174,20 @@ psql -h <host> -U <user> -d <db> -f deploy/sql/02_seed_data/003_work_types.sql
 
 ---
 
-## 与 184 实时结构同步
+## 与生产数据库结构同步
 
-如需重新获取 184 的数据库结构快照：
+如需重新获取生产数据库结构快照：
 
 ```bash
-# 1. 导出完整 schema（在本地或通过 SSH）
-ssh 184
-kubectl exec -n pms-test llm-gateway-pg-... -c citus -- \
-  pg_dump -U llm_gateway -d llm_gateway --schema-only \
-  --no-owner --no-privileges --no-comments > deploy/sql/00_schema/184_full_schema.sql
+# 1. 导出完整 schema（通过 SSH 连入生产 Kubernetes 集群）
+ssh <生产服务器>
+kubectl exec -n <命名空间> <postgres-pod> -c <容器名> -- \
+  pg_dump -U <用户名> -d <数据库名> --schema-only \
+  --no-owner --no-privileges --no-comments > deploy/sql/00_schema/full_schema.sql
 
 # 2. 重新按对象拆分
 python3 deploy/sql/scripts/split_pg_dump.py \
-  deploy/sql/00_schema/184_full_schema.sql \
+  deploy/sql/00_schema/full_schema.sql \
   deploy/sql/objects
 ```
 
@@ -215,7 +215,7 @@ python3 deploy/sql/scripts/split_pg_dump.py \
 ## 使用边界
 
 - `00_schema/` + `01_functions/` + `02_seed_data/` 用于单机目标库初始化。
-- `objects/` 是 184 实时结构的精确镜像（只读参考），不可直接用于初始化（存在顺序依赖）。
+- `objects/` 是生产数据库实时结构的精确镜像（只读参考），不可直接用于初始化（存在顺序依赖）。
 - `migrations/` 是历史 DDL 变更记录，**不保证幂等**，应按顺序执行。
 - `adhoc/` + `docs/` 中的脚本多为一次性操作，执行前请仔细阅读。
 
