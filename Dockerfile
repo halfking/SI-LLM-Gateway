@@ -7,19 +7,20 @@
 # build context.
 
 # ── Build stage ──────────────────────────────────────────────────────────────
-FROM --platform=linux/amd64 [REGISTRY_DOMAIN]/kx-base:go-vue AS builder
+ARG REGISTRY_DOMAIN=[INTERNAL_REGISTRY]
+FROM --platform=linux/amd64 ${REGISTRY_DOMAIN}/[KBASE]:go-vue AS builder
 
-# Defensive: kx-base:go-vue already provides git/ca-certificates, nodejs + npm.
+# Defensive: [KBASE]:go-vue already provides git/ca-certificates, nodejs + npm.
 # Verify availability; fail fast if any are missing.
 RUN for cmd in git node npm; do command -v "$cmd" >/dev/null 2>&1 || (echo "ERROR: $cmd not found in base image" && exit 1); done
 
-# kx-base:go-vue runs as non-root 'appuser' — switch back to root for build
+# [KBASE]:go-vue runs as non-root 'appuser' — switch back to root for build
 USER root
 
 WORKDIR /src
 COPY go.mod go.sum ./
 ARG GOTOOLCHAIN=auto
-# GFW blocks proxy.golang.org (Google IP 142.251.33.209) — use goproxy.cn
+# GFW blocks proxy.golang.org (Google IP [GOOGLE_IP]) — use goproxy.cn
 # (Qiniu CDN) as primary. See AGENTS.md 2026-05-12 "key learning".
 ARG GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct
 ARG NPM_REGISTRY=https://registry.npmmirror.com/
@@ -45,21 +46,22 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto \
     go build -a -ldflags="-s -w" -o /llm-gateway-go ./cmd/gateway
 
 # ── Runtime stage ───────────────────────────────────────────────────────────
-# 2026-06-22 T14: switched from kx-base:go-vue-amd64 (1.09GB Debian) to
-# kx-base:go-vue-alpine-slim-runtime (15.6MB alpine 3.20). Runtime only
+# 2026-06-22 T14: switched from [KBASE]:go-vue-amd64 (1.09GB Debian) to
+# [KBASE]:go-vue-alpine-slim-runtime (15.6MB alpine 3.20). Runtime only
 # needs ca-certs + tzdata + non-root appuser; no Go SDK / nodejs / pip
 # packages (those are build-time only). 预估 [IMAGE_NAME] 镜像
 # 2.14GB → ~0.95GB (-55%).
-# Builder stage (above) still uses kx-base:go-vue for Go toolchain
+# Builder stage (above) still uses [KBASE]:go-vue for Go toolchain
 # compatibility (Q2 decision: only swap runtime, keep builder).
-FROM --platform=linux/amd64 [REGISTRY_DOMAIN]/kx-base:go-vue-alpine-slim-runtime
+ARG REGISTRY_DOMAIN=[INTERNAL_REGISTRY]
+FROM --platform=linux/amd64 ${REGISTRY_DOMAIN}/[KBASE]:go-vue-alpine-slim-runtime
 
 ARG GIT_TAG=""
 ARG GIT_SHA=""
 ARG BUILD_DATE=""
 ARG BUILD_SEQ="0"
 
-# kx-base:go-vue already provides ca-certificates + tzdata + a non-root
+# [KBASE]:go-vue already provides ca-certificates + tzdata + a non-root
 # 'appuser' (uid=1001). The runtime runs as this user (matches the
 # original alpine llmgw user spec: uid=1001, no shell). No additional
 # user creation is needed.
@@ -69,7 +71,7 @@ WORKDIR /
 COPY --from=builder /llm-gateway-go /usr/local/bin/llm-gateway-go
 COPY --from=builder /src/web/dist /opt/llm-gateway-go/web/dist
 
-# kx-base:go-vue defaults USER=appuser (uid=1001); the COPY --from=builder
+# [KBASE]:go-vue defaults USER=appuser (uid=1001); the COPY --from=builder
 # files are owned by root, so we need root to chown them to appuser.
 USER root
 
