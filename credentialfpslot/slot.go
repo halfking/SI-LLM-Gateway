@@ -1250,6 +1250,129 @@ func (m *Manager) purgeExpiredLocked(now time.Time) {
 	}
 }
 
+// BatchStats returns slot occupancy for multiple credentials in one Redis round-trip.
+// This is optimized for the admin list endpoint where we need stats for many credentials.
+// Returns a map[credentialID] -> (slotLimit, used, free).
+func (m *Manager) BatchStats(ctx context.Context, credLimits map[int]*int) map[int]struct {
+	SlotLimit *int
+	Used      *int
+	Free      *int
+} {
+	result := make(map[int]struct {
+		SlotLimit *int
+		Used      *int
+		Free      *int
+	})
+
+	if !m.Enabled() {
+		return result
+	}
+
+	// Build list of credentials with valid limits
+	type credInfo struct {
+		id    int
+		limit int
+	}
+	var creds []credInfo
+	for credID, limit := range credLimits {
+		eff := EffectiveLimit(limit, m.cfg.DefaultLimit)
+		if eff != nil {
+			creds = append(creds, credInfo{id: credID, limit: *eff})
+		}
+	}
+
+	if len(creds) == 0 {
+		return result
+	}
+
+	if m.client != nil {
+		// Use Redis pipeline to query all credentials concurrently
+		pipe := m.client.Pipeline()
+		type scriptCmd struct {
+			credID int
+			limit  int
+			cmd    *redis.Cmd
+		}
+		var cmds []scriptCmd
+
+		for _, c := range creds {
+			cmd := pipe.Do(ctx, "EVAL", availableCountScript.Hash(), 1,
+				slotKeyPrefix(c.id), c.limit)
+			cmds = append(cmds, scriptCmd{credID: c.id, limit: c.limit, cmd: cmd})
+		}
+
+		// Execute pipeline
+		if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+			// On pipeline failure, fall back to individual queries
+			for _, c := range creds {
+				avail, _ := m.AvailableCount(ctx, c.id, &c.limit)
+				used := c.limit - avail
+				if used < 0 {
+					used = 0
+				}
+				l, u, f := c.limit, used, avail
+				result[c.id] = struct {
+					SlotLimit *int
+					Used      *int
+					Free      *int
+				}{SlotLimit: &l, Used: &u, Free: &f}
+			}
+			return result
+		}
+
+		// Collect results
+		for _, sc := range cmds {
+			free := 0
+			if val, err := sc.cmd.Int(); err == nil {
+				free = val
+				if free < 0 {
+					free = 0
+				}
+			} else {
+				free = sc.limit // Default to all free on error
+			}
+			used := sc.limit - free
+			if used < 0 {
+				used = 0
+			}
+			l, u, f := sc.limit, used, free
+			result[sc.credID] = struct {
+				SlotLimit *int
+				Used      *int
+				Free      *int
+			}{SlotLimit: &l, Used: &u, Free: &f}
+		}
+		return result
+	}
+
+	// Memory mode: query in-memory state
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := time.Now()
+	m.purgeExpiredLocked(now)
+
+	for _, c := range creds {
+		used := 0
+		for k, e := range m.memSlots {
+			if k.credentialID == c.id && e.exp.After(now) {
+				used++
+			}
+		}
+		free := c.limit - used
+		if free < 0 {
+			free = 0
+		}
+		l, u, f := c.limit, used, free
+		result[c.id] = struct {
+			SlotLimit *int
+			Used      *int
+			Free      *int
+		}{SlotLimit: &l, Used: &u, Free: &f}
+	}
+
+	return result
+}
+
 // ResetSlots clears all slot and pin keys for a credential, resetting occupancy to zero.
 // Used by admin UI "复位" button when slots appear stuck due to:
 //   - Gateway restart before defer cleanup
