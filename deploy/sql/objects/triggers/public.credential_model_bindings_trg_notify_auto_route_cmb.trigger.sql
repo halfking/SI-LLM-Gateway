@@ -2,7 +2,7 @@
 -- Object:   credential_model_bindings trg_notify_auto_route_cmb
 -- Type:     TRIGGER
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: credential_model_bindings trg_notify_auto_route_cmb; Type: TRIGGER; Schema: public; Owner: -
 --

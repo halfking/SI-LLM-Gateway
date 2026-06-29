@@ -2,7 +2,7 @@
 -- Object:   assets tenant_isolation_assets
 -- Type:     POLICY
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: assets tenant_isolation_assets; Type: POLICY; Schema: public; Owner: -
 --

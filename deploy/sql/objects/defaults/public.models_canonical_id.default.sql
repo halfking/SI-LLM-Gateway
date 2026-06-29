@@ -2,7 +2,7 @@
 -- Object:   models_canonical id
 -- Type:     DEFAULT
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: models_canonical id; Type: DEFAULT; Schema: public; Owner: -
 --

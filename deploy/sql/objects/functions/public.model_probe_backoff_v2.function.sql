@@ -2,7 +2,7 @@
 -- Object:   model_probe_backoff_v2(integer, timestamp with time zone)
 -- Type:     FUNCTION
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: model_probe_backoff_v2(integer, timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
 --

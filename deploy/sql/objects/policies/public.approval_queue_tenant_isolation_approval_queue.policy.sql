@@ -2,7 +2,7 @@
 -- Object:   approval_queue tenant_isolation_approval_queue
 -- Type:     POLICY
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: approval_queue tenant_isolation_approval_queue; Type: POLICY; Schema: public; Owner: -
 --

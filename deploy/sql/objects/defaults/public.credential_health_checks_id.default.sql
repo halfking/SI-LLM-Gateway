@@ -2,7 +2,7 @@
 -- Object:   credential_health_checks id
 -- Type:     DEFAULT
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: credential_health_checks id; Type: DEFAULT; Schema: public; Owner: -
 --

@@ -2,7 +2,7 @@
 -- Object:   request_logs_default_client_model_idx7
 -- Type:     INDEX ATTACH
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: request_logs_default_client_model_idx7; Type: INDEX ATTACH; Schema: public; Owner: -
 --

@@ -2,7 +2,7 @@
 -- Object:   agents tenant_isolation_agents
 -- Type:     POLICY
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: agents tenant_isolation_agents; Type: POLICY; Schema: public; Owner: -
 --

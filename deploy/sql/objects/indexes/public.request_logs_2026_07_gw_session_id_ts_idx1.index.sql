@@ -2,7 +2,7 @@
 -- Object:   request_logs_2026_07_gw_session_id_ts_idx1
 -- Type:     INDEX
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: request_logs_2026_07_gw_session_id_ts_idx1; Type: INDEX; Schema: public; Owner: -
 --

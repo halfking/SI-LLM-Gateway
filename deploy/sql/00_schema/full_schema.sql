@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict z1UgeCz3VTxcv926OVu2ewGUpN5POHlHJMxLVRoS7GcJAb55BdtOfwaWY9B0Qm4
+\restrict 4ey3UQUuyKB95a0ZOSRup1DCQroXHnLJZhA7aKDSzpkTqeL56r6HaeBBbwhY9qo
 
 -- Dumped from database version 15.3 (Debian 15.3-1.pgdg120+1)
 -- Dumped by pg_dump version 15.18 (Debian 15.18-1.pgdg12+1)
@@ -44,6 +44,53 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 --
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+
+--
+-- Name: archive_credential_model_index(date); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.archive_credential_model_index(archive_month date) RETURNS TABLE(status text, rows_archived bigint, rows_deleted bigint)
+    LANGUAGE plpgsql
+    AS $$
+		DECLARE
+		    month_start date := date_trunc('month', archive_month)::date;
+		    month_end   date := (date_trunc('month', archive_month) + interval '1 month')::date;
+		    partition_name text := 'credential_model_index_archive_' || to_char(month_start, 'YYYY_MM');
+		    archived_count bigint;
+		    deleted_count bigint;
+		    cutoff_ts timestamptz := NOW() - INTERVAL '7 days';
+		BEGIN
+		    -- Create target columnar partition if missing
+		    IF NOT EXISTS (SELECT 1 FROM pg_class
+		                   WHERE relname = partition_name AND relnamespace = 'public'::regnamespace) THEN
+		        EXECUTE format(
+		            'CREATE TABLE %I PARTITION OF credential_model_index_archive FOR VALUES FROM (%L) TO (%L) USING columnar',
+		            partition_name, month_start, month_end
+		        );
+		    END IF;
+
+		    -- Archive 7d+ data for this month to columnar
+		    INSERT INTO credential_model_index_archive
+		    SELECT * FROM credential_model_index
+		    WHERE bucket >= month_start 
+		      AND bucket < month_end
+		      AND bucket < cutoff_ts
+		    ON CONFLICT DO NOTHING;
+		    
+		    GET DIAGNOSTICS archived_count = ROW_COUNT;
+
+		    -- Delete archived data from main table
+		    DELETE FROM credential_model_index
+		    WHERE bucket >= month_start 
+		      AND bucket < month_end
+		      AND bucket < cutoff_ts;
+		    
+		    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+
+		    RETURN QUERY SELECT 'success'::text, archived_count, deleted_count;
+		END;
+		$$;
 
 
 --
@@ -114,6 +161,64 @@ CREATE FUNCTION public.archive_request_wal(archive_month date) RETURNS TABLE(sta
 
 
 --
+-- Name: archive_routing_decision_log(date); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.archive_routing_decision_log(archive_month date) RETURNS TABLE(status text, rows_migrated bigint, partition_dropped boolean)
+    LANGUAGE plpgsql
+    AS $$
+		DECLARE
+		    month_start date := date_trunc('month', archive_month)::date;
+		    month_end   date := (date_trunc('month', archive_month) + interval '1 month')::date;
+		    src_part    text := 'routing_decision_log_' || to_char(month_start, 'YYYY_MM');
+		    dst_part    text := 'routing_decision_log_archive_' || to_char(month_start, 'YYYY_MM');
+		    row_count   bigint;
+		    col_list    text;
+		BEGIN
+		    IF NOT EXISTS (SELECT 1 FROM pg_class
+		                   WHERE relname = src_part AND relnamespace = 'public'::regnamespace) THEN
+		        RETURN QUERY SELECT 'skipped'::text, 0::bigint, false;
+		        RETURN;
+		    END IF;
+
+		    IF NOT EXISTS (SELECT 1 FROM pg_class
+		                   WHERE relname = dst_part AND relnamespace = 'public'::regnamespace) THEN
+		        EXECUTE format(
+		            'CREATE TABLE %I PARTITION OF routing_decision_log_archive FOR VALUES FROM (%L) TO (%L) USING columnar',
+		            dst_part, month_start, month_end
+		        );
+		    END IF;
+
+		    SELECT string_agg(a.column_name, ', ' ORDER BY a.ordinal_position)
+		    INTO col_list
+		    FROM information_schema.columns a
+		    JOIN information_schema.columns r
+		      ON a.table_schema = r.table_schema
+		     AND a.column_name  = r.column_name
+		    WHERE a.table_name = 'routing_decision_log_archive'
+		      AND r.table_name = src_part
+		      AND a.table_schema = 'public'
+		      AND a.ordinal_position > 0;
+
+		    IF col_list IS NULL OR length(col_list) = 0 THEN
+		        RAISE EXCEPTION 'No common columns between % and routing_decision_log_archive', src_part;
+		    END IF;
+
+		    EXECUTE format(
+		        'INSERT INTO %I (%s) SELECT %s FROM %I',
+		        dst_part, col_list, col_list, src_part
+		    );
+		    GET DIAGNOSTICS row_count = ROW_COUNT;
+
+		    EXECUTE format('ALTER TABLE routing_decision_log DETACH PARTITION %I', src_part);
+		    EXECUTE format('DROP TABLE %I', src_part);
+
+		    RETURN QUERY SELECT 'success'::text, row_count, true;
+		END;
+		$$;
+
+
+--
 -- Name: array_unique_append(text[], text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -159,6 +264,27 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+
+--
+-- Name: cleanup_old_credential_model_index(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.cleanup_old_credential_model_index() RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+		DECLARE
+		    deleted_count bigint;
+		    cutoff_ts timestamptz := NOW() - INTERVAL '7 days';
+		BEGIN
+		    DELETE FROM credential_model_index
+		    WHERE bucket < cutoff_ts;
+		    
+		    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+		    
+		    RETURN deleted_count;
+		END;
+		$$;
 
 
 --
@@ -220,6 +346,34 @@ $$;
 
 
 --
+-- Name: create_next_month_routing_partitions(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.create_next_month_routing_partitions() RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+		DECLARE
+		    next_month_start date := date_trunc('month', now() + interval '1 month')::date;
+		    next_month_end   date := date_trunc('month', now() + interval '2 months')::date;
+		    month_suffix     text := to_char(next_month_start, 'YYYY_MM');
+		    partition_name   text := 'routing_decision_log_' || month_suffix;
+		BEGIN
+		    -- Create main table heap partition
+		    IF NOT EXISTS (SELECT 1 FROM pg_class
+		                   WHERE relname = partition_name AND relnamespace = 'public'::regnamespace) THEN
+		        EXECUTE format(
+		            'CREATE TABLE %I PARTITION OF routing_decision_log FOR VALUES FROM (%L) TO (%L) USING heap',
+		            partition_name, next_month_start, next_month_end
+		        );
+		    END IF;
+		    
+		    -- Create archive table columnar partition
+		    PERFORM ensure_next_month_routing_archive_partition();
+		END;
+		$$;
+
+
+--
 -- Name: ensure_next_month_archive_partition(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -235,6 +389,52 @@ CREATE FUNCTION public.ensure_next_month_archive_partition() RETURNS void
 		                   WHERE relname = partition_name AND relnamespace = 'public'::regnamespace) THEN
 		        EXECUTE format(
 		            'CREATE TABLE %I PARTITION OF request_logs_archive FOR VALUES FROM (%L) TO (%L) USING columnar',
+		            partition_name, next_month_start, next_month_end
+		        );
+		    END IF;
+		END;
+		$$;
+
+
+--
+-- Name: ensure_next_month_cmi_archive_partition(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ensure_next_month_cmi_archive_partition() RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+		DECLARE
+		    next_month_start date := date_trunc('month', now() + interval '1 month')::date;
+		    next_month_end   date := date_trunc('month', now() + interval '2 months')::date;
+		    partition_name   text := 'credential_model_index_archive_' || to_char(next_month_start, 'YYYY_MM');
+		BEGIN
+		    IF NOT EXISTS (SELECT 1 FROM pg_class
+		                   WHERE relname = partition_name AND relnamespace = 'public'::regnamespace) THEN
+		        EXECUTE format(
+		            'CREATE TABLE %I PARTITION OF credential_model_index_archive FOR VALUES FROM (%L) TO (%L) USING columnar',
+		            partition_name, next_month_start, next_month_end
+		        );
+		    END IF;
+		END;
+		$$;
+
+
+--
+-- Name: ensure_next_month_routing_archive_partition(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ensure_next_month_routing_archive_partition() RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+		DECLARE
+		    next_month_start date := date_trunc('month', now() + interval '1 month')::date;
+		    next_month_end   date := date_trunc('month', now() + interval '2 months')::date;
+		    partition_name   text := 'routing_decision_log_archive_' || to_char(next_month_start, 'YYYY_MM');
+		BEGIN
+		    IF NOT EXISTS (SELECT 1 FROM pg_class
+		                   WHERE relname = partition_name AND relnamespace = 'public'::regnamespace) THEN
+		        EXECUTE format(
+		            'CREATE TABLE %I PARTITION OF routing_decision_log_archive FOR VALUES FROM (%L) TO (%L) USING columnar',
 		            partition_name, next_month_start, next_month_end
 		        );
 		    END IF;
@@ -1920,6 +2120,61 @@ CREATE TABLE public.credential_model_index (
     updated_at timestamp with time zone DEFAULT now()
 );
 
+
+--
+-- Name: credential_model_index_archive; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.credential_model_index_archive (
+    bucket timestamp with time zone NOT NULL,
+    credential_id bigint NOT NULL,
+    raw_model text NOT NULL,
+    canonical_id integer,
+    billing_mode text,
+    unit_price_in_per_1m numeric(10,4),
+    unit_price_out_per_1m numeric(10,4),
+    context_window integer,
+    success_rate numeric(5,4),
+    p95_latency_ms integer,
+    active_sessions integer DEFAULT 0,
+    concurrency_limit integer,
+    pressure_ratio numeric(5,4),
+    score_smart numeric(8,4),
+    score_speed_first numeric(8,4),
+    score_cost_first numeric(8,4),
+    updated_at timestamp with time zone DEFAULT now()
+)
+PARTITION BY RANGE (bucket);
+
+
+SET default_table_access_method = columnar;
+
+--
+-- Name: credential_model_index_archive_2026_06; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.credential_model_index_archive_2026_06 (
+    bucket timestamp with time zone NOT NULL,
+    credential_id bigint NOT NULL,
+    raw_model text NOT NULL,
+    canonical_id integer,
+    billing_mode text,
+    unit_price_in_per_1m numeric(10,4),
+    unit_price_out_per_1m numeric(10,4),
+    context_window integer,
+    success_rate numeric(5,4),
+    p95_latency_ms integer,
+    active_sessions integer DEFAULT 0,
+    concurrency_limit integer,
+    pressure_ratio numeric(5,4),
+    score_smart numeric(8,4),
+    score_speed_first numeric(8,4),
+    score_cost_first numeric(8,4),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+SET default_table_access_method = heap;
 
 --
 -- Name: credential_model_peak_1m; Type: TABLE; Schema: public; Owner: -
@@ -4887,6 +5142,228 @@ CREATE TABLE public.routing_decision_log (
     canonical_model text,
     resolution_raw_models jsonb,
     decision_trace jsonb
+)
+PARTITION BY RANGE (ts);
+
+
+--
+-- Name: routing_decision_log_2026_06; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.routing_decision_log_2026_06 (
+    ts timestamp with time zone DEFAULT now() NOT NULL,
+    request_id uuid NOT NULL,
+    idempotency_key text,
+    tenant_id text,
+    api_key_id bigint,
+    model text NOT NULL,
+    chosen_credential_id bigint,
+    chosen_provider_id bigint,
+    tier smallint,
+    candidates_tried smallint,
+    latency_ms integer,
+    success boolean NOT NULL,
+    error_class text,
+    prompt_tokens integer,
+    completion_tokens integer,
+    cost_usd numeric(12,6),
+    request_bytes integer,
+    response_bytes integer,
+    client_model text,
+    resolved_raw_model text,
+    sticky_hit boolean,
+    client_profile text,
+    outbound_model text,
+    request_mode text,
+    identity_hash text,
+    transform_rule_id text,
+    egress_protocol text,
+    failure_stage text,
+    failure_detail_code text,
+    virtual_client_id text,
+    virtual_ip text,
+    virtual_mac text,
+    resolution_path text,
+    canonical_model text,
+    resolution_raw_models jsonb,
+    decision_trace jsonb
+);
+
+
+--
+-- Name: routing_decision_log_2026_07; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.routing_decision_log_2026_07 (
+    ts timestamp with time zone DEFAULT now() NOT NULL,
+    request_id uuid NOT NULL,
+    idempotency_key text,
+    tenant_id text,
+    api_key_id bigint,
+    model text NOT NULL,
+    chosen_credential_id bigint,
+    chosen_provider_id bigint,
+    tier smallint,
+    candidates_tried smallint,
+    latency_ms integer,
+    success boolean NOT NULL,
+    error_class text,
+    prompt_tokens integer,
+    completion_tokens integer,
+    cost_usd numeric(12,6),
+    request_bytes integer,
+    response_bytes integer,
+    client_model text,
+    resolved_raw_model text,
+    sticky_hit boolean,
+    client_profile text,
+    outbound_model text,
+    request_mode text,
+    identity_hash text,
+    transform_rule_id text,
+    egress_protocol text,
+    failure_stage text,
+    failure_detail_code text,
+    virtual_client_id text,
+    virtual_ip text,
+    virtual_mac text,
+    resolution_path text,
+    canonical_model text,
+    resolution_raw_models jsonb,
+    decision_trace jsonb
+);
+
+
+--
+-- Name: routing_decision_log_archive; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.routing_decision_log_archive (
+    ts timestamp with time zone DEFAULT now() NOT NULL,
+    request_id uuid NOT NULL,
+    idempotency_key text,
+    tenant_id text,
+    api_key_id bigint,
+    model text NOT NULL,
+    chosen_credential_id bigint,
+    chosen_provider_id bigint,
+    tier smallint,
+    candidates_tried smallint,
+    latency_ms integer,
+    success boolean NOT NULL,
+    error_class text,
+    prompt_tokens integer,
+    completion_tokens integer,
+    cost_usd numeric(12,6),
+    request_bytes integer,
+    response_bytes integer,
+    client_model text,
+    resolved_raw_model text,
+    sticky_hit boolean,
+    client_profile text,
+    outbound_model text,
+    request_mode text,
+    identity_hash text,
+    transform_rule_id text,
+    egress_protocol text,
+    failure_stage text,
+    failure_detail_code text,
+    virtual_client_id text,
+    virtual_ip text,
+    virtual_mac text,
+    resolution_path text,
+    canonical_model text,
+    resolution_raw_models jsonb,
+    decision_trace jsonb
+)
+PARTITION BY RANGE (ts);
+
+
+--
+-- Name: routing_decision_log_default; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.routing_decision_log_default (
+    ts timestamp with time zone DEFAULT now() NOT NULL,
+    request_id uuid NOT NULL,
+    idempotency_key text,
+    tenant_id text,
+    api_key_id bigint,
+    model text NOT NULL,
+    chosen_credential_id bigint,
+    chosen_provider_id bigint,
+    tier smallint,
+    candidates_tried smallint,
+    latency_ms integer,
+    success boolean NOT NULL,
+    error_class text,
+    prompt_tokens integer,
+    completion_tokens integer,
+    cost_usd numeric(12,6),
+    request_bytes integer,
+    response_bytes integer,
+    client_model text,
+    resolved_raw_model text,
+    sticky_hit boolean,
+    client_profile text,
+    outbound_model text,
+    request_mode text,
+    identity_hash text,
+    transform_rule_id text,
+    egress_protocol text,
+    failure_stage text,
+    failure_detail_code text,
+    virtual_client_id text,
+    virtual_ip text,
+    virtual_mac text,
+    resolution_path text,
+    canonical_model text,
+    resolution_raw_models jsonb,
+    decision_trace jsonb
+);
+
+
+--
+-- Name: routing_decision_log_old; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.routing_decision_log_old (
+    ts timestamp with time zone DEFAULT now() NOT NULL,
+    request_id uuid NOT NULL,
+    idempotency_key text,
+    tenant_id text,
+    api_key_id bigint,
+    model text NOT NULL,
+    chosen_credential_id bigint,
+    chosen_provider_id bigint,
+    tier smallint,
+    candidates_tried smallint,
+    latency_ms integer,
+    success boolean NOT NULL,
+    error_class text,
+    prompt_tokens integer,
+    completion_tokens integer,
+    cost_usd numeric(12,6),
+    request_bytes integer,
+    response_bytes integer,
+    client_model text,
+    resolved_raw_model text,
+    sticky_hit boolean,
+    client_profile text,
+    outbound_model text,
+    request_mode text,
+    identity_hash text,
+    transform_rule_id text,
+    egress_protocol text,
+    failure_stage text,
+    failure_detail_code text,
+    virtual_client_id text,
+    virtual_ip text,
+    virtual_mac text,
+    resolution_path text,
+    canonical_model text,
+    resolution_raw_models jsonb,
+    decision_trace jsonb
 );
 
 
@@ -6705,6 +7182,13 @@ ALTER SEQUENCE public.work_type_model_route_id_seq OWNED BY public.work_type_mod
 
 
 --
+-- Name: credential_model_index_archive_2026_06; Type: TABLE ATTACH; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.credential_model_index_archive ATTACH PARTITION public.credential_model_index_archive_2026_06 FOR VALUES FROM ('2026-06-01 00:00:00+00') TO ('2026-07-01 00:00:00+00');
+
+
+--
 -- Name: credit_ledger_2026_06; Type: TABLE ATTACH; Schema: public; Owner: -
 --
 
@@ -6779,6 +7263,27 @@ ALTER TABLE ONLY public.request_wal ATTACH PARTITION public.request_wal_2026_06 
 --
 
 ALTER TABLE ONLY public.request_wal ATTACH PARTITION public.request_wal_2026_07 FOR VALUES FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00');
+
+
+--
+-- Name: routing_decision_log_2026_06; Type: TABLE ATTACH; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_decision_log ATTACH PARTITION public.routing_decision_log_2026_06 FOR VALUES FROM ('2026-06-01 00:00:00+00') TO ('2026-07-01 00:00:00+00');
+
+
+--
+-- Name: routing_decision_log_2026_07; Type: TABLE ATTACH; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_decision_log ATTACH PARTITION public.routing_decision_log_2026_07 FOR VALUES FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00');
+
+
+--
+-- Name: routing_decision_log_default; Type: TABLE ATTACH; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_decision_log ATTACH PARTITION public.routing_decision_log_default DEFAULT;
 
 
 --
@@ -7976,6 +8481,48 @@ ALTER TABLE ONLY public.work_type_model_route
 
 
 --
+-- Name: idx_cmi_archive_cred_model; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_cmi_archive_cred_model ON ONLY public.credential_model_index_archive USING btree (credential_id, raw_model, bucket DESC);
+
+
+--
+-- Name: credential_model_index_archiv_credential_id_raw_model_bucke_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX credential_model_index_archiv_credential_id_raw_model_bucke_idx ON public.credential_model_index_archive_2026_06 USING btree (credential_id, raw_model, bucket DESC);
+
+
+--
+-- Name: idx_cmi_archive_bucket; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_cmi_archive_bucket ON ONLY public.credential_model_index_archive USING btree (bucket DESC);
+
+
+--
+-- Name: credential_model_index_archive_2026_06_bucket_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX credential_model_index_archive_2026_06_bucket_idx ON public.credential_model_index_archive_2026_06 USING btree (bucket DESC);
+
+
+--
+-- Name: idx_cmi_archive_canonical; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_cmi_archive_canonical ON ONLY public.credential_model_index_archive USING btree (canonical_id, bucket DESC) WHERE (canonical_id IS NOT NULL);
+
+
+--
+-- Name: credential_model_index_archive_2026_06_canonical_id_bucket_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX credential_model_index_archive_2026_06_canonical_id_bucket_idx ON public.credential_model_index_archive_2026_06 USING btree (canonical_id, bucket DESC) WHERE (canonical_id IS NOT NULL);
+
+
+--
 -- Name: idx_credit_ledger_part_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -8631,6 +9178,48 @@ CREATE INDEX idx_response_format_anomalies_type ON public.response_format_anomal
 --
 
 CREATE INDEX idx_response_format_anomalies_unresolved ON public.response_format_anomalies USING btree (detected_at DESC) WHERE (NOT resolved);
+
+
+--
+-- Name: idx_routing_decision_log_part_credential; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_routing_decision_log_part_credential ON ONLY public.routing_decision_log USING btree (chosen_credential_id, ts DESC) WHERE (chosen_credential_id IS NOT NULL);
+
+
+--
+-- Name: idx_routing_decision_log_part_model; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_routing_decision_log_part_model ON ONLY public.routing_decision_log USING btree (model, ts DESC);
+
+
+--
+-- Name: idx_routing_decision_log_part_request_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_routing_decision_log_part_request_id ON ONLY public.routing_decision_log USING btree (request_id);
+
+
+--
+-- Name: idx_routing_decision_log_part_success; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_routing_decision_log_part_success ON ONLY public.routing_decision_log USING btree (success, ts DESC);
+
+
+--
+-- Name: idx_routing_decision_log_part_tenant_ts; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_routing_decision_log_part_tenant_ts ON ONLY public.routing_decision_log USING btree (tenant_id, ts DESC) WHERE (tenant_id IS NOT NULL);
+
+
+--
+-- Name: idx_routing_decision_log_part_ts; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_routing_decision_log_part_ts ON ONLY public.routing_decision_log USING btree (ts DESC);
 
 
 --
@@ -9782,6 +10371,132 @@ CREATE INDEX request_wal_2026_07_tenant_id_created_at_idx ON public.request_wal_
 
 
 --
+-- Name: routing_decision_log_2026_06_chosen_credential_id_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_06_chosen_credential_id_ts_idx ON public.routing_decision_log_2026_06 USING btree (chosen_credential_id, ts DESC) WHERE (chosen_credential_id IS NOT NULL);
+
+
+--
+-- Name: routing_decision_log_2026_06_model_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_06_model_ts_idx ON public.routing_decision_log_2026_06 USING btree (model, ts DESC);
+
+
+--
+-- Name: routing_decision_log_2026_06_request_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_06_request_id_idx ON public.routing_decision_log_2026_06 USING btree (request_id);
+
+
+--
+-- Name: routing_decision_log_2026_06_success_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_06_success_ts_idx ON public.routing_decision_log_2026_06 USING btree (success, ts DESC);
+
+
+--
+-- Name: routing_decision_log_2026_06_tenant_id_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_06_tenant_id_ts_idx ON public.routing_decision_log_2026_06 USING btree (tenant_id, ts DESC) WHERE (tenant_id IS NOT NULL);
+
+
+--
+-- Name: routing_decision_log_2026_06_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_06_ts_idx ON public.routing_decision_log_2026_06 USING btree (ts DESC);
+
+
+--
+-- Name: routing_decision_log_2026_07_chosen_credential_id_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_07_chosen_credential_id_ts_idx ON public.routing_decision_log_2026_07 USING btree (chosen_credential_id, ts DESC) WHERE (chosen_credential_id IS NOT NULL);
+
+
+--
+-- Name: routing_decision_log_2026_07_model_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_07_model_ts_idx ON public.routing_decision_log_2026_07 USING btree (model, ts DESC);
+
+
+--
+-- Name: routing_decision_log_2026_07_request_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_07_request_id_idx ON public.routing_decision_log_2026_07 USING btree (request_id);
+
+
+--
+-- Name: routing_decision_log_2026_07_success_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_07_success_ts_idx ON public.routing_decision_log_2026_07 USING btree (success, ts DESC);
+
+
+--
+-- Name: routing_decision_log_2026_07_tenant_id_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_07_tenant_id_ts_idx ON public.routing_decision_log_2026_07 USING btree (tenant_id, ts DESC) WHERE (tenant_id IS NOT NULL);
+
+
+--
+-- Name: routing_decision_log_2026_07_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_2026_07_ts_idx ON public.routing_decision_log_2026_07 USING btree (ts DESC);
+
+
+--
+-- Name: routing_decision_log_default_chosen_credential_id_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_default_chosen_credential_id_ts_idx ON public.routing_decision_log_default USING btree (chosen_credential_id, ts DESC) WHERE (chosen_credential_id IS NOT NULL);
+
+
+--
+-- Name: routing_decision_log_default_model_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_default_model_ts_idx ON public.routing_decision_log_default USING btree (model, ts DESC);
+
+
+--
+-- Name: routing_decision_log_default_request_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_default_request_id_idx ON public.routing_decision_log_default USING btree (request_id);
+
+
+--
+-- Name: routing_decision_log_default_success_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_default_success_ts_idx ON public.routing_decision_log_default USING btree (success, ts DESC);
+
+
+--
+-- Name: routing_decision_log_default_tenant_id_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_default_tenant_id_ts_idx ON public.routing_decision_log_default USING btree (tenant_id, ts DESC) WHERE (tenant_id IS NOT NULL);
+
+
+--
+-- Name: routing_decision_log_default_ts_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX routing_decision_log_default_ts_idx ON public.routing_decision_log_default USING btree (ts DESC);
+
+
+--
 -- Name: tool_usage_stats_2026_06_created_at_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9926,6 +10641,27 @@ CREATE INDEX usage_ledger_2026_08_tenant_id_ts_idx ON public.usage_ledger_2026_0
 --
 
 CREATE INDEX usage_ledger_2026_08_ts_idx ON public.usage_ledger_2026_08 USING btree (ts);
+
+
+--
+-- Name: credential_model_index_archiv_credential_id_raw_model_bucke_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_cmi_archive_cred_model ATTACH PARTITION public.credential_model_index_archiv_credential_id_raw_model_bucke_idx;
+
+
+--
+-- Name: credential_model_index_archive_2026_06_bucket_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_cmi_archive_bucket ATTACH PARTITION public.credential_model_index_archive_2026_06_bucket_idx;
+
+
+--
+-- Name: credential_model_index_archive_2026_06_canonical_id_bucket_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_cmi_archive_canonical ATTACH PARTITION public.credential_model_index_archive_2026_06_canonical_id_bucket_idx;
 
 
 --
@@ -10657,6 +11393,132 @@ ALTER INDEX public.idx_wal_tenant_created ATTACH PARTITION public.request_wal_20
 
 
 --
+-- Name: routing_decision_log_2026_06_chosen_credential_id_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_credential ATTACH PARTITION public.routing_decision_log_2026_06_chosen_credential_id_ts_idx;
+
+
+--
+-- Name: routing_decision_log_2026_06_model_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_model ATTACH PARTITION public.routing_decision_log_2026_06_model_ts_idx;
+
+
+--
+-- Name: routing_decision_log_2026_06_request_id_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_request_id ATTACH PARTITION public.routing_decision_log_2026_06_request_id_idx;
+
+
+--
+-- Name: routing_decision_log_2026_06_success_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_success ATTACH PARTITION public.routing_decision_log_2026_06_success_ts_idx;
+
+
+--
+-- Name: routing_decision_log_2026_06_tenant_id_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_tenant_ts ATTACH PARTITION public.routing_decision_log_2026_06_tenant_id_ts_idx;
+
+
+--
+-- Name: routing_decision_log_2026_06_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_ts ATTACH PARTITION public.routing_decision_log_2026_06_ts_idx;
+
+
+--
+-- Name: routing_decision_log_2026_07_chosen_credential_id_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_credential ATTACH PARTITION public.routing_decision_log_2026_07_chosen_credential_id_ts_idx;
+
+
+--
+-- Name: routing_decision_log_2026_07_model_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_model ATTACH PARTITION public.routing_decision_log_2026_07_model_ts_idx;
+
+
+--
+-- Name: routing_decision_log_2026_07_request_id_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_request_id ATTACH PARTITION public.routing_decision_log_2026_07_request_id_idx;
+
+
+--
+-- Name: routing_decision_log_2026_07_success_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_success ATTACH PARTITION public.routing_decision_log_2026_07_success_ts_idx;
+
+
+--
+-- Name: routing_decision_log_2026_07_tenant_id_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_tenant_ts ATTACH PARTITION public.routing_decision_log_2026_07_tenant_id_ts_idx;
+
+
+--
+-- Name: routing_decision_log_2026_07_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_ts ATTACH PARTITION public.routing_decision_log_2026_07_ts_idx;
+
+
+--
+-- Name: routing_decision_log_default_chosen_credential_id_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_credential ATTACH PARTITION public.routing_decision_log_default_chosen_credential_id_ts_idx;
+
+
+--
+-- Name: routing_decision_log_default_model_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_model ATTACH PARTITION public.routing_decision_log_default_model_ts_idx;
+
+
+--
+-- Name: routing_decision_log_default_request_id_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_request_id ATTACH PARTITION public.routing_decision_log_default_request_id_idx;
+
+
+--
+-- Name: routing_decision_log_default_success_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_success ATTACH PARTITION public.routing_decision_log_default_success_ts_idx;
+
+
+--
+-- Name: routing_decision_log_default_tenant_id_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_tenant_ts ATTACH PARTITION public.routing_decision_log_default_tenant_id_ts_idx;
+
+
+--
+-- Name: routing_decision_log_default_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
+--
+
+ALTER INDEX public.idx_routing_decision_log_part_ts ATTACH PARTITION public.routing_decision_log_default_ts_idx;
+
+
+--
 -- Name: tool_usage_stats_2026_06_created_at_idx; Type: INDEX ATTACH; Schema: public; Owner: -
 --
 
@@ -11203,6 +12065,12 @@ CREATE POLICY response_format_anomalies_tenant_isolation ON public.response_form
 
 
 --
+-- Name: routing_decision_log_archive; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.routing_decision_log_archive ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: session_audit_records; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -11316,6 +12184,13 @@ CREATE POLICY tenant_isolation_request_logs ON public.request_logs USING ((tenan
 --
 
 CREATE POLICY tenant_isolation_request_logs_archive ON public.request_logs_archive USING ((tenant_id = public.get_current_tenant()));
+
+
+--
+-- Name: routing_decision_log_archive tenant_isolation_routing_decision_log_archive; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation_routing_decision_log_archive ON public.routing_decision_log_archive USING ((tenant_id = public.get_current_tenant()));
 
 
 --
@@ -11473,5 +12348,5 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict z1UgeCz3VTxcv926OVu2ewGUpN5POHlHJMxLVRoS7GcJAb55BdtOfwaWY9B0Qm4
+\unrestrict 4ey3UQUuyKB95a0ZOSRup1DCQroXHnLJZhA7aKDSzpkTqeL56r6HaeBBbwhY9qo
 

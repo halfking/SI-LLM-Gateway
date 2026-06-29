@@ -2,7 +2,7 @@
 -- Object:   idx_work_type_config_l1
 -- Type:     INDEX
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: idx_work_type_config_l1; Type: INDEX; Schema: public; Owner: -
 --

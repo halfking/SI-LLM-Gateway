@@ -2,7 +2,7 @@
 -- Object:   provider_settings provider_settings_unique_key
 -- Type:     CONSTRAINT
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: provider_settings provider_settings_unique_key; Type: CONSTRAINT; Schema: public; Owner: -
 --

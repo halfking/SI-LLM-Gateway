@@ -2,7 +2,7 @@
 -- Object:   v_suspicious_probe_targets
 -- Type:     VIEW
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: v_suspicious_probe_targets; Type: VIEW; Schema: public; Owner: -
 --

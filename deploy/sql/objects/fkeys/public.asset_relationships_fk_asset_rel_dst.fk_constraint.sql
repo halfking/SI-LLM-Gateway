@@ -2,7 +2,7 @@
 -- Object:   asset_relationships fk_asset_rel_dst
 -- Type:     FK CONSTRAINT
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: asset_relationships fk_asset_rel_dst; Type: FK CONSTRAINT; Schema: public; Owner: -
 --

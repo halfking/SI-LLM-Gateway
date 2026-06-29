@@ -2,7 +2,7 @@
 -- Object:   routing_decision_log
 -- Type:     TABLE
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: routing_decision_log; Type: TABLE; Schema: public; Owner: -
 --
@@ -44,7 +44,8 @@ CREATE TABLE public.routing_decision_log (
     canonical_model text,
     resolution_raw_models jsonb,
     decision_trace jsonb
-);
+)
+PARTITION BY RANGE (ts);
 
 
 --
