@@ -89,3 +89,71 @@ func TestPrepareRequestBody_SkipsStreamOptionsForAnthropic(t *testing.T) {
 		t.Errorf("Anthropic body should keep stream:true, got: %s", string(got))
 	}
 }
+
+// TestExtractOpenAIUsageFromBody_CacheRead covers the 2026-06-30 fix
+// to extractOpenAIUsageFromBody: when upstream reports
+// prompt_tokens_details.cached_tokens (the OpenAI variant of
+// Anthropic's cache_read_input_tokens), the function must surface it
+// in the third return value. Before the fix, this field was dropped
+// and request_logs.cache_read_tokens stayed NULL even for OpenAI
+// cached-prompt calls.
+func TestExtractOpenAIUsageFromBody_CacheRead(t *testing.T) {
+	body := []byte(`{
+		"id": "chatcmpl-1",
+		"object": "chat.completion",
+		"model": "gpt-4o",
+		"choices": [],
+		"usage": {
+			"prompt_tokens": 100,
+			"completion_tokens": 50,
+			"total_tokens": 150,
+			"prompt_tokens_details": {
+				"cached_tokens": 80
+			}
+		}
+	}`)
+	pt, ct, cr, cw := extractOpenAIUsageFromBody(body)
+	if pt == nil || *pt != 100 {
+		t.Errorf("prompt_tokens = %v, want pointer to 100", pt)
+	}
+	if ct == nil || *ct != 50 {
+		t.Errorf("completion_tokens = %v, want pointer to 50", ct)
+	}
+	if cr == nil || *cr != 80 {
+		t.Errorf("cache_read = %v, want pointer to 80", cr)
+	}
+	// OpenAI Chat Completions does not have a public "create cache"
+	// surface, so cache_write stays nil.
+	if cw != nil {
+		t.Errorf("cache_write = %v, want nil for OpenAI", *cw)
+	}
+}
+
+// TestExtractOpenAIUsageFromBody_NoCacheDetails confirms cache_read
+// is nil when the upstream omits prompt_tokens_details.
+func TestExtractOpenAIUsageFromBody_NoCacheDetails(t *testing.T) {
+	body := []byte(`{
+		"id": "chatcmpl-1",
+		"object": "chat.completion",
+		"model": "gpt-4o",
+		"choices": [],
+		"usage": {
+			"prompt_tokens": 100,
+			"completion_tokens": 50,
+			"total_tokens": 150
+		}
+	}`)
+	pt, ct, cr, cw := extractOpenAIUsageFromBody(body)
+	if pt == nil || *pt != 100 {
+		t.Errorf("prompt_tokens = %v, want pointer to 100", pt)
+	}
+	if ct == nil || *ct != 50 {
+		t.Errorf("completion_tokens = %v, want pointer to 50", ct)
+	}
+	if cr != nil {
+		t.Errorf("cache_read = %v, want nil when prompt_tokens_details missing", *cr)
+	}
+	if cw != nil {
+		t.Errorf("cache_write = %v, want nil for OpenAI", *cw)
+	}
+}

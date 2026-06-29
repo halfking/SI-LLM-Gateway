@@ -100,7 +100,7 @@ func (c *ChatExecutor) StreamResponse(w http.ResponseWriter, resp *http.Response
 	return legacyStreamChat(w, resp)
 }
 
-func (c *ChatExecutor) ExtractUsage(resp *http.Response, body []byte) (inputTokens, outputTokens *int) {
+func (c *ChatExecutor) ExtractUsage(resp *http.Response, body []byte) (inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens *int) {
 	return extractOpenAIUsageFromBody(body)
 }
 
@@ -112,18 +112,31 @@ func (c *ChatExecutor) CheckSoftMismatch(reqModel, respModel string) (bool, stri
 }
 
 // extractOpenAIUsageFromBody pulls prompt_tokens / completion_tokens
-// from an OpenAI chat completions response body.
-func extractOpenAIUsageFromBody(body []byte) (*int, *int) {
+// from an OpenAI chat completions response body, plus the cache_read
+// token count when the upstream reports prompt_tokens_details.cached_tokens
+// (the OpenAI variant of Anthropic's cache_read_input_tokens).
+//
+// cacheWriteTokens is always nil for the OpenAI protocol — OpenAI has
+// no public "create cache" surface in chat completions. The fourth
+// return value exists so the signature matches the ProtocolHandler
+// interface that also serves Anthropic.
+func extractOpenAIUsageFromBody(body []byte) (promptTokens, completionTokens, cacheReadTokens, cacheWriteTokens *int) {
 	var v struct {
 		Usage struct {
-			PromptTokens     *int `json:"prompt_tokens"`
-			CompletionTokens *int `json:"completion_tokens"`
+			PromptTokens        *int `json:"prompt_tokens"`
+			CompletionTokens    *int `json:"completion_tokens"`
+			PromptTokensDetails *struct {
+				CachedTokens *int `json:"cached_tokens"`
+			} `json:"prompt_tokens_details"`
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(body, &v); err != nil {
-		return nil, nil
+		return nil, nil, nil, nil
 	}
-	return v.Usage.PromptTokens, v.Usage.CompletionTokens
+	if v.Usage.PromptTokensDetails != nil && v.Usage.PromptTokensDetails.CachedTokens != nil {
+		cacheReadTokens = v.Usage.PromptTokensDetails.CachedTokens
+	}
+	return v.Usage.PromptTokens, v.Usage.CompletionTokens, cacheReadTokens, nil
 }
 
 // legacyStreamChat is a minimal OpenAI stream forwarder. Real stream
