@@ -448,6 +448,47 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ── 2026-06-29 P1 fix: validate model field is non-empty EARLY ──────
+	// Done before the executor/provider check so a request with a missing
+	// or empty "model" field fails fast with 400 missing_model instead of
+	// either:
+	//   (a) 503 executor_unavailable (if executor/provider not configured) — confusing
+	//   (b) 503 no_candidate (if executor runs but finds nothing for "") — misleading
+	// The OpenAI / Anthropic / Responses APIs all require a model and treat
+	// a missing one as a client bug; we should too. The Anthropic
+	// (relay/messages.go:243) and Responses (relay/responses.go:217)
+	// handlers already do this; only the chat handler was missing it
+	// (caught by prod_e2e/F2).
+	// We need to peek at the body to validate, so we do a one-shot read.
+	// The executor will re-read the body via io.NopCloser+Reset below;
+	// ensure we don't consume the original body twice.
+	if r.Body != nil {
+		// Save body bytes for re-read. logCtx.Body is set further down for
+		// audit, but here we read & re-buffer it for the main pipeline.
+		var peekBuf []byte
+		peekBuf, _ = io.ReadAll(r.Body)
+		if len(peekBuf) > 0 {
+			r.Body = io.NopCloser(bytes.NewReader(peekBuf))
+		}
+		if len(peekBuf) > 0 && len(peekBuf) <= maxBodySize {
+			var peek struct {
+				Model string `json:"model"`
+			}
+			if json.Unmarshal(peekBuf, &peek) == nil && strings.TrimSpace(peek.Model) == "" {
+				logCtx.SetError("missing_model", "model is required")
+				logCtx.EnsureCaptured()
+				if logCtx.ClientModel == "" {
+					logCtx.SetClientModel("<unset>")
+				}
+				logCtx.EmitFailure("missing_model", "model is required", nil, nil)
+				logCtx.MarkLogged()
+				writeErrorJSON(w, http.StatusBadRequest, requestID,
+					"model is required", "invalid_request", "missing_model")
+				return
+			}
+		}
+	}
+
 	if h.executor != nil && h.provider != nil && h.provider.Enabled() {
 		h.serveWithExecutor(w, r, logCtx)
 		return
@@ -799,6 +840,24 @@ func (h *ChatHandler) serveWithExecutor(
 
 	clientModel := reqBody.Model
 	logCtx.SetClientModel(clientModel)
+
+	// ── 2026-06-29 P1 fix: validate model field is non-empty ────────────
+	// Before this fix, a request with a missing/empty "model" field was
+	// allowed to proceed to routing, where loadCandidatesDB returned no
+	// candidates for "" and the client received a misleading 503
+	// "no_candidate" error. The OpenAI / Anthropic / Responses APIs all
+	// require a model and treat a missing one as a client bug — we should
+	// too. The Anthropic (relay/messages.go:243) and Responses
+	// (relay/responses.go:217) handlers already do this; only the chat
+	// handler was missing it (caught by prod_e2e/F2).
+	if strings.TrimSpace(clientModel) == "" {
+		logCtx.SetError("missing_model", "model is required")
+		logCtx.EmitFailure("missing_model", "model is required", nil, nil)
+		logCtx.MarkLogged()
+		writeErrorJSON(w, http.StatusBadRequest, requestID,
+			"model is required", "invalid_request", "missing_model")
+		return
+	}
 
 	// ── Session resolution (deferred from header parsing) ──────────────
 	// If client didn't provide a session ID, resolve it now based on message count.
