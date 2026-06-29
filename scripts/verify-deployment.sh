@@ -5,7 +5,7 @@
 #   ./scripts/verify-deployment.sh <server-ip> <api-key>
 #
 # 示例：
-#   ./scripts/verify-deployment.sh 192.168.1.71 sk-test-xxx
+#   ./scripts/verify-deployment.sh 192.168.1.[SERVER_IP] sk-test-xxx
 
 set -euo pipefail
 

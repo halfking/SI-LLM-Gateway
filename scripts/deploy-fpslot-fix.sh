@@ -10,8 +10,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-REDIS_HOST="${REDIS_HOST:-172.31.0.4}"
-DB_HOST="${DB_HOST:-184}"
+REDIS_HOST="${REDIS_HOST:-[INTERNAL_DB_HOST]}"
+DB_HOST="${DB_HOST:-[SERVER]}"
 
 echo "========================================"
 echo "minimax-prod-1 fp_slot 问题修复部署"
@@ -99,32 +99,32 @@ else
     echo "⊘ 跳过数据库更新"
 fi
 
-# 6. 部署到 71 机器
+# 6. 部署到 [SERVER] 机器
 echo ""
-echo "=== 6. 部署到 71 机器 ==="
-read -p "是否部署到 71 机器 (llm.kxpms.cn)？(y/n) " -n 1 -r
+echo "=== 6. 部署到 [SERVER] 机器 ==="
+read -p "是否部署到 [SERVER] 机器 ([PROD_DOMAIN])？(y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "停止服务..."
-    ssh root@llm.kxpms.cn 'systemctl stop llm-gateway'
+    ssh root@[PROD_DOMAIN] 'systemctl stop llm-gateway'
     
     echo "备份当前二进制文件..."
-    ssh root@llm.kxpms.cn 'cp /opt/llm-gateway-go/llm-gateway /opt/llm-gateway-go/llm-gateway.backup-$(date +%Y%m%d-%H%M%S)'
+    ssh root@[PROD_DOMAIN] 'cp /opt/llm-gateway-go/llm-gateway /opt/llm-gateway-go/llm-gateway.backup-$(date +%Y%m%d-%H%M%S)'
     
     echo "上传新版本..."
-    scp "$NEW_BINARY" root@llm.kxpms.cn:/opt/llm-gateway-go/llm-gateway
+    scp "$NEW_BINARY" root@[PROD_DOMAIN]:/opt/llm-gateway-go/llm-gateway
     
     echo "启动服务..."
-    ssh root@llm.kxpms.cn 'systemctl start llm-gateway'
+    ssh root@[PROD_DOMAIN] 'systemctl start llm-gateway'
     
     sleep 3
     
     echo "检查服务状态..."
-    if ssh root@llm.kxpms.cn 'systemctl is-active llm-gateway'; then
+    if ssh root@[PROD_DOMAIN] 'systemctl is-active llm-gateway'; then
         echo "✓ 服务已启动"
     else
         echo "✗ 服务启动失败"
-        ssh root@llm.kxpms.cn 'journalctl -u llm-gateway -n 50 --no-pager'
+        ssh root@[PROD_DOMAIN] 'journalctl -u llm-gateway -n 50 --no-pager'
         exit 1
     fi
 else
@@ -173,7 +173,7 @@ fi
 # 8. 查看最近日志
 echo ""
 echo "=== 8. 最近 50 条相关日志 ==="
-ssh root@llm.kxpms.cn 'journalctl -u llm-gateway -n 50 --no-pager' | grep -E "cred_fp_slot|minimax-m3" | tail -20 || true
+ssh root@[PROD_DOMAIN] 'journalctl -u llm-gateway -n 50 --no-pager' | grep -E "cred_fp_slot|minimax-m3" | tail -20 || true
 
 # 9. 生成部署报告
 echo ""
@@ -185,7 +185,7 @@ minimax-prod-1 fp_slot 问题修复部署报告
 生成时间: $(date)
 
 1. Git 标签: $DEPLOY_TAG
-   回滚命令: git checkout $DEPLOY_TAG && make build && scp llm-gateway-linux-amd64 root@llm.kxpms.cn:/opt/llm-gateway-go/llm-gateway
+   回滚命令: git checkout $DEPLOY_TAG && make build && scp llm-gateway-linux-amd64 root@[PROD_DOMAIN]:/opt/llm-gateway-go/llm-gateway
 
 2. 代码修改:
    - credentialfpslot/slot.go: 添加 holder 共享快速路径
@@ -201,7 +201,7 @@ minimax-prod-1 fp_slot 问题修复部署报告
 
 5. 监控建议:
    - 持续观察失败率（目标：从 52% 降至 < 5%）
-   - 监控命令: watch -n 5 'curl -s http://llm.kxpms.cn/api/credentials/monitor-summary | jq ".credentials[] | select(.id==6)"'
+   - 监控命令: watch -n 5 'curl -s http://[PROD_DOMAIN]/api/credentials/monitor-summary | jq ".credentials[] | select(.id==6)"'
    
 6. 诊断脚本:
    - Redis 诊断: $SCRIPT_DIR/diagnose-fpslot-issue.sh
@@ -211,8 +211,8 @@ minimax-prod-1 fp_slot 问题修复部署报告
    a. 数据库: UPDATE credentials SET fp_slot_limit = 25 WHERE id = 6;
    b. 代码: git checkout <previous-tag>
    c. 构建: make build
-   d. 部署: scp llm-gateway-linux-amd64 root@llm.kxpms.cn:/opt/llm-gateway-go/llm-gateway
-   e. 重启: ssh root@llm.kxpms.cn systemctl restart llm-gateway
+   d. 部署: scp llm-gateway-linux-amd64 root@[PROD_DOMAIN]:/opt/llm-gateway-go/llm-gateway
+   e. 重启: ssh root@[PROD_DOMAIN] systemctl restart llm-gateway
 EOF
 
 cat /tmp/fpslot-deploy-report.txt

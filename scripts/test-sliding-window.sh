@@ -3,7 +3,7 @@
 
 set -e
 
-API_BASE="https://llmgo.kxpms.cn"
+API_BASE="https://[GATEWAY_DOMAIN]"
 ADMIN_TOKEN="${ADMIN_TOKEN:-your_admin_token_here}"
 
 echo "=== Testing Sliding Window API ==="
@@ -48,7 +48,7 @@ fi
 # Test 2: Check credential_model_bindings state
 echo ""
 echo "2. Checking credential_model_bindings state..."
-echo "   (Run this SQL on 184:)"
+echo "   ((Run this SQL on [SERVER]:))"
 echo ""
 cat << 'SQL'
 SELECT 
@@ -73,5 +73,5 @@ echo ""
 # Test 3: Check Redis sliding window data
 echo "4. Checking Redis sliding window key..."
 echo "   Redis key: llmgw:callhist:${CREDENTIAL_ID}:${MODEL}"
-echo "   (Run on 184:)"
+echo "   ((Run on [SERVER]:))"
 echo "   redis-cli LRANGE llmgw:callhist:${CREDENTIAL_ID}:${MODEL} 0 49"

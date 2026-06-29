@@ -112,7 +112,7 @@ offer_id,unit_price_in_per_1m,unit_price_out_per_1m,cache_read_price_per_1m,cach
 177,3.0,15.0,,,USD,token,tier1_or_official_forwarded
 178,2.0,8.0,,,USD,token,tier1_or_official_forwarded
 179,0.435,0.87,,,CNY,token,tier1_or_official_forwarded
-184,0.5,0.8,,,USD,token,tier1_or_official_forwarded
+[SERVER],0.5,0.8,,,USD,token,tier1_or_official_forwarded
 185,0.05,0.05,,,USD,token,tier1_or_official_forwarded
 186,0.8,2.0,,,CNY,token,tier1_or_official_forwarded
 187,0.3,1.2,,,USD,token,tier1_or_official_forwarded

@@ -18,7 +18,7 @@
     <div class="section">
         <h2>1. 配置</h2>
         <label>API Base URL: 
-            <input type="text" id="baseUrl" value="https://llm.kxpms.cn" />
+            <input type="text" id="baseUrl" value="https://[PROD_DOMAIN]" />
         </label><br/>
         <label>Auth Token (可选): 
             <input type="text" id="authToken" placeholder="Bearer token or leave empty" />
@@ -205,7 +205,7 @@
                 <h4>在服务器上执行以下命令：</h4>
                 <pre>
 # 检查最近 24 小时的数据
-docker exec r112_postgres psql -U kxuser -d llm_gateway -c "
+docker exec r112_postgres psql -U [DB_USER] -d llm_gateway -c "
 SELECT 
     COUNT(*) AS total_24h,
     MIN(ts) AS earliest,
@@ -215,7 +215,7 @@ WHERE ts > now() - interval '24 hours';
 "
 
 # 查看最近 10 条记录
-docker exec r112_postgres psql -U kxuser -d llm_gateway -c "
+docker exec r112_postgres psql -U [DB_USER] -d llm_gateway -c "
 SELECT 
     to_char(ts, 'YYYY-MM-DD HH24:MI:SS') AS time,
     client_model,
@@ -242,10 +242,10 @@ LIMIT 10;
     <div class="section">
         <h2>使用说明</h2>
         <ol>
-            <li>确认 API Base URL 是否正确（默认 https://llm.kxpms.cn）</li>
+            <li>确认 API Base URL 是否正确（默认 https://[PROD_DOMAIN]）</li>
             <li>获取 Auth Token：
                 <ul>
-                    <li>方法 1: 在浏览器访问 https://llm.kxpms.cn，F12 打开 DevTools → Application → Cookies，找到 auth token</li>
+                    <li>方法 1: 在浏览器访问 https://[PROD_DOMAIN]，F12 打开 DevTools → Application → Cookies，找到 auth token</li>
                     <li>方法 2: 使用登录 API 获取 token</li>
                 </ul>
             </li>

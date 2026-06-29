@@ -1,8 +1,8 @@
 #!/bin/bash
-# deploy-to-71.sh — 2026-06-29 会话管理修复部署脚本
+# deploy-to-target-server.sh — 2026-06-29 会话管理修复部署脚本
 # 
 # 用法：
-#   ./scripts/deploy-to-71.sh [--skip-tests] [--dry-run]
+#   ./scripts/deploy-to-target-server.sh [--skip-tests] [--dry-run]
 #
 # 选项：
 #   --skip-tests    跳过测试（不推荐，仅用于紧急修复）
@@ -79,12 +79,12 @@ BINARY_NAME="llm-gateway-$(git rev-parse --short HEAD)"
 log "✓ 编译完成: $BINARY_NAME"
 
 # 3. 上传到服务器
-log "上传二进制到服务器 71 (${SERVER_71_IP})..."
+log "上传二进制到服务器 [SERVER] (${SERVER_71_IP})..."
 run_cmd "$SCP_CMD $BINARY_NAME ${SERVER_71}:${REMOTE_DIR}/"
 log "✓ 上传完成"
 
 # 4. 远程部署
-log "在服务器 71 上执行部署..."
+log "在服务器 [SERVER] 上执行部署..."
 
 REMOTE_SCRIPT=$(cat <<'EOF'
 set -euo pipefail
@@ -150,7 +150,7 @@ EOF
 )
 
 if [ "$DRY_RUN" = true ]; then
-  echo "[DRY-RUN] 将在服务器 71 上执行远程部署脚本"
+  echo "[DRY-RUN] 将在服务器 [SERVER] 上执行远程部署脚本"
   echo "$REMOTE_SCRIPT"
 else
   $SSH_CMD "$SERVER_71" "bash -s" "$BINARY_NAME" "$REMOTE_DIR" "$SERVICE_NAME" <<< "$REMOTE_SCRIPT"

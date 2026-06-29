@@ -1,6 +1,6 @@
 # Incremental build: only replace binary and web assets
-# Use an existing runtime image on 184 as base (has all system deps).
-ARG BASE_IMAGE=kx-llm-gateway-go:latest
+# Use an existing runtime image on [SERVER] as base (has all system deps).
+ARG BASE_IMAGE=[IMAGE_NAME]:latest
 FROM ${BASE_IMAGE}
 
 # Stage new binary and web assets from build context
@@ -22,7 +22,7 @@ RUN cp /tmp/llm-gateway-go-new /usr/local/bin/llm-gateway-go && \
     cp /tmp/version-files/VERSION /opt/llm-gateway-go/VERSION && \
     cp /tmp/version-files/.deploy_seq /opt/llm-gateway-go/.deploy_seq && \
     chown 1001:1001 /opt/llm-gateway-go/VERSION /opt/llm-gateway-go/.deploy_seq && \
-    # Also stamp at root so scripts/deploy-llm-gateway-go-184.sh verify_version
+    # Also stamp at root so scripts/deploy-llm-gateway-go-[SERVER].sh verify_version
     # check (`cat /.deploy_seq`) sees the fresh build seq, not the base
     # image's stale value. Without this the post-deploy fatal fires even
     # when the runtime API /api/system/version returns the correct seq.

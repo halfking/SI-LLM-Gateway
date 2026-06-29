@@ -4,7 +4,7 @@
 
 set -e
 
-SERVER="${1:-root@llm.kxpms.cn}"
+SERVER="${1:-root@[PROD_DOMAIN]}"
 REMOTE_PATH="/opt/llm-gateway-go"
 
 echo "=========================================="
@@ -18,8 +18,8 @@ echo ""
 CURRENT_BRANCH=$(git branch --show-current)
 echo "当前分支: $CURRENT_BRANCH"
 
-if [ "$CURRENT_BRANCH" != "server-71" ]; then
-    echo "⚠️  警告: 当前不在 server-71 分支"
+if [ "$CURRENT_BRANCH" != "target-server" ]; then
+    echo "⚠️  警告: 当前不在 target-server 分支"
     read -p "是否继续? (y/N) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -83,7 +83,7 @@ echo ""
 echo "运行健康检查..."
 sleep 2
 
-curl -s http://llm.kxpms.cn/healthz || echo "⚠️  健康检查失败"
+curl -s http://[PROD_DOMAIN]/healthz || echo "⚠️  健康检查失败"
 
 echo ""
 echo "=========================================="

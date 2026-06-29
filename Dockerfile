@@ -1,5 +1,5 @@
 # Multi-stage build for llm-gateway-go data plane
-# Build with: docker build -t kx-llm-gateway-go:latest .
+# Build with: docker build -t [IMAGE_NAME]:latest .
 #
 # This Dockerfile is self-contained: the builder stage compiles the Go
 # binary AND builds the Vue SPA from source. The resulting image is
@@ -7,7 +7,7 @@
 # build context.
 
 # ── Build stage ──────────────────────────────────────────────────────────────
-FROM --platform=linux/amd64 registry.kxpms.cn/kx-base:go-vue AS builder
+FROM --platform=linux/amd64 [REGISTRY_DOMAIN]/kx-base:go-vue AS builder
 
 # Defensive: kx-base:go-vue already provides git/ca-certificates, nodejs + npm.
 # Verify availability; fail fast if any are missing.
@@ -48,11 +48,11 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto \
 # 2026-06-22 T14: switched from kx-base:go-vue-amd64 (1.09GB Debian) to
 # kx-base:go-vue-alpine-slim-runtime (15.6MB alpine 3.20). Runtime only
 # needs ca-certs + tzdata + non-root appuser; no Go SDK / nodejs / pip
-# packages (those are build-time only). 预估 kx-llm-gateway-go 镜像
+# packages (those are build-time only). 预估 [IMAGE_NAME] 镜像
 # 2.14GB → ~0.95GB (-55%).
 # Builder stage (above) still uses kx-base:go-vue for Go toolchain
 # compatibility (Q2 decision: only swap runtime, keep builder).
-FROM --platform=linux/amd64 registry.kxpms.cn/kx-base:go-vue-alpine-slim-runtime
+FROM --platform=linux/amd64 [REGISTRY_DOMAIN]/kx-base:go-vue-alpine-slim-runtime
 
 ARG GIT_TAG=""
 ARG GIT_SHA=""

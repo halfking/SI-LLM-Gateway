@@ -1,6 +1,6 @@
 #!/bin/bash
 # 自动化部署脚本 - minimax-prod-1 fp_slot 问题修复
-# 用法：./deploy-to-71-fpslot-fix.sh
+# 用法：./deploy-to-target-server-fpslot-fix.sh
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ echo ""
 # 配置
 PROJECT_ROOT="/Users/xutaohuang/workspace/llm-gateway-go-2"
 BINARY_NAME="llm-gateway-fpslot-fix-20260629-181208"
-SERVER_71="root@llm.kxpms.cn"
+SERVER_71="root@[PROD_DOMAIN]"
 REMOTE_DIR="/opt/llm-gateway-go"
 SERVICE_NAME="llm-gateway"
 
@@ -45,7 +45,7 @@ log_info "✓ 二进制文件存在 ($(ls -lh $BINARY_NAME | awk '{print $5}'))"
 
 # 2. 确认部署
 echo ""
-echo "即将部署到 71 机器 (llm.kxpms.cn)"
+echo "即将部署到 [SERVER] 机器 ([PROD_DOMAIN])"
 echo "二进制文件: $BINARY_NAME"
 echo "Git 标签: deploy/fix-fpslot-sharing-20260629-181208"
 echo ""
@@ -57,7 +57,7 @@ if [ "$confirm" != "yes" ]; then
 fi
 
 # 3. 上传二进制文件
-log_info "上传二进制文件到 71 机器..."
+log_info "上传二进制文件到 [SERVER] 机器..."
 scp "$BINARY_NAME" "${SERVER_71}:${REMOTE_DIR}/" || {
     log_error "上传失败"
     exit 1
@@ -176,7 +176,7 @@ minimax-prod-1 fp_slot 修复部署报告
 生成时间: $(date)
 
 1. 部署信息:
-   - 目标机器: 71 (llm.kxpms.cn)
+   - 目标机器: [SERVER] ([PROD_DOMAIN])
    - 二进制文件: $BINARY_NAME
    - Git 标签: deploy/fix-fpslot-sharing-20260629-181208
    - 部署时间: $(date)
@@ -187,7 +187,7 @@ minimax-prod-1 fp_slot 修复部署报告
 
 3. 下一步验证:
    a. 监控失败率（持续 1 小时）:
-      watch -n 10 'curl -s http://llm.kxpms.cn/api/credentials/monitor-summary | jq ".credentials[] | select(.id==6) | {label, aggregated_success_rate}"'
+      watch -n 10 'curl -s http://[PROD_DOMAIN]/api/credentials/monitor-summary | jq ".credentials[] | select(.id==6) | {label, aggregated_success_rate}"'
    
    b. 检查 Redis slot 使用:
       cd $PROJECT_ROOT && ./scripts/diagnose-fpslot-issue.sh
@@ -205,7 +205,7 @@ minimax-prod-1 fp_slot 修复部署报告
 5. 数据库配置:
    ⚠️  记得执行数据库更新（如未执行）:
    
-   ssh root@<184-host>
+   (ssh root@<[SERVER]-host>)
    psql -U postgres -d llm_gateway << 'SQL'
    UPDATE credentials SET fp_slot_limit = 5 WHERE id = 6;
    SQL

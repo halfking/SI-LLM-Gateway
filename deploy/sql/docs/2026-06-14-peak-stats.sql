@@ -1,7 +1,7 @@
 -- 2026-06-14-peak-stats.sql
 -- Per-credential-model peak concurrency tracking + weekly aggregation + auto-tune audit.
 -- Apply via:
---   kubectl -n pms-test exec -i deploy/postgres-deployment -- psql -U kxuser -d kaixuan < 2026-06-14-peak-stats.sql
+--   kubectl -n pms-test exec -i deploy/postgres-deployment -- psql -U [DB_USER] -d kaixuan < 2026-06-14-peak-stats.sql
 
 -- 1. Per-minute peak concurrent requests (TimescaleDB hypertable)
 CREATE TABLE IF NOT EXISTS credential_model_peak_1m (

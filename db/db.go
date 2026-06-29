@@ -193,7 +193,7 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 		    -- 2026-06-26: client-provided X-Request-Id is preserved here
 		    -- for debug / cross-system tracing. Mirror of submodule's
 		    -- db/db.go change so the schema is identical across both
-		    -- build paths (184 k3s submodule + 71 host-docker fork).
+		    -- build paths ([SERVER] k3s submodule + [SERVER] host-docker fork).
 		    -- See db/migrations/054_request_logs_client_request_id.sql.
 		    ADD COLUMN IF NOT EXISTS client_request_id TEXT;
 		CREATE INDEX IF NOT EXISTS idx_request_logs_gw_session_ts
@@ -1188,7 +1188,7 @@ func (d *DB) ensureCredentialColumns(ctx context.Context) error {
 
 		-- 033: credential_model_call_history (sliding window for the
 		-- credential monitor UI; consumed by CallHistoryAggregator)
-		-- 🆕 2026-06-23 真实表 schema (从 71 llm-pg-71 docker 内 psql 远程验证):
+		-- 🆕 2026-06-23 真实表 schema (从 [SERVER] llm-pg-71 docker 内 psql 远程验证):
 		--   credential_id, raw_model, window_start, total_calls, success_calls,
 		--   failed_calls, avg_latency_ms, p95_latency_ms, p99_latency_ms, ...
 		-- 老 schema (raw_model_name + ts per-call) 是 design 错位, 已不创建
@@ -1247,7 +1247,7 @@ func (d *DB) ensureCredentialColumns(ctx context.Context) error {
 // check, CHECK via pg_constraint check).
 //
 // Runs at startup via ensureSchema so every gateway instance
-// (184 k3s + 71 host docker) converges on the same schema without
+// ([SERVER] k3s + [SERVER] host docker) converges on the same schema without
 // needing a separate migration runner.
 func (d *DB) ensureFpSlotLimit(ctx context.Context) error {
 	if d == nil || d.pool == nil {
