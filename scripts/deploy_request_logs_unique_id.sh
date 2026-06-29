@@ -24,7 +24,7 @@
 #   DRY_RUN=1 ./scripts/deploy_request_logs_unique_id.sh
 #
 # Required env:
-#   LLM_GATEWAY_DATABASE_URL  — Postgres URL, e.g. postgres://user:pass@host:5432/db?sslmode=disable
+#   LLM_GATEWAY_DATABASE_URL  — Postgres URL, e.g. postgres://user:[REDACTED_PASSWORD]@host:5432/db?sslmode=disable
 #
 # Optional env:
 #   PG_HOST, PG_PORT, PG_USER, PG_PASSWORD, PG_DATABASE — alternative connection params
@@ -62,7 +62,7 @@ elif [[ -n "${PG_HOST:-}" ]]; then
 else
     echo "${LOG_PREFIX} ERROR: Set LLM_GATEWAY_DATABASE_URL or PG_HOST/PG_USER/PG_PASSWORD/PG_DATABASE" >&2
     echo "${LOG_PREFIX} Example:" >&2
-    echo "  LLM_GATEWAY_DATABASE_URL=postgres://user:pass@host:5432/llm_gateway?sslmode=disable \\" >&2
+    echo "  LLM_GATEWAY_DATABASE_URL=postgres://user:[REDACTED_PASSWORD]@host:5432/llm_gateway?sslmode=disable \\" >&2
     echo "    $0" >&2
     exit 2
 fi

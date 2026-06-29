@@ -5,7 +5,7 @@
 set -e
 
 MODEL="${1:-minimax-m3}"
-DB_URL="${LLM_GATEWAY_DATABASE_URL:-postgresql://postgres:Kaixuan2023@192.168.1.184:5432/llm_gateway_production?sslmode=disable}"
+DB_URL="${LLM_GATEWAY_DATABASE_URL:-postgresql://postgres:[REDACTED_PASSWORD]@192.168.1.[SERVER_IP]:5432/llm_gateway_production?sslmode=disable}"
 
 echo "=========================================="
 echo "LLM Gateway 路由诊断工具"

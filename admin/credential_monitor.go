@@ -274,7 +274,7 @@ func (m *CredentialMonitorHandlers) handleMonitorSummary(w http.ResponseWriter, 
 						  AND latency_ms IS NOT NULL
 					) live ON true
 					-- 🆕 2026-06-23: last_used + total_calls (24h credential_model_call_history).
-					-- 184 host system postgres 真实表 schema (2026-06-24 实查, migration 033):
+					-- [SERVER] host system postgres 真实表 schema (2026-06-24 实查, migration 033):
 					--   credential_id, raw_model, window_start, total_calls, success_calls,
 					--   failed_calls, avg_latency_ms, p95_latency_ms, p99_latency_ms,
 					--   error_rate_limit_count, error_quota_count, error_concurrent_count,

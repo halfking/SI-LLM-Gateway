@@ -234,7 +234,7 @@ var acquisitionMethods = []map[string]any{
 	{
 		"mode":      "signup",
 		"title":     "官方注册 + 环境变量",
-		"summary":   "在厂商控制台完成新手注册，将 API Key 写入 71 的 config/free-pool.env，由定时任务或「导入环境变量 Key」注入池子。",
+		"summary":   "在厂商控制台完成新手注册，将 API Key 写入 [SERVER] 的 config/free-pool.env，由定时任务或「导入环境变量 Key」注入池子。",
 		"steps":     []string{"在模板目录点击「注册」完成厂商 signup", "将 Key 写入 /opt/llm-gateway/config/free-pool.env（如 OPENROUTER_API_KEY=sk-...）", "重启 llm-gateway 或 POST /api/free-pool/import-env"},
 		"risk":      "low",
 		"automated": true,
@@ -626,15 +626,15 @@ var (
 		"localhost":      true,
 		"127.0.0.1":      true,
 		"0.0.0.0":        true,
-		"llm.kxpms.cn":   true,
-		"auth.kxpms.cn":  true,
-		"acc.kxpms.cn":   true,
-		"mcp.kxpms.cn":   true,
+		"[PROD_DOMAIN]":   true,
+		"[AUTH_DOMAIN]":  true,
+		"[ACC_DOMAIN]":   true,
+		"[MCP_DOMAIN]":   true,
 	}
 	probePrivateNets = []*net.IPNet{
 		mustCIDR("10.0.0.0/8"),
 		mustCIDR("172.16.0.0/12"),
-		mustCIDR("192.168.0.0/16"),
+		mustCIDR("192.168.[NETWORK].[HOST]/16"),
 		mustCIDR("127.0.0.0/8"),
 	}
 )

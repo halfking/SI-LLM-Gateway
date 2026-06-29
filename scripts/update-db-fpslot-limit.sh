@@ -1,6 +1,6 @@
 #!/bin/bash
-# 数据库配置更新脚本 - 在 184 机器上执行
-# 用法：在 184 机器上运行此脚本
+# 数据库配置更新脚本 - 在 [SERVER] 机器上执行
+# 用法：在 [SERVER] 机器上运行此脚本
 
 set -euo pipefail
 
@@ -84,7 +84,7 @@ if [ $? -eq 0 ]; then
     echo ""
     log_info "fp_slot_limit 已从 25 更新为 5"
     echo ""
-    log_warn "接下来请部署 71 机器的二进制文件"
+    log_warn "接下来请部署 [SERVER] 机器的二进制文件"
 else
     log_warn "✗ 数据库配置更新失败"
     exit 1

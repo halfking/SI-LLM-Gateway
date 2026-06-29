@@ -1,16 +1,16 @@
 #!/bin/bash
-# Request Logs 诊断脚本 - 仅在生产环境 71 上运行
+# Request Logs 诊断脚本 - 仅在生产环境 [SERVER] 上运行
 
 set -e
 
 echo "=========================================="
-echo "Request Logs 诊断 - 生产环境 71"
+echo "Request Logs 诊断 - 生产环境 [SERVER]"
 echo "=========================================="
 echo ""
 
 # 配置
 DB_CONTAINER="r112_postgres"  # 根据实际容器名修改
-DB_USER="kxuser"
+DB_USER="[DB_USER]"
 DB_NAME="llm_gateway"
 
 echo "1️⃣  检查数据库中的 request_logs"
@@ -177,7 +177,7 @@ echo "4. 如果是 tenant_admin，request_logs 的 tenant_id 是否匹配？"
 echo ""
 echo "下一步："
 echo "1. 如果数据库有数据但前端看不到，请测试 API："
-echo "   curl https://llm.kxpms.cn/api/logs -H 'Authorization: Bearer YOUR_TOKEN'"
+echo "   curl https://[PROD_DOMAIN]/api/logs -H 'Authorization: Bearer YOUR_TOKEN'"
 echo ""
 echo "2. 如果 API 也返回空，检查浏览器 DevTools Network 标签"
 echo "   查看实际的请求参数（特别是 from/to 时间范围）"

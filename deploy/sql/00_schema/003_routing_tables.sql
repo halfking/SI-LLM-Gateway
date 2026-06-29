@@ -1,6 +1,6 @@
 -- ============================================================================
 -- llm-gateway-go 路由相关表结构
--- Source of truth: 184 / llm_gateway / pg_dump --schema-only (2026-06-27)
+-- Source of truth: [SERVER] / llm_gateway / pg_dump --schema-only (2026-06-27)
 -- 说明:
 --   1. 本文件保留真实表结构、约束、索引
 --   2. 不包含依赖额外业务函数的非关键触发器，避免初始化阶段失败

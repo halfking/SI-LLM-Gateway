@@ -22,7 +22,7 @@ import (
 // empty_response after the 2026-06-26 fix.
 //
 // To run:
-//   export LLM_GATEWAY_PG_URL="postgres://user:pass@host:5432/llm_gateway?sslmode=disable"
+//   export LLM_GATEWAY_PG_URL="postgres://user:[REDACTED_PASSWORD]@host:5432/llm_gateway?sslmode=disable"
 //   go test -tags=integration ./tests/integration -v -run TestEmptyResponseAudit
 func TestEmptyResponseAudit_ToolCallNotMisclassified(t *testing.T) {
 	if testing.Short() {

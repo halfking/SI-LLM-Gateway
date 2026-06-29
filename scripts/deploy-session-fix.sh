@@ -1,8 +1,8 @@
 #!/bin/bash
-# 部署 V2.2.9-session-fix 到 71 服务器
+# 部署 V2.2.9-session-fix 到 [SERVER] 服务器
 set -euo pipefail
 
-SERVER="root@llm.kxpms.cn"
+SERVER="root@[PROD_DOMAIN]"
 REMOTE_PATH="/opt/llm-gateway-go"
 VERSION="V2.2.9-session-fix"
 BINARY_NAME="llm-gateway-${VERSION}"
@@ -12,7 +12,7 @@ log() {
 }
 
 log "=========================================="
-log "部署 ${VERSION} 到 71 服务器"
+log "部署 ${VERSION} 到 [SERVER] 服务器"
 log "=========================================="
 
 # 1. 检查本地二进制是否存在

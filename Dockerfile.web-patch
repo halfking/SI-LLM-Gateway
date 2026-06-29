@@ -1,5 +1,5 @@
 # Frontend-only patch: layer new web/dist onto an existing runtime image.
-ARG BASE_IMAGE=kx-llm-gateway-go:latest
+ARG BASE_IMAGE=[IMAGE_NAME]:latest
 FROM ${BASE_IMAGE}
 
 ARG GIT_TAG=""

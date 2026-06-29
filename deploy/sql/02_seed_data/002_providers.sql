@@ -1,6 +1,6 @@
 -- ============================================================================
 -- llm-gateway-go 提供商初始化数据
--- Source: 184 / providers (sanitized)
+-- Source: [SERVER] / providers (sanitized)
 -- 说明:
 --   1. 仅保留 default 租户下的标准 provider 配置
 --   2. 不包含 credentials / api_keys / 自定义业务 provider

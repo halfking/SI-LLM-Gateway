@@ -1,21 +1,21 @@
 #!/bin/bash
-# 71 服务器路由和请求记录诊断脚本
+# [SERVER] 服务器路由和请求记录诊断脚本
 # 日期: 2026-06-26
 # 目的: 诊断路由问题和 empty_response 问题
 
 set -e
 
 echo "=========================================="
-echo "71 服务器路由诊断"
+echo "[SERVER] 服务器路由诊断"
 echo "日期: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "=========================================="
 echo ""
 
 # 配置
-API_BASE="https://llm.kxpms.cn"
+API_BASE="https://[PROD_DOMAIN]"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
-DB_USER="${DB_USER:-kxuser}"
+DB_USER="${DB_USER:-[DB_USER]}"
 DB_NAME="${DB_NAME:-llm_gateway}"
 
 # 颜色输出

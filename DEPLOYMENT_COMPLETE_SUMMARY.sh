@@ -33,7 +33,7 @@ cat << 'EOF'
 ✅ 3. Git 提交和推送
    ├─ Commit: fdb9a9bd
    ├─ Message: fix(telemetry): revert ON CONFLICT to (request_id, ts)
-   └─ 推送到: origin/server-71 ✅
+   └─ 推送到: origin/target-server ✅
 
 ✅ 4. 部署工具准备
    ├─ deploy_p0_hotfix.sh       (9.2K) - 自动化部署脚本
@@ -52,12 +52,12 @@ cat << 'EOF'
 
 当前运行的容器:
   名称: optimistic_chandrasekhar
-  镜像: kx-llm-gateway-go:seq-705
+  镜像: [IMAGE_NAME]:seq-705
   状态: Up 9 hours
   端口: 8781/tcp
 
 建议的部署步骤:
-  1. 构建新镜像: docker build -t kx-llm-gateway-go:p0-hotfix-fdb9a9bd .
+  1. 构建新镜像: docker build -t [IMAGE_NAME]:p0-hotfix-fdb9a9bd .
   2. 备份当前容器: docker rename optimistic_chandrasekhar optimistic_chandrasekhar-backup
   3. 启动新容器（使用相同的配置和环境变量）
   4. 验证写入功能: ./verify_p0_hotfix.sh
@@ -102,7 +102,7 @@ cat << 'EOF'
 ────────────────────────────────────────
 
 # 1. 构建新镜像
-docker build -t kx-llm-gateway-go:p0-hotfix-fdb9a9bd .
+docker build -t [IMAGE_NAME]:p0-hotfix-fdb9a9bd .
 
 # 2. 备份当前容器
 docker stop optimistic_chandrasekhar
@@ -114,7 +114,7 @@ docker run -d \
   -p 8781:8781 \
   -e LLM_GATEWAY_DATABASE_URL="..." \
   -e LLM_GATEWAY_REDIS_URL="..." \
-  kx-llm-gateway-go:p0-hotfix-fdb9a9bd
+  [IMAGE_NAME]:p0-hotfix-fdb9a9bd
 
 # 4. 检查日志
 docker logs -f llm-gateway-go

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 71 服务器路由问题完整修复方案
+# [SERVER] 服务器路由问题完整修复方案
 # 日期: 2026-06-26
 # 问题: 请求无法记录 + 路由失败 + empty_response 过多
 
@@ -35,16 +35,16 @@ function log_section() {
 # 配置
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
-DB_USER="${DB_USER:-kxuser}"
+DB_USER="${DB_USER:-[DB_USER]}"
 DB_NAME="${DB_NAME:-llm_gateway}"
 
-log_section "71 服务器路由问题诊断和修复"
+log_section "[SERVER] 服务器路由问题诊断和修复"
 
 echo "问题描述:"
 echo "1. 71服务器上的请求无法记录到 request_logs"
-echo "2. 通过 llm.kxpms.cn/v1 发起的请求无法正确路由"
+echo "2. 通过 [PROD_DOMAIN]/v1 发起的请求无法正确路由"
 echo "3. 路由层无法匹配凭据（虽然有可用凭据如 minimax-m3）"
-echo "4. 184 数据库的 request_logs 中大量 empty_response"
+echo "4. [SERVER] 数据库的 request_logs 中大量 empty_response"
 echo ""
 
 log_section "步骤 1: 诊断数据库配置"
@@ -330,7 +330,7 @@ if [ -z "$API_KEY" ]; then
 else
     log_info "发送测试请求到 minimax-m3..."
     
-    RESPONSE=$(curl -s -w "\n%{http_code}" https://llm.kxpms.cn/v1/chat/completions \
+    RESPONSE=$(curl -s -w "\n%{http_code}" https://[PROD_DOMAIN]/v1/chat/completions \
         -H "Authorization: Bearer ${API_KEY}" \
         -H "Content-Type: application/json" \
         -d '{

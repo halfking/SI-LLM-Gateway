@@ -7,7 +7,7 @@ func TestExtractFromPreviews_SkipsNoise(t *testing.T) {
 		{Direction: "user", PromptPreview: "short"},
 		{Direction: "user", PromptPreview: "You are a helpful assistant. Follow ALL instructions."},
 		{Direction: "user", PromptPreview: `{"tool_call": {"name": "grep"}}`},
-		{Direction: "user", PromptPreview: "184 部署 llm-gateway-go 完成，healthz 返回 200，镜像 tag 1.0.0-abc"},
+		{Direction: "user", PromptPreview: "[SERVER] 部署 llm-gateway-go 完成，healthz 返回 200，镜像 tag 1.0.0-abc"},
 	}
 	st := ExtractFromPreviews(turns, nil, false)
 	if len(st.Candidates) != 1 {
@@ -19,7 +19,7 @@ func TestExtractFromPreviews_SkipsNoise(t *testing.T) {
 }
 
 func TestExtractFromPreviews_DedupExisting(t *testing.T) {
-	fact := "184 部署 llm-gateway-go 完成，healthz 返回 200"
+	fact := "[SERVER] 部署 llm-gateway-go 完成，healthz 返回 200"
 	turns := []PreviewTurn{
 		{Direction: "user", PromptPreview: fact},
 	}
