@@ -1,11 +1,11 @@
-# llm.kxpms.cn 端到端测试报告
+# 端到端测试报告
 
 **测试时间**：2026-06-28 ~ 2026-06-29
-**测试目标**：验证线上 LLM 网关（`https://llm.kxpms.cn`）的多模型路由、流式响应、错误处理、并发稳定性
-**测试环境**：公网网关 V2.2.0-f2f9a1c-20260629-1（含 P0 hotfix + F2 missing_model 修复）
-**测试 API key**：`sk-e2e-1781897808-B-3322`（E2E 测试专用）
-**部署目标**：71 服务器 (`14.103.174.71`)
-**部署版本**：镜像 `kx-llm-gateway-go:gitsha-f2f9a1c-versioned` (155 MB, systemd 管理 + auto-restart)
+**测试目标**：验证线上 LLM 网关（`[PROD_DOMAIN]`）的多模型路由、流式响应、错误处理、并发稳定性
+**测试环境**：公网网关 `[VERSION_STRING]`（含 P0 hotfix + F2 missing_model 修复）
+**测试 API key**：`[REDACTED_TEST_KEY]`（E2E 测试专用）
+**部署目标**：`[PROD_SERVER]` 服务器（`[PROD_HOST_IP]`）
+**部署版本**：镜像 `[IMAGE_NAME]:gitsha-[GIT_SHA]-versioned`（155 MB，systemd 管理 + auto-restart）
 
 ---
 
@@ -18,9 +18,9 @@
 | 失败 | **12** | 10.3% | -2 |
 | 跳过（依赖模型不可用） | **12** | 10.3% | 持平 |
 
-### 关键改善对比（从初始版本 acd7ead8 升级到 f2f9a1c）
+### 关键改善对比（从初始版本 [GIT_SHA] 升级到 [GIT_SHA]）
 
-| 指标 | acd7ead8（原始） | 9c614f44（P0 修复） | f2f9a1c（P0 + F2） |
+| 指标 | [GIT_SHA]（原始） | [GIT_SHA]（P0 修复） | [GIT_SHA]（P0 + F2） |
 |---|---|---|---|
 | `qwen3-235b-a22b` 首次响应 | 200s+ hang | **130s** 503 | **130s** 503 |
 | `qwen3-235b-a22b` 第二次响应（同 circuit） | 200s+ hang | **44ms** 503 | **44ms** 503 |
@@ -29,7 +29,7 @@
 | `/v1/completions` 端点 | 永久挂起 | **130s** 503 | **130s** 503 |
 | **缺 model 字段** | **503 `no_candidate`** ❌ | **503 `no_candidate`** ❌ | **400 `missing_model`** ✅ |
 | systemd auto-restart | ✅ | ❌（手动 docker run） | ✅（已恢复） |
-| `/healthz` version | `V2.2.0-acd7ead8-...` | `V2.2.0-acd7ead8-...` | `V2.2.0-f2f9a1c-20260629-1` ✅ |
+| `/healthz` version | `[VERSION_STRING]` | `[VERSION_STRING]` | `[VERSION_STRING]` ✅ |
 
 | 维度 | 数量 | 占比 |
 |---|---|---|
@@ -63,7 +63,7 @@
 
 ### 🔴 P0 — 上游挂起（已修复）
 
-**症状**：当上游供应商通过代理（`172.31.0.2:7890`）接收请求但**永远不返回响应**时，网关会卡住 3-4 分钟，远超 `UpstreamTimeout=120s` 配置。
+**症状**：当上游供应商通过代理（`[INTERNAL_PROXY]`）接收请求但**永远不返回响应**时，网关会卡住 3-4 分钟，远超 `UpstreamTimeout=120s` 配置。
 
 **影响范围**：
 - `qwen3-235b-a22b`（NVIDIA 代理）— non-stream 永远挂起
@@ -116,16 +116,16 @@
 
 ## 4. 已应用的修复（代码改动）
 
-### 4.0 部署到 71 服务器（已完成）
+### 4.0 部署到生产服务器（已完成）
 
 **部署时间**：2026-06-29 03:50 - 04:00 UTC+8
 **部署流程**：
 
-1. **环境探测**：通过 `sshpass` + xray SOCKS5 代理（`127.0.0.1:10810` → `115.29.212.252:443`）连入 71 (`14.103.174.71`)。原 71 通过 systemd 管理 `llm-gateway-go.service` 容器。
-2. **构建方式**：本地 macOS ARM64 交叉编译 `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /tmp/llm-gateway-go-fixed ./cmd/gateway`（44 MB），通过 `scp` 上传到 71 的 `/tmp/`。
-3. **镜像构建**：避开了 `docker build` 在内网环境下卡住的问题，改用 `docker run --entrypoint sleep` 启动辅助容器 → `docker cp` 注入新二进制 → `docker commit` 提交为新镜像 `kx-llm-gateway-go:gitsha-9c614f44`（155 MB）。ENTRYPOINT 显式设为 `["/usr/local/bin/llm-gateway-go"]`。
-4. **启动容器**：`/etc/systemd/system/llm-gateway-go.service` 因 `chattr +i`（immutable 属性）无法修改，于是 `systemctl stop llm-gateway-go.service` 后用等效 `docker run` 命令手动启动。容器运行后，`llm.kxpms.cn` 自动通过 nginx 反代转发到 71 的 8781 端口。
-5. **验证**：二进制 MD5 校验一致 `24121031557a3f3e82d559f9ff18caa9`，修复代码确实在生产运行。
+1. **环境探测**：通过 `[SSH_TOOL]` + `[PROXY_TECH]` 代理（`[LOCAL_PROXY]` → `[JUMP_HOST]`）连入生产服务器（`[PROD_HOST_IP]`）。原生产服务器通过 systemd 管理 `[SYSTEMD_SERVICE]` 容器。
+2. **构建方式**：本地 macOS ARM64 交叉编译 `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /tmp/llm-gateway-go-fixed ./cmd/gateway`（44 MB），通过 `[FILE_TRANSFER]` 上传到服务器的 `/tmp/`。
+3. **镜像构建**：避开了 `docker build` 在内网环境下卡住的问题，改用 `docker run --entrypoint sleep` 启动辅助容器 → `docker cp` 注入新二进制 → `docker commit` 提交为新镜像 `[IMAGE_NAME]:gitsha-[GIT_SHA]`（155 MB）。ENTRYPOINT 显式设为 `["/usr/local/bin/llm-gateway-go"]`。
+4. **启动容器**：`[SYSTEMD_SERVICE]` 因 `[IMMUTABLE_ATTR]`（immutable 属性）无法修改，于是 `systemctl stop llm-gateway-go.service` 后用等效 `docker run` 命令手动启动。容器运行后，`[PROD_DOMAIN]` 自动通过 `[REVERSE_PROXY]` 反代转发到 `[SERVICE_PORT]` 端口。
+5. **验证**：二进制 MD5 校验一致 `[BINARY_MD5]`，修复代码确实在生产运行。
 
 **注意**：当前部署是手动启动（systemd 还在 failed 状态），需要 ops 同学补做 `systemctl reset-failed llm-gateway-go.service` + 修改 service 文件的 immutable 属性 + `systemctl start` 来恢复 systemd 自动拉起。
 
@@ -172,7 +172,7 @@
 **单元测试**（`relay/handler_missing_model_test.go`）：
 - `TestChatHandler_MissingModelReturns400`：4 个子测试覆盖 field-absent / empty-string / whitespace / null 场景，全部通过。
 
-**生产验证**（`https://llm.kxpms.cn` 部署后实测）：
+**生产验证**（`[PROD_DOMAIN]` 部署后实测）：
 ```
 === F2 Test 1: missing model field ===
 {"error":{"code":"missing_model","message":"model is required","request_id":"..."}}
@@ -190,17 +190,17 @@ HTTP=400 time=0.100694s
 
 ### 4.4 VERSION 文件补丁与镜像重建
 
-**问题**：第一次部署后 `/healthz` 仍显示 `V2.2.0-acd7ead8-20260627-712`，因为 `docker commit` 只复制文件系统层，不会触发重新 `go build`，所以 `-ldflags -X main.Version=...` 注入的字符串保持原值。VERSION 文件也写在镜像里（`/opt/llm-gateway-go/VERSION`），无法通过 host 端 `echo` 直接修改（容器内是只读 + volume mount 只覆盖 `data/`）。
+**问题**：第一次部署后 `/healthz` 仍显示 `[VERSION_STRING]`，因为 `docker commit` 只复制文件系统层，不会触发重新 `go build`，所以 `-ldflags -X main.Version=...` 注入的字符串保持原值。VERSION 文件也写在镜像里（`[INSTALL_DIR]/VERSION`），无法通过 host 端 `echo` 直接修改（容器内是只读 + volume mount 只覆盖 `data/`）。
 
-**修复**：用 `docker create` + `docker start` 起辅助容器 → `docker exec -u root` 修改 VERSION 文件 → `docker commit` 重新打标为 `kx-llm-gateway-go:gitsha-f2f9a1c-versioned`。重启后 `/healthz` 正确返回 `V2.2.0-f2f9a1c-20260629-1`。
+**修复**：用 `docker create` + `docker start` 起辅助容器 → `docker exec -u root` 修改 VERSION 文件 → `docker commit` 重新打标为 `[IMAGE_NAME]:gitsha-[GIT_SHA]-versioned`。重启后 `/healthz` 正确返回 `[VERSION_STRING]`。
 
 ### 4.5 systemd 服务恢复（auto-restart）
 
-**问题**：71 上的 `/etc/systemd/system/llm-gateway-go.service` 文件被 `chattr +i` 标记（immutable），且 ExecStart 仍引用旧镜像 `gitsha-acd7ead8`，导致 systemd 无法自动拉起。
+**问题**：生产服务器上的 `[SYSTEMD_SERVICE]` 文件被 `[IMMUTABLE_ATTR]` 标记（immutable），且 ExecStart 仍引用旧镜像 `gitsha-[GIT_SHA]`，导致 systemd 无法自动拉起。
 
 **修复步骤**：
-1. `chattr -i /etc/systemd/system/llm-gateway-go.service`（需要 root + CAP_LINUX_IMMUTABLE，71 上 root 有此权限）
-2. `sed -i 's|kx-llm-gateway-go:gitsha-acd7ead8|kx-llm-gateway-go:gitsha-f2f9a1c-versioned|' /etc/systemd/system/llm-gateway-go.service`
+1. `[IMMUTABLE_ATTR] [SYSTEMD_SERVICE]`（需要 root + CAP_LINUX_IMMUTABLE，生产服务器上 root 有此权限）
+2. `sed -i 's|[IMAGE_NAME]:gitsha-[GIT_SHA]|[IMAGE_NAME]:gitsha-[GIT_SHA]-versioned|' [SYSTEMD_SERVICE]`
 3. `systemctl daemon-reload && systemctl reset-failed llm-gateway-go.service`
 4. `systemctl stop llm-gateway-go.service`（停止之前的 manual docker run）
 5. `systemctl start llm-gateway-go.service`
@@ -225,9 +225,9 @@ HTTP=400 time=0.100694s
 
 ## 5. 修复影响范围（生产验证后）
 
-修复部署到 71 后实测表现：
+修复部署到生产服务器后实测表现：
 
-| 场景 | 修复前 (acd7ead8) | 修复后 (9c614f44) | 改善 |
+| 场景 | 修复前 ([GIT_SHA]) | 修复后 ([GIT_SHA]) | 改善 |
 |---|---|---|---|
 | `qwen3-235b-a22b` non-stream | 200s+ 挂起（curl timeout 强制退出） | **130s** 返回 503 | -35% 等待 |
 | `qwen3-235b-a22b` 第二次（同 circuit） | 200s+ 挂起 | **44ms** 返回 503（circuit breaker fast-fail） | -99.97% |
@@ -255,12 +255,12 @@ HTTP=400 time=0.100694s
 
 ## 6. 已知限制
 
-1. **✅ 已解决 - systemd service 文件 immutable**：`/etc/systemd/system/llm-gateway-go.service` 已被 `chattr -i` 移除 immutable 标记，并使用 `chattr +i` 重新保护（防止误改）。ExecStart 现在指向 `gitsha-f2f9a1c-versioned` 镜像，`Restart=always` 已生效。
+1. **✅ 已解决 - systemd service 文件 immutable**：`[SYSTEMD_SERVICE]` 已被 `[IMMUTABLE_ATTR]` 移除 immutable 标记，并使用 `[IMMUTABLE_ATTR]` 重新保护（防止误改）。ExecStart 现在指向 `gitsha-[GIT_SHA]-versioned` 镜像，`Restart=always` 已生效。
 2. **sync_retry 仍占 130s**：上游超时修到 upCtx=120s，但 `routing/executor.go:1146-1249` 的 sync_retry 循环会再重试几轮（每 5s 一次），导致总响应时间约 130s。这是设计上的解耦：会话路径允许重试以维持 sticky session。优化空间：把 sync_retry 循环也加上相同的硬超时（这是另一个 PR 的工作）。
-3. **路由数据缺失**：`docs/pricing/2026-06-12-all-paid-offers.csv` 列出的 189 个模型中，部分（如 `gpt-4o` / `claude-3-5-sonnet-20241022` / `doubao-pro-128k`）在生产数据库中没有可用凭据。这是数据层问题，需要在 admin 后台手动补录或同步上游凭据。
-4. **限流测试跳过了**：E2E key 的 tier 配置较高（`X-RateLimit-Limit: 600`），50 个连续请求未触发 429。如要验证限流路径，需要使用 tier=applicant (RPM=6, concurrent=2) 的 key。
+3. **路由数据缺失**：`[PRICING_CSV]` 列出的 189 个模型中，部分（如 `gpt-4o` / `claude-3-5-sonnet-20241022` / `doubao-pro-128k`）在生产数据库中没有可用凭据。这是数据层问题，需要在 admin 后台手动补录或同步上游凭据。
+4. **限流测试跳过了**：E2E key 的 tier 配置较高（`X-RateLimit-Limit: [RATE_LIMIT]`），50 个连续请求未触发 429。如要验证限流路径，需要使用 tier=applicant (RPM=[RATE], concurrent=[CONCURRENCY]) 的 key。
 5. **Anthropic 模型测试**：D2 / D4 / E10 因 claude-* 模型当前不可用被跳过，需要路由数据补全后才能验证 Q3/Q4 协议转换路径。
-6. **circuit breaker 会触发 fast-fail**：单次上游挂起会让一个凭据 30 分钟内被 fast-fail。生产验证中已观察到 `circuit open for credential 14`，所以同一模型的第二次调用会立即返回 503 而非 130s 挂起。这对客户端反而是好事（立即可重试），但运维需要知道。
+6. **circuit breaker 会触发 fast-fail**：单次上游挂起会让一个凭据 30 分钟内被 fast-fail。生产验证中已观察到 `circuit open for credential [ID]`，所以同一模型的第二次调用会立即返回 503 而非 130s 挂起。这对客户端反而是好事（立即可重试），但运维需要知道。
 7. **测试矩阵 B/C/G 仍有 12 个失败**：这些失败**不是** P0/P1 bug 引起，而是因为：
    - 部分供应商的代理（kimi / doubao 等）在测试时本身不可用 → circuit-breaker 触发 no_candidate
    - 某些 multi-credential 模型（B-claude-3-5-sonnet-20241022, B-gpt-4o）在生产数据库里没有可用凭据
@@ -303,7 +303,7 @@ tests/prod_e2e/
 
 | 优先级 | 行动项 | 责任人 | 状态 |
 |---|---|---|---|
-| **P0** | 部署 `routing/executor_chat.go` 修复到 71 / 184 | ops | 待办 |
+| **P0** | 部署 `routing/executor_chat.go` 修复到生产服务器 | ops | 待办 |
 | **P0** | 在 admin 后台补全 `gpt-4o` / `claude-3-5-sonnet` / `doubao-pro-128k` 等的凭据 | ops | 待办 |
 | **P1** | 在测试脚本中增加 503 误判为 skip 的容错（E10 / D2 / D4 等） | 测试 | 建议 |
 | **P2** | 给 E2E key 配置 tier=applicant 来验证限流触发（F12） | 测试 | 建议 |
@@ -321,10 +321,10 @@ bash tests/prod_e2e/06_errors.sh
 bash tests/prod_e2e/run_all.sh
 
 # 自定义 API key
-API_KEY=sk-your-key bash tests/prod_e2e/01_health.sh
+API_KEY=[REDACTED_TEST_KEY] bash tests/prod_e2e/01_health.sh
 
 # 自定义 endpoint
-API_BASE=https://staging.kxpms.cn bash tests/prod_e2e/run_all.sh
+API_BASE=[STAGING_DOMAIN] bash tests/prod_e2e/run_all.sh
 ```
 
 输出会同时打印到 stdout 和写到 `results/` 下对应 `.jsonl` / `.summary` / `.failures.log`。
