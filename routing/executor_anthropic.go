@@ -293,7 +293,7 @@ func (a *AnthropicExecutor) StreamResponse(w http.ResponseWriter, resp *http.Res
 	return defaultAnthropicPassthrough(w, resp)
 }
 
-func (a *AnthropicExecutor) ExtractUsage(resp *http.Response, body []byte) (inputTokens, outputTokens *int) {
+func (a *AnthropicExecutor) ExtractUsage(resp *http.Response, body []byte) (inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens *int) {
 	return extractAnthropicUsageFromBody(body)
 }
 
@@ -307,17 +307,29 @@ func (a *AnthropicExecutor) CheckSoftMismatch(reqModel, respModel string) (bool,
 	return false, ""
 }
 
-func extractAnthropicUsageFromBody(body []byte) (*int, *int) {
+// extractAnthropicUsageFromBody pulls input_tokens / output_tokens
+// from an Anthropic Messages response body, plus the cache-related
+// fields cache_read_input_tokens and cache_creation_input_tokens
+// (Anthropic's prompt-caching accounting).
+//
+// Cache fields are part of the standard Anthropic Messages API and
+// are emitted on every cached-prompt call. Before 2026-06-30 they
+// were dropped here and the request_logs row showed NULL for the
+// cache columns, which undercounted cached-prompt cost in billing
+// rollups.
+func extractAnthropicUsageFromBody(body []byte) (inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens *int) {
 	var v struct {
 		Usage struct {
-			InputTokens  *int `json:"input_tokens"`
-			OutputTokens *int `json:"output_tokens"`
+			InputTokens              *int `json:"input_tokens"`
+			OutputTokens             *int `json:"output_tokens"`
+			CacheReadInputTokens     *int `json:"cache_read_input_tokens"`
+			CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(body, &v); err != nil {
-		return nil, nil
+		return nil, nil, nil, nil
 	}
-	return v.Usage.InputTokens, v.Usage.OutputTokens
+	return v.Usage.InputTokens, v.Usage.OutputTokens, v.Usage.CacheReadInputTokens, v.Usage.CacheCreationInputTokens
 }
 
 // defaultAnthropicPassthrough is the Q4 fallback when no PassthroughStream

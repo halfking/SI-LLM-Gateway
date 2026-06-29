@@ -135,6 +135,11 @@ func StreamOpenAIToAnthropicSSE(w http.ResponseWriter, resp *http.Response, clie
 	finalFinishReason := ""
 	outputTokens := 0
 	inputTokens := 0
+	// 2026-06-30: also accumulate cache_read / cache_creation tokens
+	// across the stream so the final usage chunk can populate
+	// capture.ObserveUsage with the full Anthropic cache accounting.
+	inputTokensCacheRead := 0
+	inputTokensCacheWrite := 0
 
 	// Phase 4 stream-end split: lazy probing of the running text content
 	// prefix. Most upstreams emit plain text and we want incremental
@@ -171,7 +176,7 @@ func StreamOpenAIToAnthropicSSE(w http.ResponseWriter, resp *http.Response, clie
 		}
 		captureSSE("error", errPayload)
 		flusher.Flush()
-		writeAnthropicTail(w, flusher, pc, msgID, clientModel, finalFinishReason, outputTokens, inputTokens, capture)
+		writeAnthropicTail(w, flusher, pc, msgID, clientModel, finalFinishReason, outputTokens, inputTokens, inputTokensCacheRead, inputTokensCacheWrite, capture)
 		outcome.Interrupted = true
 		outcome.Reason = "first_byte_timeout"
 		return outcome
@@ -233,11 +238,41 @@ func StreamOpenAIToAnthropicSSE(w http.ResponseWriter, resp *http.Response, clie
 				if v, ok := usage["completion_tokens"].(float64); ok {
 					outputTokens = int(v)
 				}
+				// 2026-06-30: also lift cache_creation_input_tokens /
+				// cache_read_input_tokens (Anthropic native when the
+				// upstream echoes the Anthropic shape) and the OpenAI
+				// prompt_tokens_details.cached_tokens variant. Without
+				// this forward the audit capture would have
+				// cache_read_tokens / cache_write_tokens nil for the
+				// Q3 (openai→anthropic) stream path.
+				if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
+					if v, ok := details["cached_tokens"].(float64); ok {
+						cacheRead := int(v)
+						inputTokensCacheRead = cacheRead
+					}
+				}
+				if v, ok := usage["cache_read_input_tokens"].(float64); ok {
+					cacheRead := int(v)
+					inputTokensCacheRead = cacheRead
+				}
+				if v, ok := usage["cache_creation_input_tokens"].(float64); ok {
+					cacheWrite := int(v)
+					inputTokensCacheWrite = cacheWrite
+				}
 			}
 			if capture != nil {
 				pt := inputTokens
 				ct := outputTokens
-				capture.ObserveUsage(&pt, &ct, nil, nil)
+				var crPtr, cwPtr *int
+				if inputTokensCacheRead > 0 {
+					cr := inputTokensCacheRead
+					crPtr = &cr
+				}
+				if inputTokensCacheWrite > 0 {
+					cw := inputTokensCacheWrite
+					cwPtr = &cw
+				}
+				capture.ObserveUsage(&pt, &ct, crPtr, cwPtr)
 			}
 		}
 
@@ -465,7 +500,7 @@ func StreamOpenAIToAnthropicSSE(w http.ResponseWriter, resp *http.Response, clie
 		}
 	}
 
-	writeAnthropicTail(w, flusher, pc, msgID, clientModel, finalFinishReason, outputTokens, inputTokens, capture)
+	writeAnthropicTail(w, flusher, pc, msgID, clientModel, finalFinishReason, outputTokens, inputTokens, inputTokensCacheRead, inputTokensCacheWrite, capture)
 
 	// Only mark the capture as "done" if the stream was NOT interrupted.
 	// If we received an interruption (e.g. stream_timeout, read_error,
@@ -483,11 +518,17 @@ func StreamOpenAIToAnthropicSSE(w http.ResponseWriter, resp *http.Response, clie
 	return outcome
 }
 
-func writeAnthropicTail(w http.ResponseWriter, flusher http.Flusher, pc *pendingCapturer, msgID, clientModel, finishReason string, outputTokens int, inputTokens int, capture *audit.StreamCapture) {
+func writeAnthropicTail(w http.ResponseWriter, flusher http.Flusher, pc *pendingCapturer, msgID, clientModel, finishReason string, outputTokens int, inputTokens int, cacheReadTokens int, cacheWriteTokens int, capture *audit.StreamCapture) {
 	stopReason := mapAnthropicStopReason(finishReason)
 
-	// Record usage in capture for audit trail (IR-based)
-	if capture != nil && (inputTokens > 0 || outputTokens > 0) {
+	// Record usage in capture for audit trail (IR-based).
+	// 2026-06-30: also forward cache_read / cache_write tokens into the
+	// capture via ObserveUsage so request_logs.cache_read_tokens and
+	// request_logs.cache_write_tokens are populated for billing
+	// rollups on the Q3 (openai->anthropic) streaming path. Previously
+	// the cache pointers stayed nil here because the trailing message_delta
+	// payload only emitted output_tokens.
+	if capture != nil && (inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0 || cacheWriteTokens > 0) {
 		capture.ObserveChunk(&ir.StreamChunk{
 			Type: ir.ChunkTypeUsage,
 			Usage: &ir.StreamUsage{
@@ -497,6 +538,18 @@ func writeAnthropicTail(w http.ResponseWriter, flusher http.Flusher, pc *pending
 			},
 			SourceProtocol: ir.ProtocolAnthropicMessages,
 		})
+		if cacheReadTokens > 0 || cacheWriteTokens > 0 {
+			var crPtr, cwPtr *int
+			if cacheReadTokens > 0 {
+				cr := cacheReadTokens
+				crPtr = &cr
+			}
+			if cacheWriteTokens > 0 {
+				cw := cacheWriteTokens
+				cwPtr = &cw
+			}
+			capture.ObserveUsage(&inputTokens, &outputTokens, crPtr, cwPtr)
+		}
 	}
 
 	// Note: the trailing content_block_stop is intentionally omitted. Phase 4's
@@ -504,13 +557,20 @@ func writeAnthropicTail(w http.ResponseWriter, flusher http.Flusher, pc *pending
 	// block (or for thinking + post-think text after a split). Emitting an
 	// extra stop here would produce a duplicate on the un-split path.
 
+	usage := map[string]any{"output_tokens": outputTokens}
+	if cacheReadTokens > 0 {
+		usage["cache_read_input_tokens"] = cacheReadTokens
+	}
+	if cacheWriteTokens > 0 {
+		usage["cache_creation_input_tokens"] = cacheWriteTokens
+	}
 	deltaPayload := map[string]any{
 		"type": "message_delta",
 		"delta": map[string]any{
 			"stop_reason":   stopReason,
 			"stop_sequence": nil,
 		},
-		"usage": map[string]any{"output_tokens": outputTokens},
+		"usage": usage,
 	}
 	writeSSEWithCapturer(w, pc, "message_delta", deltaPayload)
 

@@ -37,9 +37,9 @@ func (s *stubProtocolHandler) StreamResponse(w http.ResponseWriter, resp *http.R
 	return StreamOutcome{}
 }
 
-func (s *stubProtocolHandler) ExtractUsage(resp *http.Response, body []byte) (inputTokens, outputTokens *int) {
+func (s *stubProtocolHandler) ExtractUsage(resp *http.Response, body []byte) (inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens *int) {
 	s.extractUsageCalled = true
-	return nil, nil
+	return nil, nil, nil, nil
 }
 
 func (s *stubProtocolHandler) CheckSoftMismatch(reqModel, respModel string) (mismatched bool, reason string) {
