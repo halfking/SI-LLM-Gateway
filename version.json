@@ -1,8 +1,8 @@
 {
-  "version": "V2.2.0-55-gd64ef5ba",
-  "git_tag": "V2.2.0-55-gd64ef5ba",
-  "git_sha": "d64ef5ba",
-  "build_seq": 711,
-  "build_date": "2026-06-26",
+  "version": "deploy/fix-fpslot-sharing-20260629-181413",
+  "git_tag": "deploy/fix-fpslot-sharing-20260629-181413",
+  "git_sha": "bca04b89",
+  "build_seq": 713,
+  "build_date": "2026-06-29",
   "module": "llm-gateway-go-2"
 }

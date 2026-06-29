@@ -310,6 +310,21 @@ func (m *Manager) RoutingEligible(ctx context.Context, credentialID int, limit *
 }
 
 // Acquire tries to take one slot. ok=false means saturated.
+//
+// 🆕 2026-06-29 P0 fix: 同一 holder 的并发请求共享同一 slot。
+// 快速路径：如果 holder 已经持有 slot（通过 pin），直接返回并增加 inflight 计数。
+// 这修复了高并发场景下每个请求都尝试获取新 slot 导致的 slot 耗尽问题。
+//
+// 问题背景：
+//   - 设计意图：每个 holder（用户会话）占用 1 个 slot，多个并发请求共享
+//   - 实际实现（修复前）：每次请求都调用 Acquire，没有检查"已持有"
+//   - 结果：10 个并发 → 占用 10 个 slot（而非 1 个）
+//
+// 修复方案：
+//   1. 检查 holder 是否有 pin（Redis: llmgw:sess_cred_fp:<holder>:<cred>）
+//   2. 验证 pin 指向的 slot 是否仍被该 holder 持有
+//   3. 如果是，增加 inflight 计数并返回（slot 共享）
+//   4. 否则，执行原有逻辑获取新 slot
 func (m *Manager) Acquire(ctx context.Context, credentialID int, limit *int, holder, tenantID string) (*Lease, bool) {
 	if !m.Enabled() {
 		return &Lease{Unlimited: true, CredentialID: credentialID, Holder: holder}, true
@@ -318,6 +333,48 @@ func (m *Manager) Acquire(ctx context.Context, credentialID int, limit *int, hol
 	if eff == nil {
 		return &Lease{Unlimited: true, CredentialID: credentialID, Holder: holder}, true
 	}
+	
+	// 🆕 快速路径：检查 holder 是否已经持有 slot（通过 pin）
+	if m.client != nil && holder != "" {
+		pinKey := pinRedisKey(holder, credentialID)
+		slotStr, err := m.client.Get(ctx, pinKey).Result()
+		if err == nil && slotStr != "" {
+			// holder 已有 pin，检查对应的 slot 是否仍被该 holder 持有
+			slot, parseErr := strconv.Atoi(strings.TrimSpace(slotStr))
+			if parseErr == nil && slot >= 0 && slot < *eff {
+				slotKey := slotRedisKey(credentialID, slot)
+				currentHolder, err := m.client.Get(ctx, slotKey).Result()
+				if err == nil && strings.TrimSpace(currentHolder) == holder {
+					// 持有权验证通过，增加 inflight 计数并返回（slot 共享）
+					inflightK := inflightKey(credentialID, slot)
+					newInflight, _ := m.client.Incr(ctx, inflightK).Result()
+					m.client.Expire(ctx, inflightK, time.Duration(slotTTLSeconds)*time.Second)
+					
+					// 刷新 slot 和 pin 的 TTL（保持活跃）
+					m.client.Expire(ctx, slotKey, time.Duration(slotTTLSeconds)*time.Second)
+					m.client.Expire(ctx, pinKey, time.Duration(sessionPinTTLSeconds)*time.Second)
+					
+					slog.Debug("cred_fp_slot reused existing slot",
+						"credential_id", credentialID,
+						"holder", holder,
+						"slot", slot,
+						"inflight", newInflight,
+					)
+					
+					egress := identity.BuildEgressIdentity(credentialID, slot, tenantID)
+					return &Lease{
+						SlotIndex:    slot,
+						Egress:       &egress,
+						Unlimited:    false,
+						CredentialID: credentialID,
+						Holder:       holder,
+					}, true
+				}
+			}
+		}
+	}
+	
+	// 原有逻辑：holder 没有 slot 或验证失败，尝试获取新 slot 或抢占
 	if m.client != nil {
 		if lease, ok := m.acquireRedis(ctx, credentialID, *eff, holder, tenantID); ok {
 			return lease, true
@@ -1248,6 +1305,129 @@ func (m *Manager) purgeExpiredLocked(now time.Time) {
 			delete(m.memPins, k)
 		}
 	}
+}
+
+// BatchStats returns slot occupancy for multiple credentials in one Redis round-trip.
+// This is optimized for the admin list endpoint where we need stats for many credentials.
+// Returns a map[credentialID] -> (slotLimit, used, free).
+func (m *Manager) BatchStats(ctx context.Context, credLimits map[int]*int) map[int]struct {
+	SlotLimit *int
+	Used      *int
+	Free      *int
+} {
+	result := make(map[int]struct {
+		SlotLimit *int
+		Used      *int
+		Free      *int
+	})
+
+	if !m.Enabled() {
+		return result
+	}
+
+	// Build list of credentials with valid limits
+	type credInfo struct {
+		id    int
+		limit int
+	}
+	var creds []credInfo
+	for credID, limit := range credLimits {
+		eff := EffectiveLimit(limit, m.cfg.DefaultLimit)
+		if eff != nil {
+			creds = append(creds, credInfo{id: credID, limit: *eff})
+		}
+	}
+
+	if len(creds) == 0 {
+		return result
+	}
+
+	if m.client != nil {
+		// Use Redis pipeline to query all credentials concurrently
+		pipe := m.client.Pipeline()
+		type scriptCmd struct {
+			credID int
+			limit  int
+			cmd    *redis.Cmd
+		}
+		var cmds []scriptCmd
+
+		for _, c := range creds {
+			cmd := pipe.Do(ctx, "EVAL", availableCountScript.Hash(), 1,
+				slotKeyPrefix(c.id), c.limit)
+			cmds = append(cmds, scriptCmd{credID: c.id, limit: c.limit, cmd: cmd})
+		}
+
+		// Execute pipeline
+		if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+			// On pipeline failure, fall back to individual queries
+			for _, c := range creds {
+				avail, _ := m.AvailableCount(ctx, c.id, &c.limit)
+				used := c.limit - avail
+				if used < 0 {
+					used = 0
+				}
+				l, u, f := c.limit, used, avail
+				result[c.id] = struct {
+					SlotLimit *int
+					Used      *int
+					Free      *int
+				}{SlotLimit: &l, Used: &u, Free: &f}
+			}
+			return result
+		}
+
+		// Collect results
+		for _, sc := range cmds {
+			free := 0
+			if val, err := sc.cmd.Int(); err == nil {
+				free = val
+				if free < 0 {
+					free = 0
+				}
+			} else {
+				free = sc.limit // Default to all free on error
+			}
+			used := sc.limit - free
+			if used < 0 {
+				used = 0
+			}
+			l, u, f := sc.limit, used, free
+			result[sc.credID] = struct {
+				SlotLimit *int
+				Used      *int
+				Free      *int
+			}{SlotLimit: &l, Used: &u, Free: &f}
+		}
+		return result
+	}
+
+	// Memory mode: query in-memory state
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := time.Now()
+	m.purgeExpiredLocked(now)
+
+	for _, c := range creds {
+		used := 0
+		for k, e := range m.memSlots {
+			if k.credentialID == c.id && e.exp.After(now) {
+				used++
+			}
+		}
+		free := c.limit - used
+		if free < 0 {
+			free = 0
+		}
+		l, u, f := c.limit, used, free
+		result[c.id] = struct {
+			SlotLimit *int
+			Used      *int
+			Free      *int
+		}{SlotLimit: &l, Used: &u, Free: &f}
+	}
+
+	return result
 }
 
 // ResetSlots clears all slot and pin keys for a credential, resetting occupancy to zero.

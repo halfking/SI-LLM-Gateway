@@ -1,0 +1,619 @@
+{
+  "ts": "B-minimax-m3.model",
+  "test_id": "B-minimax-m3.model",
+  "status": "PASS",
+  "message": "minimax-m3: response.model 回填正确",
+  "details": {
+    "provider": "minimax",
+    "returned_model": "minimax-m3",
+    "prompt_tokens": 186,
+    "completion_tokens": 30,
+    "total_tokens": 216,
+    "content": "<think>The user is asking me to reply with a single word \"OK\" and nothing else. This is a simple instruction. I should comply with this</think>",
+    "finish_reason": "length",
+    "request_id": "0690b7724bd3449f8ff927ceda60fd8f"
+  }
+}
+{
+  "ts": "B-minimax-m3.tokens",
+  "test_id": "B-minimax-m3.tokens",
+  "status": "PASS",
+  "message": "minimax-m3: usage.total_tokens=216",
+  "details": {
+    "provider": "minimax",
+    "returned_model": "minimax-m3",
+    "prompt_tokens": 186,
+    "completion_tokens": 30,
+    "total_tokens": 216,
+    "content": "<think>The user is asking me to reply with a single word \"OK\" and nothing else. This is a simple instruction. I should comply with this</think>",
+    "finish_reason": "length",
+    "request_id": "0690b7724bd3449f8ff927ceda60fd8f"
+  }
+}
+{
+  "ts": "B-minimax-m3.content",
+  "test_id": "B-minimax-m3.content",
+  "status": "PASS",
+  "message": "minimax-m3: content 非空 (len=143)",
+  "details": {
+    "provider": "minimax",
+    "returned_model": "minimax-m3",
+    "prompt_tokens": 186,
+    "completion_tokens": 30,
+    "total_tokens": 216,
+    "content": "<think>The user is asking me to reply with a single word \"OK\" and nothing else. This is a simple instruction. I should comply with this</think>",
+    "finish_reason": "length",
+    "request_id": "0690b7724bd3449f8ff927ceda60fd8f"
+  }
+}
+{
+  "ts": "B-minimax-m3.finish",
+  "test_id": "B-minimax-m3.finish",
+  "status": "PASS",
+  "message": "minimax-m3: finish_reason=length",
+  "details": {
+    "provider": "minimax",
+    "returned_model": "minimax-m3",
+    "prompt_tokens": 186,
+    "completion_tokens": 30,
+    "total_tokens": 216,
+    "content": "<think>The user is asking me to reply with a single word \"OK\" and nothing else. This is a simple instruction. I should comply with this</think>",
+    "finish_reason": "length",
+    "request_id": "0690b7724bd3449f8ff927ceda60fd8f"
+  }
+}
+{
+  "ts": "B-minimax-m2.7.model",
+  "test_id": "B-minimax-m2.7.model",
+  "status": "PASS",
+  "message": "minimax-m2.7: response.model 回填正确",
+  "details": {
+    "provider": "minimax",
+    "returned_model": "minimax-m2.7",
+    "prompt_tokens": 53,
+    "completion_tokens": 30,
+    "total_tokens": 83,
+    "content": "<think>We need to respond with the single word \"OK\" and nothing else. The user says: \"Reply with the single word OK and nothing else.\"</think>",
+    "finish_reason": "length",
+    "request_id": "0690b774acfacdfa0583d7838433a6fd"
+  }
+}
+{
+  "ts": "B-minimax-m2.7.tokens",
+  "test_id": "B-minimax-m2.7.tokens",
+  "status": "PASS",
+  "message": "minimax-m2.7: usage.total_tokens=83",
+  "details": {
+    "provider": "minimax",
+    "returned_model": "minimax-m2.7",
+    "prompt_tokens": 53,
+    "completion_tokens": 30,
+    "total_tokens": 83,
+    "content": "<think>We need to respond with the single word \"OK\" and nothing else. The user says: \"Reply with the single word OK and nothing else.\"</think>",
+    "finish_reason": "length",
+    "request_id": "0690b774acfacdfa0583d7838433a6fd"
+  }
+}
+{
+  "ts": "B-minimax-m2.7.content",
+  "test_id": "B-minimax-m2.7.content",
+  "status": "PASS",
+  "message": "minimax-m2.7: content 非空 (len=142)",
+  "details": {
+    "provider": "minimax",
+    "returned_model": "minimax-m2.7",
+    "prompt_tokens": 53,
+    "completion_tokens": 30,
+    "total_tokens": 83,
+    "content": "<think>We need to respond with the single word \"OK\" and nothing else. The user says: \"Reply with the single word OK and nothing else.\"</think>",
+    "finish_reason": "length",
+    "request_id": "0690b774acfacdfa0583d7838433a6fd"
+  }
+}
+{
+  "ts": "B-minimax-m2.7.finish",
+  "test_id": "B-minimax-m2.7.finish",
+  "status": "PASS",
+  "message": "minimax-m2.7: finish_reason=length",
+  "details": {
+    "provider": "minimax",
+    "returned_model": "minimax-m2.7",
+    "prompt_tokens": 53,
+    "completion_tokens": 30,
+    "total_tokens": 83,
+    "content": "<think>We need to respond with the single word \"OK\" and nothing else. The user says: \"Reply with the single word OK and nothing else.\"</think>",
+    "finish_reason": "length",
+    "request_id": "0690b774acfacdfa0583d7838433a6fd"
+  }
+}
+{
+  "ts": "B-minimax-text-01",
+  "test_id": "B-minimax-text-01",
+  "status": "SKIP",
+  "message": "模型 minimax-text-01 当前不可用 (no_candidate)",
+  "details": {
+    "http_code": "503",
+    "error_code": "no_candidate",
+    "body": "{\"error\":{\"code\":\"no_candidate\",\"message\":\"no available provider for model 'minimax-text-01'\",\"request_id\":\"9ad1c1ca470ff42f98d562cbc9639bd8\",\"type\":\"server_error\"}}"
+  }
+}
+{
+  "ts": "B-glm-4.5-air.model",
+  "test_id": "B-glm-4.5-air.model",
+  "status": "PASS",
+  "message": "glm-4.5-air: response.model 回填正确",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-air",
+    "prompt_tokens": 15,
+    "completion_tokens": 232,
+    "total_tokens": 247,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "2026062904304506707bf9cfbf4c44"
+  }
+}
+{
+  "ts": "B-glm-4.5-air.tokens",
+  "test_id": "B-glm-4.5-air.tokens",
+  "status": "PASS",
+  "message": "glm-4.5-air: usage.total_tokens=247",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-air",
+    "prompt_tokens": 15,
+    "completion_tokens": 232,
+    "total_tokens": 247,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "2026062904304506707bf9cfbf4c44"
+  }
+}
+{
+  "ts": "B-glm-4.5-air.content",
+  "test_id": "B-glm-4.5-air.content",
+  "status": "PASS",
+  "message": "glm-4.5-air: content 非空 (len=2)",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-air",
+    "prompt_tokens": 15,
+    "completion_tokens": 232,
+    "total_tokens": 247,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "2026062904304506707bf9cfbf4c44"
+  }
+}
+{
+  "ts": "B-glm-4.5-air.finish",
+  "test_id": "B-glm-4.5-air.finish",
+  "status": "PASS",
+  "message": "glm-4.5-air: finish_reason=stop",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-air",
+    "prompt_tokens": 15,
+    "completion_tokens": 232,
+    "total_tokens": 247,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "2026062904304506707bf9cfbf4c44"
+  }
+}
+{
+  "ts": "B-glm-4.5-flash.model",
+  "test_id": "B-glm-4.5-flash.model",
+  "status": "PASS",
+  "message": "glm-4.5-flash: response.model 回填正确",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-flash",
+    "prompt_tokens": 15,
+    "completion_tokens": 30,
+    "total_tokens": 45,
+    "content": "",
+    "finish_reason": "length",
+    "request_id": "20260629043050bbfcbed7edc141f7"
+  }
+}
+{
+  "ts": "B-glm-4.5-flash.tokens",
+  "test_id": "B-glm-4.5-flash.tokens",
+  "status": "PASS",
+  "message": "glm-4.5-flash: usage.total_tokens=45",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-flash",
+    "prompt_tokens": 15,
+    "completion_tokens": 30,
+    "total_tokens": 45,
+    "content": "",
+    "finish_reason": "length",
+    "request_id": "20260629043050bbfcbed7edc141f7"
+  }
+}
+{
+  "ts": "B-glm-4.5-flash.content",
+  "test_id": "B-glm-4.5-flash.content",
+  "status": "FAIL",
+  "message": "glm-4.5-flash: content 为空",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-flash",
+    "prompt_tokens": 15,
+    "completion_tokens": 30,
+    "total_tokens": 45,
+    "content": "",
+    "finish_reason": "length",
+    "request_id": "20260629043050bbfcbed7edc141f7"
+  }
+}
+{
+  "ts": "B-glm-4.5-flash.finish",
+  "test_id": "B-glm-4.5-flash.finish",
+  "status": "PASS",
+  "message": "glm-4.5-flash: finish_reason=length",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.5-flash",
+    "prompt_tokens": 15,
+    "completion_tokens": 30,
+    "total_tokens": 45,
+    "content": "",
+    "finish_reason": "length",
+    "request_id": "20260629043050bbfcbed7edc141f7"
+  }
+}
+{
+  "ts": "B-glm-4.6.model",
+  "test_id": "B-glm-4.6.model",
+  "status": "PASS",
+  "message": "glm-4.6: response.model 回填正确",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.6",
+    "prompt_tokens": 15,
+    "completion_tokens": 140,
+    "total_tokens": 155,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "20260629043051f36d1b68a9a14148"
+  }
+}
+{
+  "ts": "B-glm-4.6.tokens",
+  "test_id": "B-glm-4.6.tokens",
+  "status": "PASS",
+  "message": "glm-4.6: usage.total_tokens=155",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.6",
+    "prompt_tokens": 15,
+    "completion_tokens": 140,
+    "total_tokens": 155,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "20260629043051f36d1b68a9a14148"
+  }
+}
+{
+  "ts": "B-glm-4.6.content",
+  "test_id": "B-glm-4.6.content",
+  "status": "PASS",
+  "message": "glm-4.6: content 非空 (len=2)",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.6",
+    "prompt_tokens": 15,
+    "completion_tokens": 140,
+    "total_tokens": 155,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "20260629043051f36d1b68a9a14148"
+  }
+}
+{
+  "ts": "B-glm-4.6.finish",
+  "test_id": "B-glm-4.6.finish",
+  "status": "PASS",
+  "message": "glm-4.6: finish_reason=stop",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.6",
+    "prompt_tokens": 15,
+    "completion_tokens": 140,
+    "total_tokens": 155,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "20260629043051f36d1b68a9a14148"
+  }
+}
+{
+  "ts": "B-glm-4.7.model",
+  "test_id": "B-glm-4.7.model",
+  "status": "PASS",
+  "message": "glm-4.7: response.model 回填正确",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.7",
+    "prompt_tokens": 15,
+    "completion_tokens": 208,
+    "total_tokens": 223,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "20260629043056bc20a9d6966b4c71"
+  }
+}
+{
+  "ts": "B-glm-4.7.tokens",
+  "test_id": "B-glm-4.7.tokens",
+  "status": "PASS",
+  "message": "glm-4.7: usage.total_tokens=223",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.7",
+    "prompt_tokens": 15,
+    "completion_tokens": 208,
+    "total_tokens": 223,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "20260629043056bc20a9d6966b4c71"
+  }
+}
+{
+  "ts": "B-glm-4.7.content",
+  "test_id": "B-glm-4.7.content",
+  "status": "PASS",
+  "message": "glm-4.7: content 非空 (len=2)",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.7",
+    "prompt_tokens": 15,
+    "completion_tokens": 208,
+    "total_tokens": 223,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "20260629043056bc20a9d6966b4c71"
+  }
+}
+{
+  "ts": "B-glm-4.7.finish",
+  "test_id": "B-glm-4.7.finish",
+  "status": "PASS",
+  "message": "glm-4.7: finish_reason=stop",
+  "details": {
+    "provider": "zhipu",
+    "returned_model": "glm-4.7",
+    "prompt_tokens": 15,
+    "completion_tokens": 208,
+    "total_tokens": 223,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "20260629043056bc20a9d6966b4c71"
+  }
+}
+{
+  "ts": "B-deepseek-v3",
+  "test_id": "B-deepseek-v3",
+  "status": "SKIP",
+  "message": "模型 deepseek-v3 当前不可用 (model_not_found)",
+  "details": {
+    "http_code": "503",
+    "error_code": "model_not_found",
+    "body": "{\"error\":{\"code\":\"model_not_found\",\"gateway_debug\":{\"attempts\":null,\"kind\":\"\",\"retryable\":false,\"stage\":\"execution\",\"tried\":0},\"kind\":\"no_candidates\",\"message\":\"No available provider for model 'deepse"
+  }
+}
+{
+  "ts": "B-deepseek-v3-1",
+  "test_id": "B-deepseek-v3-1",
+  "status": "SKIP",
+  "message": "模型 deepseek-v3-1 当前不可用 (model_not_found)",
+  "details": {
+    "http_code": "503",
+    "error_code": "model_not_found",
+    "body": "{\"error\":{\"code\":\"model_not_found\",\"gateway_debug\":{\"attempts\":null,\"kind\":\"\",\"retryable\":false,\"stage\":\"execution\",\"tried\":0},\"kind\":\"no_candidates\",\"message\":\"No available provider for model 'deepse"
+  }
+}
+{
+  "ts": "B-deepseek-r1",
+  "test_id": "B-deepseek-r1",
+  "status": "SKIP",
+  "message": "模型 deepseek-r1 当前不可用 (model_not_found)",
+  "details": {
+    "http_code": "503",
+    "error_code": "model_not_found",
+    "body": "{\"error\":{\"code\":\"model_not_found\",\"gateway_debug\":{\"attempts\":null,\"kind\":\"\",\"retryable\":false,\"stage\":\"execution\",\"tried\":0},\"kind\":\"no_candidates\",\"message\":\"No available provider for model 'deepse"
+  }
+}
+{
+  "ts": "B-kimi-k2",
+  "test_id": "B-kimi-k2",
+  "status": "SKIP",
+  "message": "模型 kimi-k2 当前不可用 (model_not_found)",
+  "details": {
+    "http_code": "503",
+    "error_code": "model_not_found",
+    "body": "{\"error\":{\"code\":\"model_not_found\",\"gateway_debug\":{\"attempts\":null,\"kind\":\"\",\"retryable\":false,\"stage\":\"execution\",\"tried\":0},\"kind\":\"no_candidates\",\"message\":\"No available provider for model 'kimi-k"
+  }
+}
+{
+  "ts": "B-kimi-k2.5",
+  "test_id": "B-kimi-k2.5",
+  "status": "FAIL",
+  "message": "模型 kimi-k2.5 返回 HTTP 000",
+  "details": {
+    "http_code": "000",
+    "body": ""
+  }
+}
+{
+  "ts": "B-kimi-k2.6.model",
+  "test_id": "B-kimi-k2.6.model",
+  "status": "PASS",
+  "message": "kimi-k2.6: response.model 回填正确",
+  "details": {
+    "provider": "moonshot",
+    "returned_model": "kimi-k2.6",
+    "prompt_tokens": 19,
+    "completion_tokens": 2,
+    "total_tokens": 21,
+    "content": " OK",
+    "finish_reason": "stop",
+    "request_id": "chatcmpl-9c171754458413b2c0da76004c27b85f"
+  }
+}
+{
+  "ts": "B-kimi-k2.6.tokens",
+  "test_id": "B-kimi-k2.6.tokens",
+  "status": "PASS",
+  "message": "kimi-k2.6: usage.total_tokens=21",
+  "details": {
+    "provider": "moonshot",
+    "returned_model": "kimi-k2.6",
+    "prompt_tokens": 19,
+    "completion_tokens": 2,
+    "total_tokens": 21,
+    "content": " OK",
+    "finish_reason": "stop",
+    "request_id": "chatcmpl-9c171754458413b2c0da76004c27b85f"
+  }
+}
+{
+  "ts": "B-kimi-k2.6.content",
+  "test_id": "B-kimi-k2.6.content",
+  "status": "PASS",
+  "message": "kimi-k2.6: content 非空 (len=3)",
+  "details": {
+    "provider": "moonshot",
+    "returned_model": "kimi-k2.6",
+    "prompt_tokens": 19,
+    "completion_tokens": 2,
+    "total_tokens": 21,
+    "content": " OK",
+    "finish_reason": "stop",
+    "request_id": "chatcmpl-9c171754458413b2c0da76004c27b85f"
+  }
+}
+{
+  "ts": "B-kimi-k2.6.finish",
+  "test_id": "B-kimi-k2.6.finish",
+  "status": "PASS",
+  "message": "kimi-k2.6: finish_reason=stop",
+  "details": {
+    "provider": "moonshot",
+    "returned_model": "kimi-k2.6",
+    "prompt_tokens": 19,
+    "completion_tokens": 2,
+    "total_tokens": 21,
+    "content": " OK",
+    "finish_reason": "stop",
+    "request_id": "chatcmpl-9c171754458413b2c0da76004c27b85f"
+  }
+}
+{
+  "ts": "B-qwen3-32b",
+  "test_id": "B-qwen3-32b",
+  "status": "SKIP",
+  "message": "模型 qwen3-32b 当前不可用 (model_not_found)",
+  "details": {
+    "http_code": "503",
+    "error_code": "model_not_found",
+    "body": "{\"error\":{\"code\":\"model_not_found\",\"gateway_debug\":{\"attempts\":null,\"kind\":\"\",\"retryable\":false,\"stage\":\"execution\",\"tried\":0},\"kind\":\"no_candidates\",\"message\":\"No available provider for model 'qwen3-"
+  }
+}
+{
+  "ts": "B-qwen3-235b-a22b",
+  "test_id": "B-qwen3-235b-a22b",
+  "status": "FAIL",
+  "message": "模型 qwen3-235b-a22b 返回 HTTP 000",
+  "details": {
+    "http_code": "000",
+    "body": ""
+  }
+}
+{
+  "ts": "B-doubao-pro-32k",
+  "test_id": "B-doubao-pro-32k",
+  "status": "SKIP",
+  "message": "模型 doubao-pro-32k 当前不可用 (model_not_found)",
+  "details": {
+    "http_code": "503",
+    "error_code": "model_not_found",
+    "body": "{\"error\":{\"code\":\"model_not_found\",\"gateway_debug\":{\"attempts\":null,\"kind\":\"\",\"retryable\":false,\"stage\":\"execution\",\"tried\":0},\"kind\":\"no_candidates\",\"message\":\"No available provider for model 'doubao"
+  }
+}
+{
+  "ts": "B-mimo-v2.5-pro",
+  "test_id": "B-mimo-v2.5-pro",
+  "status": "FAIL",
+  "message": "模型 mimo-v2.5-pro 返回 HTTP 000",
+  "details": {
+    "http_code": "000",
+    "body": ""
+  }
+}
+{
+  "ts": "B-llama-3.3-70b-instruct.model",
+  "test_id": "B-llama-3.3-70b-instruct.model",
+  "status": "PASS",
+  "message": "llama-3.3-70b-instruct: response.model 回填正确",
+  "details": {
+    "provider": "meta",
+    "returned_model": "llama-3.3-70b-instruct",
+    "prompt_tokens": 45,
+    "completion_tokens": 2,
+    "total_tokens": 47,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "chatcmpl-496bdbc0587ca39f9695e12ceab2e050"
+  }
+}
+{
+  "ts": "B-llama-3.3-70b-instruct.tokens",
+  "test_id": "B-llama-3.3-70b-instruct.tokens",
+  "status": "PASS",
+  "message": "llama-3.3-70b-instruct: usage.total_tokens=47",
+  "details": {
+    "provider": "meta",
+    "returned_model": "llama-3.3-70b-instruct",
+    "prompt_tokens": 45,
+    "completion_tokens": 2,
+    "total_tokens": 47,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "chatcmpl-496bdbc0587ca39f9695e12ceab2e050"
+  }
+}
+{
+  "ts": "B-llama-3.3-70b-instruct.content",
+  "test_id": "B-llama-3.3-70b-instruct.content",
+  "status": "PASS",
+  "message": "llama-3.3-70b-instruct: content 非空 (len=2)",
+  "details": {
+    "provider": "meta",
+    "returned_model": "llama-3.3-70b-instruct",
+    "prompt_tokens": 45,
+    "completion_tokens": 2,
+    "total_tokens": 47,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "chatcmpl-496bdbc0587ca39f9695e12ceab2e050"
+  }
+}
+{
+  "ts": "B-llama-3.3-70b-instruct.finish",
+  "test_id": "B-llama-3.3-70b-instruct.finish",
+  "status": "PASS",
+  "message": "llama-3.3-70b-instruct: finish_reason=stop",
+  "details": {
+    "provider": "meta",
+    "returned_model": "llama-3.3-70b-instruct",
+    "prompt_tokens": 45,
+    "completion_tokens": 2,
+    "total_tokens": 47,
+    "content": "OK",
+    "finish_reason": "stop",
+    "request_id": "chatcmpl-496bdbc0587ca39f9695e12ceab2e050"
+  }
+}

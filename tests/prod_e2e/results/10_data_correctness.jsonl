@@ -1,0 +1,47 @@
+{
+  "ts": "J1",
+  "test_id": "J1",
+  "status": "PASS",
+  "message": "X-Request-Id 存在: 69334da9f80f948a4df0b3692582c88a (len=32)",
+  "details": {
+    "request_id": "69334da9f80f948a4df0b3692582c88a"
+  }
+}
+{
+  "ts": "J2",
+  "test_id": "J2",
+  "status": "PASS",
+  "message": "5 个不同 request_id",
+  "details": {}
+}
+{
+  "ts": "J3",
+  "test_id": "J3",
+  "status": "PASS",
+  "message": "non-stream: 30 tokens; stream 内容存在 (head=<think>The user just said \"OK\"...)",
+  "details": {
+    "non_stream_tokens": 30,
+    "total": "216",
+    "prompt": "186",
+    "streamed_preview": "<think>The user just said \"OK\". This is a very brief message with no clear request or question. I sh",
+    "non_stream_preview": "<think>\nThe user is asking me to reply with the single word \"OK\" and nothing else. This is a simple "
+  }
+}
+{
+  "ts": "J4",
+  "test_id": "J4",
+  "status": "PASS",
+  "message": "错误响应含 request_id=14b5d2bcb02e4d3984d6b70da2b9883c",
+  "details": {
+    "request_id": "14b5d2bcb02e4d3984d6b70da2b9883c"
+  }
+}
+{
+  "ts": "J5",
+  "test_id": "J5",
+  "status": "PASS",
+  "message": "错误响应不含供应商/API key 关键字",
+  "details": {
+    "body": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"content\":\"\\u003cthink\\u003e\\nThe user has sent an empty message. I should respond in a helpful way, perhaps asking what they need help with.\\n\\u003c/think\\u003e\\nIt looks like your message came through empty. How can I help you today? Feel fr"
+  }
+}

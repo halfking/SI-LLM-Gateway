@@ -27,8 +27,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/kaixuan/llm-gateway-go/internal/probeutil"
 	"github.com/kaixuan/llm-gateway-go/provider"
 )
 
@@ -155,10 +158,44 @@ func (h *Handler) doHealthCheck(ctx context.Context, providerID, credID int) (ma
 		msg := healthError
 		apiModelsErr = &msg
 	} else {
-		start := time.Now()
-		models, source, fetchErr := h.resolveModelsForCredential(ctx, cred, apiKey, true)
-		healthLatencyMs = int(time.Since(start).Milliseconds())
+		// 2026-06-29 audit: a single failed vendor-models fetch must not
+		// mark a credential unreachable. Wrap the resolveModelsForCredential
+		// call in the shared short-jitter retry loop (0s/2s/5s) so transient
+		// network blips, momentary 5xx, or upstream LB hiccups are absorbed
+		// instead of leaking into the health_status as "unreachable".
+		//
+		// The classifier below mirrors bg/credential_probe_v2.go's policy
+		// (see internal/probeutil.IsProbeRetryableStatus): 401/403/404/400/
+		// 422/402 fail fast; everything else (5xx, 408, 425, 429, network
+		// errors) retries.
+		var (
+			models     []string
+			source     string
+			fetchErr   error
+			attempts   int
+		)
+		fetchStart := time.Now()
+		for _, delay := range probeutil.ProbeRetryDelays {
+			if !probeutil.SleepWithCtx(ctx, delay) {
+				fetchErr = ctx.Err()
+				break
+			}
+			attempts++
+			models, source, fetchErr = h.resolveModelsForCredential(ctx, cred, apiKey, true)
+			if fetchErr == nil {
+				break
+			}
+			if !shouldRetryAdminFetchErr(fetchErr) {
+				break
+			}
+		}
+		healthLatencyMs = int(time.Since(fetchStart).Milliseconds())
 		effectiveSource = source
+		if attempts > 1 && fetchErr != nil {
+			// Annotate the error so the operator can see retries were
+			// attempted (useful when looking at health_error later).
+			fetchErr = fmt.Errorf("after %d attempts: %w", attempts, fetchErr)
+		}
 
 		if fetchErr != nil {
 			healthStatus = "unreachable"
@@ -322,5 +359,43 @@ func (h *Handler) getCredentialUsage(w http.ResponseWriter, r *http.Request, cre
 		"avg_latency_ms":     avgLatency,
 		"success_rate":       successRate,
 	})
+}
+
+// shouldRetryAdminFetchErr classifies a fetchVendorModelsFromURLs error
+// into retryable vs fail-fast. Mirrors the bg/credential_probe_v2 policy
+// in internal/probeutil.
+//
+// Recognised fetch error shapes (produced by fetchVendorModels):
+//   "models endpoint returned 503: ..."  → status 503 → retryable
+//   "no models found from any candidate URL" → no status code → retryable
+//     (could be all-URLs 5xx or network blip)
+//   "Get \"...\": dial tcp: ..."         → network error → retryable
+//   "<url>: context canceled"           → ctx cancel → fail-fast (stop signal)
+func shouldRetryAdminFetchErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if probeutil.IsProbeCtxCancel(err) {
+		return false
+	}
+	msg := err.Error()
+	// Sniff for an embedded HTTP status code in the format
+	// "models endpoint returned NNN: ...".
+	if idx := strings.Index(msg, "returned "); idx >= 0 {
+		rest := msg[idx+len("returned "):]
+		end := 0
+		for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
+			end++
+		}
+		if end >= 3 {
+			code, convErr := strconv.Atoi(rest[:end])
+			if convErr == nil {
+				return probeutil.IsProbeRetryableStatus(code)
+			}
+		}
+	}
+	// No status code visible — assume network/transport level.
+	// The shared classifier (status==0 → retryable) covers this.
+	return probeutil.IsProbeRetryableStatus(0)
 }
 

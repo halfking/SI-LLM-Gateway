@@ -24,9 +24,15 @@ func jsonMarshal(v any) ([]byte, error) {
 type RequestLogContext struct {
 	handler   *ChatHandler
 	RequestID string
-	StartTime time.Time
-	Request   *http.Request
-	Session   *sessions.Session
+	// ClientRequestID is the X-Request-Id the client supplied, if any.
+	// Persisted into request_logs.client_request_id for debug /
+	// cross-system tracing. Distinct from RequestID (the server-generated
+	// UUID that is the primary audit key) so client retries that reuse
+	// the same id do not collapse into one row.
+	ClientRequestID string
+	StartTime       time.Time
+	Request         *http.Request
+	Session         *sessions.Session
 
 	KeyInfo       *auth.KeyInfo
 	Body          []byte
@@ -48,12 +54,12 @@ type RequestLogContext struct {
 	// v3 (2026-06-19) session-level outbound body fields.
 	// Populated by SessionCompressor.Prepare when it rewrites bodyBytes.
 	// All nil when the session compressor was not active.
-	OutboundBody      []byte
-	OutboundMsgCount  *int
-	OutboundTokenEst  *int
-	OutboundMsgHashes []byte // JSON [{index, sha256}]
-	OutboundStrategy  string // compression_strategy value (e.g. "delta_append")
-	OutboundSummaryMarker string
+	OutboundBody            []byte
+	OutboundMsgCount        *int
+	OutboundTokenEst        *int
+	OutboundMsgHashes       []byte // JSON [{index, sha256}]
+	OutboundStrategy        string // compression_strategy value (e.g. "delta_append")
+	OutboundSummaryMarker   string
 	OutboundWindowTriggered string
 
 	ErrCode string
@@ -66,9 +72,9 @@ type RequestLogContext struct {
 	// QualityScore is the 0..1 score from computeScore; nil when the
 	// provider is in 'off' mode. Streaming path appends to QualityFlags
 	// incrementally as each delta chunk is processed.
-	QualityFlags     []string
+	QualityFlags      []string
 	QualityFixActions []byte
-	QualityScore     *float64
+	QualityScore      *float64
 
 	meta   requestAttemptMeta
 	logged bool
@@ -365,6 +371,11 @@ func (c *RequestLogContext) BuildFailureEntry(errCode, errMessage string, provid
 	detailCode := mapGatewayErrorToDetail(errCode)
 	failureStage := classifyFailureStage(errCode)
 
+	var clientRequestIDPtr *string
+	if c.ClientRequestID != "" {
+		v := c.ClientRequestID
+		clientRequestIDPtr = &v
+	}
 	reqLog := &telemetry.RequestLogEntry{
 		RequestID:         c.RequestID,
 		TenantID:          tenantID,
@@ -389,6 +400,10 @@ func (c *RequestLogContext) BuildFailureEntry(errCode, errMessage string, provid
 		RequestPreview:    requestPreviewPtr,
 		ResponseBody:      responseBodyText,
 		ResponsePreview:   responsePreviewPtr,
+		// 2026-06-26: persist the client-supplied X-Request-Id for
+		// debug / cross-system tracing. Distinct from RequestID
+		// (server-generated) so client retries do not collapse.
+		ClientRequestID: clientRequestIDPtr,
 	}
 	enrichRequestLogFromMeta(reqLog, c.KeyInfo, &c.meta)
 	applyAutoRouteFields(reqLog, c)

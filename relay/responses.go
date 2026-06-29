@@ -234,6 +234,29 @@ func (h *ResponsesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	clientModel := reqBody.Model
 
+	// ── Session resolution (2026-06-29) ──────────────────────────
+	// Unified session handling for /v1/responses: load existing session,
+	// create fallback session for not-found/expired, or auto-create when
+	// no session header is present. This ensures /v1/responses has the same
+	// session context as /v1/chat/completions, fixing the "request sent
+	// without session attachment" gap identified in the audit.
+	ctx := r.Context()
+	if keyInfo != nil {
+		ctx = sessions.SetAPIKeyID(ctx, keyInfo.ID)
+		ctx = sessions.SetTenantID(ctx, keyInfo.TenantID)
+	}
+	sessionResult := h.chatHandler.resolveSessionFromRequest(ctx, r, keyInfo)
+	if sessionResult != nil {
+		ctx = sessionResult.Context
+		if sessionResult.ResumeHeader != "" {
+			w.Header().Set("X-Gw-Session-Id-Resume", sessionResult.ResumeHeader)
+			if sessionResult.AutoCreated {
+				w.Header().Set("X-Gw-Session-Auto", "true")
+			}
+		}
+	}
+	r = r.WithContext(ctx)
+
 	// ── Tenant model policy (Round 48, 2026-06-21) ──────────────
 	// Inserted here so a denied request never reaches GetCandidates.
 	// The /v1/responses path does not use auto_route, so a single
@@ -258,20 +281,6 @@ func (h *ResponsesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	isStream := reqBody.Stream
-	// V2 (2026-06-26): see relay/messages.go for header priority rationale.
-	sessionID := r.Header.Get("X-Gw-Session-Id")
-	if sessionID == "" {
-		sessionID = r.Header.Get("X-Session-Id")
-	}
-	if sessionID == "" {
-		sessionID = r.Header.Get("X-Conversation-Id")
-	}
-	if sessionID == "" {
-		sessionID = r.Header.Get("X-Chat-Session-Id")
-	}
-	if sessionID == "" {
-		sessionID = r.Header.Get("X-Thread-Id")
-	}
 	endUser := extractEndUser(r)
 	clientID := identity.BuildIdentityFromRequest(r, tenant(keyInfo), appID(keyInfo), apiKeyIDPtr(keyInfo), clientProfileFromKey(keyInfo))
 

@@ -276,6 +276,13 @@ type probeResult struct {
 }
 
 // probeCredential runs the 2-step probe (GET /v1/models + mini chat "hi").
+//
+// 2026-06-29 audit: a single failed probe must not declare a credential
+// dead. Each step is wrapped in a short-jitter retry loop (0s/2s/5s, see
+// internal/probeutil.ProbeRetryDelays) that only retries on transient
+// conditions (network errors, 5xx, 408/425/429). 401/403/404/400/422/402
+// fail fast because retrying them is pointless and risks masking real
+// configuration errors.
 func (c *CredentialProbeV2) probeCredential(ctx context.Context, s v2Snapshot) (bool, string) {
 	if s.BaseURL == "" {
 		return false, "empty base URL"
@@ -290,48 +297,167 @@ func (c *CredentialProbeV2) probeCredential(ctx context.Context, s v2Snapshot) (
 		if len(modelsURLs) == 0 {
 			return true, "" // manifest-only, skip
 		}
-		step1OK := false
-		for _, u := range modelsURLs {
-			req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
-			if err != nil {
-				continue
+		// Outer loop: short-jitter retries.
+		// Inner loop: walk the candidate URLs (e.g. base/v1/models, base/models).
+		// Per attempt we accept the first URL that returns 200. A non-retryable
+		// status (401/403/404/400/422) on any URL short-circuits to a final
+		// failure; all-URLs-5xx-or-network triggers the next retry.
+		var lastErr string
+		for _, delay := range probeutil.ProbeRetryDelays {
+			if !probeutil.SleepWithCtx(ctx, delay) {
+				return false, "ctx canceled during step1 retry: " + ctx.Err().Error()
 			}
-			providercap.ApplyAuthHeaders(req, desc, s.APIKey)
-			resp, err := httpClient.Do(req)
-			if err != nil {
-				continue
+			step1OK := false
+			nonRetryableHit := ""
+			for _, u := range modelsURLs {
+				req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+				if err != nil {
+					continue
+				}
+				providercap.ApplyAuthHeaders(req, desc, s.APIKey)
+				resp, err := httpClient.Do(req)
+				if err != nil {
+					// Network error — record and try next URL within this attempt.
+					lastErr = fmt.Sprintf("models endpoint network error: %s", err.Error())
+					continue
+				}
+				body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+				//nolint:errcheck // best-effort close
+				resp.Body.Close()
+				if resp.StatusCode == 200 {
+					step1OK = true
+					break
+				}
+				if !probeutil.IsProbeRetryableStatus(resp.StatusCode) {
+					nonRetryableHit = fmt.Sprintf("status %d: %s", resp.StatusCode, truncateBody(body))
+					break
+				}
+				lastErr = fmt.Sprintf("status %d: %s", resp.StatusCode, truncateBody(body))
 			}
-			body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
-			//nolint:errcheck // best-effort close
-			resp.Body.Close()
-			if resp.StatusCode == 200 {
-				step1OK = true
+			if step1OK {
+				lastErr = ""
 				break
 			}
-			if resp.StatusCode == 401 || resp.StatusCode == 403 {
-				return false, fmt.Sprintf("401/403: %s", truncateBody(body))
+			if nonRetryableHit != "" {
+				// nonRetryableHit already carries "status <code>: <body>",
+				// so no need to re-list the status codes in the prefix.
+				return false, nonRetryableHit
 			}
 		}
-		if !step1OK {
-			return false, "models endpoint unreachable"
+		if lastErr != "" {
+			return false, fmt.Sprintf("models endpoint unreachable (after %d attempts): %s",
+				len(probeutil.ProbeRetryDelays), lastErr)
 		}
 	}
 
 	// Step 2: mini chat completion with "hi" — protocol-aware.
 	// For anthropic-messages providers (e.g. minimax /anthropic) the openai
 	// chat URL 404s, so we hit /v1/messages instead with x-api-key.
-	if desc.ChatProbeEndpoint == upstreamurl.EpMessages {
-		msgURL := providercap.ProbeEndpointURL(s.BaseURL, desc)
-		ok, errMsg := c.miniAnthropic(ctx, httpClient, s.APIKey, s.DefaultProbeModel, msgURL, 20)
+	runChat := func() (bool, string) {
+		if desc.ChatProbeEndpoint == upstreamurl.EpMessages {
+			msgURL := providercap.ProbeEndpointURL(s.BaseURL, desc)
+			return c.miniAnthropic(ctx, httpClient, s.APIKey, s.DefaultProbeModel, msgURL, 20)
+		}
+		chatURL := providercap.ProbeEndpointURL(s.BaseURL, desc)
+		ok, errMsg := c.miniChat(ctx, httpClient, s.APIKey, s.DefaultProbeModel, chatURL, 1)
+		if !ok && strings.Contains(errMsg, "max_tokens") {
+			// Some legacy gateways reject max_tokens < 2; retry with 2.
+			// This is a parameter-compatibility fallback, NOT a transient
+			// retry — runs at most once per attempt, inside the attempt.
+			ok, errMsg = c.miniChat(ctx, httpClient, s.APIKey, s.DefaultProbeModel, chatURL, 2)
+		}
 		return ok, errMsg
 	}
-	chatURL := providercap.ProbeEndpointURL(s.BaseURL, desc)
-	ok, errMsg := c.miniChat(ctx, httpClient, s.APIKey, s.DefaultProbeModel, chatURL, 1)
-	if !ok && strings.Contains(errMsg, "max_tokens") {
-		// Some legacy gateways reject max_tokens < 2; retry with 2
-		ok, errMsg = c.miniChat(ctx, httpClient, s.APIKey, s.DefaultProbeModel, chatURL, 2)
+
+	var (
+		errMsg  string
+		lastErr string
+	)
+	for _, delay := range probeutil.ProbeRetryDelays {
+		if !probeutil.SleepWithCtx(ctx, delay) {
+			return false, "ctx canceled during step2 retry: " + ctx.Err().Error()
+		}
+		ok, e := runChat()
+		if ok {
+			return true, ""
+		}
+		errMsg = e
+		lastErr = e
+		// Network / 5xx / 408 / 425 / 429 → retry next loop.
+		// Anything else (400, 401, 402, 403, 404, 422) → fail fast.
+		if !shouldRetryChatErrMsg(errMsg) {
+			return false, errMsg
+		}
 	}
-	return ok, errMsg
+	return false, fmt.Sprintf("chat unreachable (after %d attempts): %s",
+		len(probeutil.ProbeRetryDelays), lastErr)
+}
+
+// shouldRetryChatErrMsg inspects the errMsg produced by miniChat / miniAnthropic
+// and returns true when the underlying failure is transient (network error,
+// 5xx, 408, 425, 429). Clear business failures (400/401/402/403/404/422)
+// return false so the loop fails fast.
+//
+// miniChat / miniAnthropic do not return a structured status, so we sniff
+// the errMsg. Recognised shapes:
+//
+//   "chat status 503: ..."  → status 503 → retryable
+//   "401/403: ..."         → not retryable
+//   "chat unreachable: ..." → network error → retryable
+//   "messages status 429: ..." → retryable
+//   "endpoint_id_required: ..." → not retryable (config issue)
+func shouldRetryChatErrMsg(errMsg string) bool {
+	if errMsg == "" {
+		// Empty error after a failed chat is unusual; treat as retryable
+		// rather than silently declaring success.
+		return true
+	}
+	if strings.HasPrefix(errMsg, "401/403:") ||
+		strings.HasPrefix(errMsg, "402 ") ||
+		strings.HasPrefix(errMsg, "402:") ||
+		strings.Contains(errMsg, "endpoint_id_required") {
+		return false
+	}
+	// Look for "status NNN:" and run through the classifier.
+	if code, ok := extractStatusCode(errMsg); ok {
+		return probeutil.IsProbeRetryableStatus(code)
+	}
+	// No status code visible — assume network/transport level error
+	// (chat unreachable, build request, etc.). Always retryable so long
+	// as the context is still alive (the loop checks ctx itself).
+	return true
+}
+
+// extractStatusCode pulls the first "<word> status NNN:" or "status NNN:"
+// pattern from a probe errMsg. Returns (code, true) on success.
+//
+// Recognised shapes produced by miniChat / miniAnthropic:
+//   "chat status 503: ..."      → 503
+//   "messages status 429: ..."  → 429
+//   "status 500: ..."           → 500  (defensive; not currently emitted)
+func extractStatusCode(s string) (int, bool) {
+	const statusWord = "status "
+	for _, prefix := range []string{"chat ", "messages ", statusWord} {
+		idx := strings.Index(s, prefix)
+		if idx < 0 {
+			continue
+		}
+		rest := s[idx+len(prefix):]
+		// Parse 3+ digits.
+		end := 0
+		for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
+			end++
+		}
+		if end < 3 {
+			continue
+		}
+		var code int
+		for i := 0; i < end; i++ {
+			code = code*10 + int(rest[i]-'0')
+		}
+		return code, true
+	}
+	return 0, false
 }
 
 func (c *CredentialProbeV2) miniChat(ctx context.Context, httpClient *http.Client, apiKey, model, chatURL string, maxTokens int) (bool, string) {

@@ -275,10 +275,33 @@ func (sm *Manager) Migrate(ctx context.Context, sessionID string, newDeviceSeed 
 	return session, nil
 }
 
+// Touch updates the session's last_active timestamp and extends the expiry
+// time (sliding window). This ensures active sessions remain valid beyond
+// their initial TTL.
+//
+// 2026-06-29: extended to refresh expires_at and Redis key TTLs so that
+// active sessions don't expire after the fixed initial TTL. This matches
+// the "5-minute sliding window" behavior documented elsewhere in the codebase.
 func (sm *Manager) Touch(ctx context.Context, sessionID string) error {
-	return sm.redis.HSet(ctx, "session:"+sessionID, map[string]any{
-		"last_active": time.Now().Format(time.RFC3339),
+	now := time.Now()
+	newExpiresAt := now.Add(sm.ttl)
+
+	// Update session hash: last_active + expires_at
+	pipe := sm.redis.client.Pipeline()
+	pipe.HSet(ctx, "session:"+sessionID, map[string]any{
+		"last_active": now.Format(time.RFC3339),
+		"expires_at":  newExpiresAt.Format(time.RFC3339),
 	})
+
+	// Refresh Redis key TTLs so active sessions don't get evicted
+	// Note: we don't know api_key_id here without reading the session first,
+	// so we only refresh the main session hash. The session:key:* and
+	// session:apiKey:*:active keys will expire at their original TTL, which
+	// is acceptable (they're lookup indexes, not the authoritative data).
+	pipe.Expire(ctx, "session:"+sessionID, sm.ttl)
+
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // BindAPIKey claims an orphan session (api_key_id=0) created before auth was wired.

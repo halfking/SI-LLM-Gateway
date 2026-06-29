@@ -145,6 +145,16 @@ var concurrentOverloadCJKRe = regexp.MustCompile(
 		`稍后重试|限流`,
 )
 
+// minimaxQuotaRe matches MiniMax-specific quota/balance errors that should
+// be classified as KindQuota rather than KindTransient. Added 2026-06-29
+// to improve error classification for minimax-prod-1 credential failures.
+var minimaxQuotaRe = regexp.MustCompile(
+	`(?i)(余额不足|balance.{0,20}insufficient|`+
+		`quota.{0,20}(exhaust|exceed|insufficient)|`+
+		`账户.{0,10}(欠费|余额)|`+
+		`insufficient (credit|balance|quota))`,
+)
+
 // eofWithoutDoneRe is a Go-level signal: the SSE stream closed before
 // the [DONE] sentinel. When combined with provider-known overload (or
 // repeated across the same credential) this is treated as concurrent
@@ -246,6 +256,11 @@ func ClassifyErrorWithBody(status int, body []byte) ErrorKind {
 		if concurrentOverloadRe.Match(body) || concurrentOverloadCJKRe.Match(body) {
 			return KindConcurrent
 		}
+		// 🆕 2026-06-29: Check for MiniMax quota errors before falling to transient
+		// Only match quota regex for non-429 statuses to avoid changing 429 behavior
+		if status != 429 && minimaxQuotaRe.Match(body) {
+			return KindQuota
+		}
 		// P5 (2026-06-18): model_not_found only on 400/404/422, matching
 		// ClassifyResponseBody's status gate. A 5xx body that mentions
 		// "model not found" (e.g. a misconfigured proxy returning 502 with
@@ -297,6 +312,10 @@ func ClassifyResponseBody(status int, body []byte) ErrorKind {
 	if len(body) > 0 {
 		if concurrentOverloadRe.Match(body) || concurrentOverloadCJKRe.Match(body) {
 			return KindConcurrent
+		}
+		// 🆕 2026-06-29: Check for MiniMax quota errors
+		if minimaxQuotaRe.Match(body) {
+			return KindQuota
 		}
 		if (status == 400 || status == 404 || status == 422) &&
 			(modelNotFoundRe.Match(body) || modelNotFoundCJKRe.Match(body)) {
