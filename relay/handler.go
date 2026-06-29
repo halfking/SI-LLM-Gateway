@@ -365,13 +365,31 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//    pointer so success / explicit-failure paths can mark the
 	//    row as already-written to avoid double-logging.
 	var logCtx *RequestLogContext
+	// 2026-06-26: ALWAxys use the server-generated X-Request-Id
+	// (the RequestIDMiddleware overwrites this header with a fresh
+	// UUID). Defensive uuid.NewString fallback covers unit tests
+	// that bypass the middleware.
 	requestID := r.Header.Get("X-Request-Id")
 	if requestID == "" {
 		requestID = generateRequestID()
 		w.Header().Set("X-Request-Id", requestID)
 	}
+	// 2026-06-26: capture the client-supplied X-Request-Id
+	// forwarded by the middleware as X-Gw-Client-Request-Id so
+	// it can persist into request_logs.client_request_id for
+	// debug / cross-system tracing.
+	var clientRequestID string
+	if v := r.Header.Get("X-Gw-Client-Request-Id"); v != "" {
+		clientRequestID = v
+	} else if v := r.Header.Get("X-Client-Request-Id"); v != "" {
+		clientRequestID = v
+	}
+	if clientRequestID != "" && clientRequestID != requestID {
+		w.Header().Set("X-Client-Request-Id", clientRequestID)
+	}
 	startTime := time.Now()
 	logCtx = h.NewRequestLogContext(r, requestID, startTime)
+	logCtx.ClientRequestID = clientRequestID
 	if wt := strings.TrimSpace(r.Header.Get(autoWorkTypeHeader)); wt != "" {
 		logCtx.SetWorkType(wt)
 	}
@@ -875,7 +893,7 @@ func (h *ChatHandler) serveWithExecutor(
 
 	// ── Session resolution (deferred from header parsing) ──────────────
 	// If client didn't provide a session ID, resolve it now based on message count.
-	// Logic: 
+	// Logic:
 	//  - Single message (new conversation) → create new session
 	//  - Multiple messages (continuing conversation) → reuse recent session or create new
 	if needSessionResolution && h.lastSystemSessionIndex != nil && keyInfo != nil {
@@ -1332,7 +1350,7 @@ func (h *ChatHandler) serveWithExecutor(
 		if err == nil && len(messages) > 0 {
 			// Compute content fingerprint
 			contentHash := h.contentDedupCache.ComputeFingerprint(messages, model, stream)
-			
+
 			// Check cache and replay if hit
 			replayed, err := h.contentDedupCache.CheckAndReplay(
 				r.Context(),
@@ -1351,7 +1369,7 @@ func (h *ChatHandler) serveWithExecutor(
 				// Don't call markLogged() here - logCtx.MarkLogged() already sets the flag
 				return
 			}
-			
+
 			// Cache miss: continue with normal execution
 			// Note: We'll store the response after successful LLM call
 			// Store contentHash in r.Context() for later retrieval
@@ -1751,7 +1769,7 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 	}
 	requestPreviewText := requestPreview(requestBody)
 	transformSummaryText := transformSummary(txResult, evt.OutboundModel)
-	
+
 	// 2026-06-26: Fix response_preview missing for streaming responses.
 	// For streaming, responseBody is empty but responseBodyText contains the
 	// reconstructed response. Use responseBodyText if available.
@@ -1761,7 +1779,7 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 	} else if len(responseBody) > 0 {
 		responsePreviewText = responsePreview(responseBody)
 	}
-	
+
 	var requestPreviewPtr *string
 	if requestPreviewText != "" {
 		requestPreviewPtr = strPtr(requestPreviewText)
@@ -1777,6 +1795,11 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 
 	loggedOutbound := outboundModelForLog(evt.ClientModel, evt.OutboundModel, result.Candidate.RawModel)
 
+	var clientRIDPtr *string
+	if logCtx != nil && logCtx.ClientRequestID != "" {
+		v := logCtx.ClientRequestID
+		clientRIDPtr = &v
+	}
 	reqLog := &telemetry.RequestLogEntry{
 		RequestID:       evt.RequestID,
 		TenantID:        tenantID,
@@ -1795,6 +1818,10 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 		LatencyMs:       intPtr(result.LatencyMs),
 		Success:         true,
 		RequestStatus:   strPtr(telemetry.RequestStatusSuccess),
+		// 2026-06-26: persist the client-supplied X-Request-Id for
+		// debug / cross-system tracing alongside the
+		// server-generated RequestID.
+		ClientRequestID: clientRIDPtr,
 		// 2026-06-20: explicitly clear ErrorKind so any stale
 		// error_kind from a prior failed UPDATE attempt for the
 		// same request_id is wiped. The UPSERT also handles this
