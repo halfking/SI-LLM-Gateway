@@ -2,7 +2,7 @@
 -- Object:   credit_ledger_2026_06
 -- Type:     TABLE
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: credit_ledger_2026_06; Type: TABLE; Schema: public; Owner: -
 --

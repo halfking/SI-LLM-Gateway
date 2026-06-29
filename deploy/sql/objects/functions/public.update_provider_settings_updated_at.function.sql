@@ -2,7 +2,7 @@
 -- Object:   update_provider_settings_updated_at()
 -- Type:     FUNCTION
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: update_provider_settings_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --

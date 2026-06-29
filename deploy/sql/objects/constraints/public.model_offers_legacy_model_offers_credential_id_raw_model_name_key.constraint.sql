@@ -2,7 +2,7 @@
 -- Object:   model_offers_legacy model_offers_credential_id_raw_model_name_key
 -- Type:     CONSTRAINT
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: model_offers_legacy model_offers_credential_id_raw_model_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --

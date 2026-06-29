@@ -2,7 +2,7 @@
 -- Object:   tenant_model_policies tenant_model_policies_audit_trg
 -- Type:     TRIGGER
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: tenant_model_policies tenant_model_policies_audit_trg; Type: TRIGGER; Schema: public; Owner: -
 --

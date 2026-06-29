@@ -2,7 +2,7 @@
 -- Object:   tuning_signals_5m
 -- Type:     MATERIALIZED VIEW
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: tuning_signals_5m; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --

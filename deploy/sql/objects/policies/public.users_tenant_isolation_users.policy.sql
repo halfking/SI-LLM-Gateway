@@ -2,7 +2,7 @@
 -- Object:   users tenant_isolation_users
 -- Type:     POLICY
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: users tenant_isolation_users; Type: POLICY; Schema: public; Owner: -
 --

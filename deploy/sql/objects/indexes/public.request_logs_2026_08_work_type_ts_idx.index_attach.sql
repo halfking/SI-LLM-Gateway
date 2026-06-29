@@ -2,7 +2,7 @@
 -- Object:   request_logs_2026_08_work_type_ts_idx
 -- Type:     INDEX ATTACH
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: request_logs_2026_08_work_type_ts_idx; Type: INDEX ATTACH; Schema: public; Owner: -
 --

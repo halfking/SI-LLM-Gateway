@@ -2,7 +2,7 @@
 -- Object:   session_audit_records session_audit_records_updated_at
 -- Type:     TRIGGER
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: session_audit_records session_audit_records_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --

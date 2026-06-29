@@ -2,7 +2,7 @@
 -- Object:   ensure_request_wal_partition(timestamp with time zone)
 -- Type:     FUNCTION
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: ensure_request_wal_partition(timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
 --
