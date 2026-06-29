@@ -82,6 +82,7 @@ func main() {
 	var weeklyPeakRollup *bg.WeeklyPeakRollup
 	var slotSuggester *bg.SlotSuggester
 	var autoIndexRefresher *bg.AutoIndexRefresher
+	var telemetryArchiver *bg.TelemetryArchiver
 	// memoraSink is the async write buffer for Memora persistence.
 	// Declared at the top so both the executor wiring and the
 	// graceful-shutdown sequence can reference it.
@@ -1030,6 +1031,13 @@ func main() {
 			autoIndexRefresher = bg.NewAutoIndexRefresher(dbConn.Pool(), autoIdx)
 			autoIndexRefresher.Start(context.Background())
 
+			// v2.3: TelemetryArchiver handles monthly archival of
+			// telemetry tables to columnar storage and daily cleanup.
+			// Runs monthly on day 1 at 2AM (request_logs, routing_decision_log)
+			// and daily at 3AM (credential_model_index cleanup).
+			telemetryArchiver = bg.NewTelemetryArchiver(dbConn.Pool())
+			telemetryArchiver.Start(context.Background())
+
 			// v2.0.1: realtime listener for sub-second index refresh
 			// (PG LISTEN/NOTIFY trigger on credential_model_bindings /
 			// credentials / api_keys / model_offers).
@@ -1406,6 +1414,9 @@ func main() {
 	}
 	if autoIndexRefresher != nil {
 		autoIndexRefresher.Stop()
+	}
+	if telemetryArchiver != nil {
+		telemetryArchiver.Stop()
 	}
 	// Drain the Memora sink queue on shutdown so in-flight writes
 	// are not lost. Bounded to 5s so shutdown is not held hostage

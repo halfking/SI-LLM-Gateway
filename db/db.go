@@ -129,6 +129,14 @@ func Open(ctx context.Context, databaseURL string) (*DB, error) {
 		// pool.Close() removed - handled by defer
 		return nil, err
 	}
+	if err := db.EnsureRoutingDecisionLogArchive(migCtx); err != nil {
+		// pool.Close() removed - handled by defer
+		return nil, err
+	}
+	if err := db.EnsureCredentialModelIndexArchive(migCtx); err != nil {
+		// pool.Close() removed - handled by defer
+		return nil, err
+	}
 	if err := db.ensureRoutingOverridesTable(migCtx); err != nil {
 		// pool.Close() removed - handled by defer
 		return nil, err
