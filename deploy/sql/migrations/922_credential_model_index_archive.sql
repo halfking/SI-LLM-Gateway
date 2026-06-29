@@ -69,12 +69,12 @@ BEGIN
     END IF;
 
     -- 2. 归档 7 天前的数据到 columnar（只归档指定月份的数据）
+    -- 注意：columnar 表不支持 ON CONFLICT，但由于我们在删除前归档，且按月分区隔离，不会有重复
     INSERT INTO credential_model_index_archive
     SELECT * FROM credential_model_index
     WHERE bucket >= month_start 
       AND bucket < month_end
-      AND bucket < cutoff_ts
-    ON CONFLICT DO NOTHING;
+      AND bucket < cutoff_ts;
     
     GET DIAGNOSTICS archived_count = ROW_COUNT;
     RAISE NOTICE 'Archived % rows from credential_model_index (month %, older than 7 days)', 
