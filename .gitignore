@@ -104,3 +104,7 @@ traffic-replay-bin
 # 编译产物（go build 输出，按 commit-sha / 版本 / 日期后缀命名）
 llm-gateway-*
 !llm-gateway-go/
+
+# Deployment-specific v2.3.0 scripts (contain internal hostnames)
+scripts/build-and-deploy-docker-v*.sh
+scripts/deploy-v*-to-*.sh
