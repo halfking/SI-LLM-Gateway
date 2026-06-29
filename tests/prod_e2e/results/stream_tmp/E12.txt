@@ -1,0 +1,24 @@
+event: response.created
+data: {"response":{"created_at":1782680699,"id":"resp_15ca5b3c1a1fcacb1ba59e6e","model":"minimax-m3","object":"response","output":[],"status":"in_progress"},"type":"response.created"}
+
+event: response.output_item.added
+data: {"item":{"content":[],"id":"msg_1a1fcacb1ba59e6e","role":"assistant","status":"in_progress","type":"message"},"output_index":0,"type":"response.output_item.added"}
+
+event: response.content_part.added
+data: {"content_index":0,"item_id":"msg_1a1fcacb1ba59e6e","output_index":0,"part":{"annotations":[],"text":"","type":"output_text"},"type":"response.content_part.added"}
+
+event: response.output_text.delta
+data: {"content_index":0,"delta":"\u003cthink\u003e\nThe user is asking me to reply with","item_id":"msg_1a1fcacb1ba59e6e","output_index":0,"type":"response.output_text.delta"}
+
+event: response.output_text.delta
+data: {"content_index":0,"delta":" \"OK\". This is a simple request. I should just respond with \"OK\" as requested.\n\u003c/think\u003e\n","item_id":"msg_1a1fcacb1ba59e6e","output_index":0,"type":"response.output_text.delta"}
+
+event: response.output_text.done
+data: {"content_index":0,"item_id":"msg_1a1fcacb1ba59e6e","output_index":0,"text":"\u003cthink\u003e\nThe user is asking me to reply with \"OK\". This is a simple request. I should just respond with \"OK\" as requested.\n\u003c/think\u003e\n","type":"response.output_text.done"}
+
+event: response.output_item.done
+data: {"item":{"content":[{"annotations":[],"text":"\u003cthink\u003e\nThe user is asking me to reply with \"OK\". This is a simple request. I should just respond with \"OK\" as requested.\n\u003c/think\u003e\n","type":"output_text"}],"id":"msg_1a1fcacb1ba59e6e","role":"assistant","status":"incomplete","type":"message"},"output_index":0,"type":"response.output_item.done"}
+
+event: response.completed
+data: {"response":{"created_at":1782680699,"id":"resp_15ca5b3c1a1fcacb1ba59e6e","model":"minimax-m3","object":"response","output":[{"content":[{"annotations":[],"text":"\u003cthink\u003e\nThe user is asking me to reply with \"OK\". This is a simple request. I should just respond with \"OK\" as requested.\n\u003c/think\u003e\n","type":"output_text"}],"id":"msg_1a1fcacb1ba59e6e","role":"assistant","status":"incomplete","type":"message"}],"status":"incomplete"},"type":"response.completed"}
+

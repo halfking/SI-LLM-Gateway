@@ -87,9 +87,17 @@ logs/
 *.bak
 *.backup
 
+# prod_e2e test artifacts (SSE streaming capture)
+tests/prod_e2e/results/stream_tmp/
+tests/prod_e2e/results/concurrency_tmp/
+
 # Vendored kx-design (use services/shared/kx-design instead)
 kx-design/
 version.json
 web/public/version.json
 web-vue/tsconfig.tsbuildinfo
 traffic-replay-bin
+
+# 编译产物（go build 输出，按 commit-sha / 版本 / 日期后缀命名）
+llm-gateway-*
+!llm-gateway-go/

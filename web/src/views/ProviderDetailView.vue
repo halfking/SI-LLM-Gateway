@@ -43,16 +43,18 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    provider.value = await getProviderDetail(providerId.value)
-    creds.value = await getProviderCredentials(providerId.value)
-    // Best-effort: badge count for the "自动测试" tab. Failure here
-    // must not block the main load.
-    try {
-      const failures = await getProviderRecentProbeFailures(providerId.value)
-      probeFailureCount.value = failures.models.reduce((sum, m) => sum + m.failed_count, 0)
-    } catch {
-      probeFailureCount.value = 0
-    }
+    // Load all three requests concurrently instead of serially
+    const [providerData, credsData, failuresData] = await Promise.all([
+      getProviderDetail(providerId.value),
+      getProviderCredentials(providerId.value),
+      // Best-effort: badge count for the "自动测试" tab. Failure here
+      // must not block the main load, so catch and return empty fallback.
+      getProviderRecentProbeFailures(providerId.value).catch(() => ({ models: [] }))
+    ])
+    
+    provider.value = providerData
+    creds.value = credsData
+    probeFailureCount.value = failuresData.models.reduce((sum, m) => sum + m.failed_count, 0)
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : '加载失败'
   } finally {

@@ -155,6 +155,13 @@ type ChatHandler struct {
 	// the dedup (every request is treated as new).
 	idempotentCache *IdempotentCache
 
+	// contentDedupCache (2026-06-29) detects duplicate requests based
+	// on message content rather than request ID. When a client retries
+	// with a new request ID but the same messages (e.g., after network
+	// failure), the cached response is replayed without calling the LLM.
+	// nil disables content-based dedup.
+	contentDedupCache *ContentDedupCache
+
 	// sessionCompressor (v3, 2026-06-19) is the session-level
 	// intelligent compressor. When non-nil, each request runs a
 	// message-level LCS delta-append + optional proactive sliding-window
@@ -223,6 +230,13 @@ func (h *ChatHandler) SetModelPolicy(mp *modelpolicy.Checker) {
 // 202 + X-Gw-Pending response.
 func (h *ChatHandler) SetIdempotentCache(c *IdempotentCache) {
 	h.idempotentCache = c
+}
+
+// SetContentDedupCache (2026-06-29) wires the content-based deduplication cache.
+// When enabled, requests with identical message content (even if request ID differs)
+// replay cached responses instead of calling the LLM. nil disables content dedup.
+func (h *ChatHandler) SetContentDedupCache(c *ContentDedupCache) {
+	h.contentDedupCache = c
 }
 
 // SetSessionCompressor wires the v3 session-level intelligent compressor.
@@ -351,13 +365,31 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//    pointer so success / explicit-failure paths can mark the
 	//    row as already-written to avoid double-logging.
 	var logCtx *RequestLogContext
+	// 2026-06-26: ALWAxys use the server-generated X-Request-Id
+	// (the RequestIDMiddleware overwrites this header with a fresh
+	// UUID). Defensive uuid.NewString fallback covers unit tests
+	// that bypass the middleware.
 	requestID := r.Header.Get("X-Request-Id")
 	if requestID == "" {
 		requestID = generateRequestID()
 		w.Header().Set("X-Request-Id", requestID)
 	}
+	// 2026-06-26: capture the client-supplied X-Request-Id
+	// forwarded by the middleware as X-Gw-Client-Request-Id so
+	// it can persist into request_logs.client_request_id for
+	// debug / cross-system tracing.
+	var clientRequestID string
+	if v := r.Header.Get("X-Gw-Client-Request-Id"); v != "" {
+		clientRequestID = v
+	} else if v := r.Header.Get("X-Client-Request-Id"); v != "" {
+		clientRequestID = v
+	}
+	if clientRequestID != "" && clientRequestID != requestID {
+		w.Header().Set("X-Client-Request-Id", clientRequestID)
+	}
 	startTime := time.Now()
 	logCtx = h.NewRequestLogContext(r, requestID, startTime)
+	logCtx.ClientRequestID = clientRequestID
 	if wt := strings.TrimSpace(r.Header.Get(autoWorkTypeHeader)); wt != "" {
 		logCtx.SetWorkType(wt)
 	}
@@ -446,6 +478,47 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logCtx.MarkLogged()
 		http.Error(w, `{"error":{"message":"Method not allowed","type":"invalid_request","code":"method_not_allowed"}}`, http.StatusMethodNotAllowed)
 		return
+	}
+
+	// ── 2026-06-29 P1 fix: validate model field is non-empty EARLY ──────
+	// Done before the executor/provider check so a request with a missing
+	// or empty "model" field fails fast with 400 missing_model instead of
+	// either:
+	//   (a) 503 executor_unavailable (if executor/provider not configured) — confusing
+	//   (b) 503 no_candidate (if executor runs but finds nothing for "") — misleading
+	// The OpenAI / Anthropic / Responses APIs all require a model and treat
+	// a missing one as a client bug; we should too. The Anthropic
+	// (relay/messages.go:243) and Responses (relay/responses.go:217)
+	// handlers already do this; only the chat handler was missing it
+	// (caught by prod_e2e/F2).
+	// We need to peek at the body to validate, so we do a one-shot read.
+	// The executor will re-read the body via io.NopCloser+Reset below;
+	// ensure we don't consume the original body twice.
+	if r.Body != nil {
+		// Save body bytes for re-read. logCtx.Body is set further down for
+		// audit, but here we read & re-buffer it for the main pipeline.
+		var peekBuf []byte
+		peekBuf, _ = io.ReadAll(r.Body)
+		if len(peekBuf) > 0 {
+			r.Body = io.NopCloser(bytes.NewReader(peekBuf))
+		}
+		if len(peekBuf) > 0 && len(peekBuf) <= maxBodySize {
+			var peek struct {
+				Model string `json:"model"`
+			}
+			if json.Unmarshal(peekBuf, &peek) == nil && strings.TrimSpace(peek.Model) == "" {
+				logCtx.SetError("missing_model", "model is required")
+				logCtx.EnsureCaptured()
+				if logCtx.ClientModel == "" {
+					logCtx.SetClientModel("<unset>")
+				}
+				logCtx.EmitFailure("missing_model", "model is required", nil, nil)
+				logCtx.MarkLogged()
+				writeErrorJSON(w, http.StatusBadRequest, requestID,
+					"model is required", "invalid_request", "missing_model")
+				return
+			}
+		}
 	}
 
 	if h.executor != nil && h.provider != nil && h.provider.Enabled() {
@@ -800,9 +873,27 @@ func (h *ChatHandler) serveWithExecutor(
 	clientModel := reqBody.Model
 	logCtx.SetClientModel(clientModel)
 
+	// ── 2026-06-29 P1 fix: validate model field is non-empty ────────────
+	// Before this fix, a request with a missing/empty "model" field was
+	// allowed to proceed to routing, where loadCandidatesDB returned no
+	// candidates for "" and the client received a misleading 503
+	// "no_candidate" error. The OpenAI / Anthropic / Responses APIs all
+	// require a model and treat a missing one as a client bug — we should
+	// too. The Anthropic (relay/messages.go:243) and Responses
+	// (relay/responses.go:217) handlers already do this; only the chat
+	// handler was missing it (caught by prod_e2e/F2).
+	if strings.TrimSpace(clientModel) == "" {
+		logCtx.SetError("missing_model", "model is required")
+		logCtx.EmitFailure("missing_model", "model is required", nil, nil)
+		logCtx.MarkLogged()
+		writeErrorJSON(w, http.StatusBadRequest, requestID,
+			"model is required", "invalid_request", "missing_model")
+		return
+	}
+
 	// ── Session resolution (deferred from header parsing) ──────────────
 	// If client didn't provide a session ID, resolve it now based on message count.
-	// Logic: 
+	// Logic:
 	//  - Single message (new conversation) → create new session
 	//  - Multiple messages (continuing conversation) → reuse recent session or create new
 	if needSessionResolution && h.lastSystemSessionIndex != nil && keyInfo != nil {
@@ -1245,6 +1336,46 @@ func (h *ChatHandler) serveWithExecutor(
 		}
 	}
 
+	// ── Content-based dedup (2026-06-29) ─────────────────────────────────
+	// When a client retries with a NEW request ID but SAME message content
+	// (e.g., network failure → user clicks "retry"), we can replay the
+	// cached response instead of calling the LLM again. This catches cases
+	// where idempotentCache misses (different request ID).
+	//
+	// This check happens AFTER idempotentCache to preserve the fast path
+	// for exact duplicates (same request ID).
+	if h.contentDedupCache != nil && sessionID != "" {
+		// Parse messages from request body for fingerprinting
+		messages, model, stream, err := ParseMessagesForFingerprint(bodyBytes)
+		if err == nil && len(messages) > 0 {
+			// Compute content fingerprint
+			contentHash := h.contentDedupCache.ComputeFingerprint(messages, model, stream)
+
+			// Check cache and replay if hit
+			replayed, err := h.contentDedupCache.CheckAndReplay(
+				r.Context(),
+				sessionID,
+				contentHash,
+				w,
+			)
+			if err != nil {
+				slog.Warn("content dedup check failed", "session_id", sessionID, "error", err)
+			}
+			if replayed {
+				// Cache hit! Response already written to client
+				// Mark as successful in logs with special error code for tracking
+				logCtx.SetError("content_cache_hit", fmt.Sprintf("replayed cached response, hash=%s", truncateHash(contentHash)))
+				logCtx.MarkLogged()
+				// Don't call markLogged() here - logCtx.MarkLogged() already sets the flag
+				return
+			}
+
+			// Cache miss: continue with normal execution
+			// Note: We'll store the response after successful LLM call
+			// Store contentHash in r.Context() for later retrieval
+		}
+	}
+
 	stickyKey := buildRouteStickyKey(tenant(keyInfo), appID(keyInfo), apiKeyIDPtr(keyInfo), clientID.Fingerprint.ClientProfile)
 
 	// Phase C (2026-06-22): Pass bodyBytes directly — per-candidate
@@ -1638,7 +1769,7 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 	}
 	requestPreviewText := requestPreview(requestBody)
 	transformSummaryText := transformSummary(txResult, evt.OutboundModel)
-	
+
 	// 2026-06-26: Fix response_preview missing for streaming responses.
 	// For streaming, responseBody is empty but responseBodyText contains the
 	// reconstructed response. Use responseBodyText if available.
@@ -1648,7 +1779,7 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 	} else if len(responseBody) > 0 {
 		responsePreviewText = responsePreview(responseBody)
 	}
-	
+
 	var requestPreviewPtr *string
 	if requestPreviewText != "" {
 		requestPreviewPtr = strPtr(requestPreviewText)
@@ -1664,6 +1795,11 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 
 	loggedOutbound := outboundModelForLog(evt.ClientModel, evt.OutboundModel, result.Candidate.RawModel)
 
+	var clientRIDPtr *string
+	if logCtx != nil && logCtx.ClientRequestID != "" {
+		v := logCtx.ClientRequestID
+		clientRIDPtr = &v
+	}
 	reqLog := &telemetry.RequestLogEntry{
 		RequestID:       evt.RequestID,
 		TenantID:        tenantID,
@@ -1682,6 +1818,10 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 		LatencyMs:       intPtr(result.LatencyMs),
 		Success:         true,
 		RequestStatus:   strPtr(telemetry.RequestStatusSuccess),
+		// 2026-06-26: persist the client-supplied X-Request-Id for
+		// debug / cross-system tracing alongside the
+		// server-generated RequestID.
+		ClientRequestID: clientRIDPtr,
 		// 2026-06-20: explicitly clear ErrorKind so any stale
 		// error_kind from a prior failed UPDATE attempt for the
 		// same request_id is wiped. The UPSERT also handles this
