@@ -325,6 +325,16 @@ func TestClassifyErrorWithBody_ToolCallIdMismatch(t *testing.T) {
 	// return KindToolCallIdMismatch so the credential is NOT cooled
 	// and the audit row carries an explicit "client bug" annotation
 	// for the operator to find.
+	//
+	// 2026-06-30 (P2): the old "plain-2013" subcase (bare
+	// `"message":"2013"` body) is intentionally no longer expected to
+	// classify as tool_call_id_mismatch. The bare (2013) suffix is
+	// shared between context-window errors and tool-call-id errors in
+	// MiniMax's vendor-private error format, so the regex now requires
+	// a "tool" / "tool_" / "tool " / "tool call" / "tool result" cue
+	// alongside the code to disambiguate (see toolCallIdMismatchRe).
+	// A bare "2013" body therefore falls through to the default
+	// transient / status-based classification.
 	tests := []struct {
 		name string
 		body string
@@ -332,10 +342,6 @@ func TestClassifyErrorWithBody_ToolCallIdMismatch(t *testing.T) {
 		{
 			"minimax-2013",
 			`{"error":{"code":2013,"message":"invalid params, tool result's tool id (call_function_poab3apjo8kn_1) not found","type":"invalid_request"}}`,
-		},
-		{
-			"plain-2013",
-			`{"type":"error","error":{"type":"invalid_request_error","message":"2013"}}`,
 		},
 		{
 			"anthropic-style",
