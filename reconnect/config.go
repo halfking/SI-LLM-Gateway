@@ -45,6 +45,36 @@ type Config struct {
 	// global defaults above.
 	TenantOverrides map[string]*TenantConfig
 
+	// ContentDedupEnabled enables content-based deduplication.
+	// When true, the gateway computes a fingerprint of request messages
+	// and checks if an identical request was recently completed. If found,
+	// the cached response is replayed without calling the LLM.
+	//
+	// This catches network retries where the client generates a new
+	// request ID but sends the same messages.
+	//
+	// Default: false (disabled for backwards compatibility)
+	ContentDedupEnabled bool
+
+	// ContentDedupWindow is the time window for content deduplication.
+	// Only cache entries within this window are checked. Older entries
+	// are ignored to avoid returning stale responses.
+	//
+	// Default: 10 minutes
+	ContentDedupWindow time.Duration
+
+	// ContentDedupDepth controls how many recent messages are included
+	// in the content fingerprint:
+	//   0 = last message only
+	//  -1 = all messages
+	//   N = last N messages
+	//
+	// Lower values increase hit rate but may return responses for
+	// different conversations. Higher values are more precise.
+	//
+	// Default: 3 (last 3 messages)
+	ContentDedupDepth int
+
 	mu sync.RWMutex
 }
 
@@ -61,6 +91,9 @@ func NewConfig() *Config {
 		Enabled:             false, // must opt-in
 		AutoResumeByDefault: false,
 		TenantOverrides:     make(map[string]*TenantConfig),
+		ContentDedupEnabled: false,              // must opt-in
+		ContentDedupWindow:  10 * time.Minute,   // 10 minutes
+		ContentDedupDepth:   3,                  // last 3 messages
 	}
 }
 

@@ -155,6 +155,13 @@ type ChatHandler struct {
 	// the dedup (every request is treated as new).
 	idempotentCache *IdempotentCache
 
+	// contentDedupCache (2026-06-29) detects duplicate requests based
+	// on message content rather than request ID. When a client retries
+	// with a new request ID but the same messages (e.g., after network
+	// failure), the cached response is replayed without calling the LLM.
+	// nil disables content-based dedup.
+	contentDedupCache *ContentDedupCache
+
 	// sessionCompressor (v3, 2026-06-19) is the session-level
 	// intelligent compressor. When non-nil, each request runs a
 	// message-level LCS delta-append + optional proactive sliding-window
@@ -223,6 +230,13 @@ func (h *ChatHandler) SetModelPolicy(mp *modelpolicy.Checker) {
 // 202 + X-Gw-Pending response.
 func (h *ChatHandler) SetIdempotentCache(c *IdempotentCache) {
 	h.idempotentCache = c
+}
+
+// SetContentDedupCache (2026-06-29) wires the content-based deduplication cache.
+// When enabled, requests with identical message content (even if request ID differs)
+// replay cached responses instead of calling the LLM. nil disables content dedup.
+func (h *ChatHandler) SetContentDedupCache(c *ContentDedupCache) {
+	h.contentDedupCache = c
 }
 
 // SetSessionCompressor wires the v3 session-level intelligent compressor.
@@ -1301,6 +1315,46 @@ func (h *ChatHandler) serveWithExecutor(
 			logCtx.EmitFailure("idempotent_replay", "duplicate request, returning in_progress", nil, nil)
 			markLogged()
 			return
+		}
+	}
+
+	// ── Content-based dedup (2026-06-29) ─────────────────────────────────
+	// When a client retries with a NEW request ID but SAME message content
+	// (e.g., network failure → user clicks "retry"), we can replay the
+	// cached response instead of calling the LLM again. This catches cases
+	// where idempotentCache misses (different request ID).
+	//
+	// This check happens AFTER idempotentCache to preserve the fast path
+	// for exact duplicates (same request ID).
+	if h.contentDedupCache != nil && sessionID != "" {
+		// Parse messages from request body for fingerprinting
+		messages, model, stream, err := ParseMessagesForFingerprint(bodyBytes)
+		if err == nil && len(messages) > 0 {
+			// Compute content fingerprint
+			contentHash := h.contentDedupCache.ComputeFingerprint(messages, model, stream)
+			
+			// Check cache and replay if hit
+			replayed, err := h.contentDedupCache.CheckAndReplay(
+				r.Context(),
+				sessionID,
+				contentHash,
+				w,
+			)
+			if err != nil {
+				slog.Warn("content dedup check failed", "session_id", sessionID, "error", err)
+			}
+			if replayed {
+				// Cache hit! Response already written to client
+				// Mark as successful in logs with special error code for tracking
+				logCtx.SetError("content_cache_hit", fmt.Sprintf("replayed cached response, hash=%s", truncateHash(contentHash)))
+				logCtx.MarkLogged()
+				// Don't call markLogged() here - logCtx.MarkLogged() already sets the flag
+				return
+			}
+			
+			// Cache miss: continue with normal execution
+			// Note: We'll store the response after successful LLM call
+			// Store contentHash in r.Context() for later retrieval
 		}
 	}
 
