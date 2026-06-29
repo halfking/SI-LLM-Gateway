@@ -19,7 +19,7 @@ deploy/sql/
 ├── 01_functions/        # 函数与触发器
 ├── 02_seed_data/        # 最小初始化数据
 ├── migrations/          # 历史迁移（按编号顺序执行）
-├── objects/             # 184 实时对象快照（只读参考）
+├── objects/             # 生产数据库实时对象快照（只读参考）
 ├── docs/                # 文档 SQL
 ├── adhoc/               # 临时/诊断脚本
 └── scripts/init-db.sh   # 自动化初始化脚本
