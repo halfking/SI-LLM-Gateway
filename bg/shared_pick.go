@@ -135,10 +135,15 @@ func PickProbeModelForCredential(ctx context.Context, db *pgxpool.Pool, credID i
 			}
 			available = append(available, r)
 		}
-		rows.Close()
-		if picked := pickFeaturedModelName(available, featured); picked != "" {
-			return PickProbeResult{Model: picked, Source: "auto:featured"}, nil
-		}
+			rows.Close()
+			// Check rows.Err() before falling back — a database error mid-scan
+			// should be returned, not silently absorbed into the fallback path.
+			if err := rows.Err(); err != nil {
+				return PickProbeResult{}, err
+			}
+			if picked := pickFeaturedModelName(available, featured); picked != "" {
+				return PickProbeResult{Model: picked, Source: "auto:featured"}, nil
+			}
 
 		// Priority 3b: featured 没命中 → 退到原逻辑（随机）。
 		//   保留以兼容 admin 没有维护 featured_models 的旧凭据，
