@@ -36,20 +36,78 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func insertBackgroundTask(ctx context.Context, db *pgxpool.Pool, taskType string, providerID *int, credentialID *int, reqJSON any) (int64, error) {
-	var id int64
 	reqBytes, _ := json.Marshal(reqJSON)
-	err := db.QueryRow(ctx, `
-		INSERT INTO background_tasks (task_type, provider_id, credential_id, request_json)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id
-	`, taskType, providerID, credentialID, string(reqBytes)).Scan(&id)
+
+	insert := func() (int64, error) {
+		var id int64
+		err := db.QueryRow(ctx, `
+			INSERT INTO background_tasks (task_type, provider_id, credential_id, request_json)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id
+		`, taskType, providerID, credentialID, string(reqBytes)).Scan(&id)
+		return id, err
+	}
+
+	id, err := insert()
+	if err == nil {
+		return id, nil
+	}
+	if !isBackgroundTasksPKConflict(err) {
+		return 0, err
+	}
+
+	// Self-heal: the sequence has fallen behind MAX(id) in the table
+	// (commonly after a manual data restore or a partial hotfix deploy).
+	// Re-align background_tasks_id_seq to MAX(id)+1 and retry once.
+	slog.Warn("background_tasks_id_seq behind MAX(id); self-healing via setval",
+		"task_type", taskType, "insert_err", err.Error())
+	if healErr := resyncBackgroundTasksSequence(ctx, db); healErr != nil {
+		slog.Error("background_tasks sequence resync failed",
+			"task_type", taskType, "error", healErr)
+		return 0, err // return original 23505 so caller still sees the conflict
+	}
+
+	id, err = insert()
+	if err != nil {
+		slog.Error("background_tasks insert still failing after sequence resync",
+			"task_type", taskType, "error", err)
+	}
 	return id, err
+}
+
+// isBackgroundTasksPKConflict reports whether err is a unique-constraint
+// violation on background_tasks_pkey specifically (SQLSTATE 23505 on that
+// constraint). Other unique violations (none currently exist on this table,
+// but defensive) are left to the caller via isUniqueViolation if needed.
+func isBackgroundTasksPKConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	if pgErr, ok := err.(*pgconn.PgError); ok {
+		return pgErr.Code == "23505" && pgErr.ConstraintName == "background_tasks_pkey"
+	}
+	return isUniqueViolation(err) && strings.Contains(err.Error(), "background_tasks_pkey")
+}
+
+// resyncBackgroundTasksSequence sets background_tasks_id_seq to
+// MAX(id)+1 so subsequent nextval() calls produce IDs strictly greater
+// than any existing row. Idempotent and safe to call on a healthy DB.
+func resyncBackgroundTasksSequence(ctx context.Context, db *pgxpool.Pool) error {
+	_, err := db.Exec(ctx, `
+		SELECT setval(
+			'background_tasks_id_seq',
+			GREATEST((SELECT COALESCE(MAX(id), 0) FROM background_tasks), 1)
+		)
+	`)
+	return err
 }
 
 func completeBackgroundTask(ctx context.Context, db *pgxpool.Pool, taskID int64, result any) {
