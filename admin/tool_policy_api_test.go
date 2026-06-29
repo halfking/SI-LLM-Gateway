@@ -15,7 +15,7 @@ func TestPolicyRequest_JSONRoundTrip(t *testing.T) {
 		ToolPattern: "filesystem.*",
 		PolicyType:  "deny",
 		Reason:      "compliance: PII access blocked",
-		CreatedBy:   "admin@kaixuan.com",
+		CreatedBy:   "admin@[INTERNAL_DOMAIN]",
 	}
 	data, err := json.Marshal(original)
 	if err != nil {
@@ -27,7 +27,7 @@ func TestPolicyRequest_JSONRoundTrip(t *testing.T) {
 		`"tool_pattern":"filesystem.*"`,
 		`"policy_type":"deny"`,
 		`"reason":"compliance: PII access blocked"`,
-		`"created_by":"admin@kaixuan.com"`,
+		`"created_by":"admin@[INTERNAL_DOMAIN]"`,
 	}
 	for _, want := range wantKeys {
 		if !strings.Contains(string(data), want) {

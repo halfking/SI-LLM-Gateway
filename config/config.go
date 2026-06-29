@@ -56,7 +56,7 @@ type Config struct {
 	// Identity
 	IdentitySalt string `yaml:"identity_salt" env:"LLM_GATEWAY_IDENTITY_SALT"`
 
-	// Background task mode: "full" (default) or "data-plane" (skip loops owned by Python 71)
+	// Background task mode: "full" (default) or "data-plane" (skip loops owned by Python [SERVER])
 	BGMode string `yaml:"bg_mode" env:"LLM_GATEWAY_BG_MODE"`
 
 	// Per-credential virtual fingerprint slot pool (NULL DB limit → default).

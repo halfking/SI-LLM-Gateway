@@ -1188,7 +1188,7 @@ func (d *DB) ensureCredentialColumns(ctx context.Context) error {
 
 		-- 033: credential_model_call_history (sliding window for the
 		-- credential monitor UI; consumed by CallHistoryAggregator)
-		-- 🆕 2026-06-23 真实表 schema (从 [SERVER] llm-pg-71 docker 内 psql 远程验证):
+		-- 🆕 2026-06-23 真实表 schema (从 [SERVER] llm-pg-[SERVER] docker 内 psql 远程验证):
 		--   credential_id, raw_model, window_start, total_calls, success_calls,
 		--   failed_calls, avg_latency_ms, p95_latency_ms, p99_latency_ms, ...
 		-- 老 schema (raw_model_name + ts per-call) 是 design 错位, 已不创建

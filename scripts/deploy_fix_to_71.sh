@@ -1,5 +1,5 @@
 #!/bin/bash
-# 部署修复到71服务器
+# 部署修复到生产服务器
 # 使用方法: ./scripts/deploy_fix_to_71.sh [服务器地址]
 
 set -e
@@ -8,7 +8,7 @@ SERVER="${1:-root@[PROD_DOMAIN]}"
 REMOTE_PATH="/opt/llm-gateway-go"
 
 echo "=========================================="
-echo "部署修复到71服务器"
+echo "部署修复到生产服务器"
 echo "=========================================="
 echo "目标服务器: $SERVER"
 echo "远程路径: $REMOTE_PATH"

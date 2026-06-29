@@ -5,14 +5,14 @@
 # 环境变量配置
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-MAILTO=ops@kaixuan.com
+MAILTO=ops@[INTERNAL_DOMAIN]
 
 # 数据库配置
 DB_HOST=[INTERNAL_DB_HOST]
 DB_PORT=5432
 DB_NAME=llm_gateway
 DB_USER=stockuser
-DB_PASSWORD=184_stock_pass_change_me
+DB_PASSWORD=[REDACTED_PASSWORD]
 
 # 清理策略配置
 ENABLE_TRIM=false           # 温数据裁剪（7-30天）
