@@ -1,0 +1,5 @@
+DROP VIEW IF EXISTS v_candidate_failure_logs_diagnosis;
+DROP INDEX IF EXISTS idx_candidate_failure_logs_extracted_status_ts;
+DROP INDEX IF EXISTS idx_candidate_failure_logs_diagnosed_kind_ts;
+ALTER TABLE candidate_failure_logs DROP COLUMN IF EXISTS diagnosed_error_kind;
+ALTER TABLE candidate_failure_logs DROP COLUMN IF EXISTS extracted_upstream_status_code;

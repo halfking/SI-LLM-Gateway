@@ -94,6 +94,36 @@ BEGIN
         RETURN 'concurrent';
     END IF;
 
+    -- 401 with a non-empty body that hints at credential failure
+    -- (api key / token / unauthorized) is auth regardless of vendor
+    -- format. The Go-side ClassifyResponseStatus maps 401 → KindAuth
+    -- but only when the body is empty; here we extend the same
+    -- intent to bodies that contain auth-shaped strings.
+    -- 2026-06-30 (P3): added during migration 057 backfill validation.
+    -- 401 with a non-empty body that hints at credential failure
+    -- is auth regardless of vendor format. The Go-side
+    -- ClassifyResponseStatus maps 401 → KindAuth but only when the
+    -- body is empty; here we extend the same intent to bodies
+    -- that contain auth-shaped strings.
+    --
+    -- Two flavours of pattern:
+    --  (a) "api key" / "token" / "unauthorized" / etc. with a
+    --      qualifying bad-state word (expired / invalid / revoked
+    --      / failed / required / missing) — catches most vendor
+    --      auth error formats.
+    --  (b) vendor-private strings with the auth meaning but no
+    --      qualifying word, e.g. MiniMax's "login fail" / "please
+    --      carry the api secret" (1004) — caught by minimaxAuthRe
+    --      below but duplicated here for clarity.
+    --  (c) "invalid ... (api key|token|credential|key)" — handles
+    --      the common "invalid api key" / "invalid token" shape
+    --      where the qualifier (invalid) and the noun are not
+    --      adjacent.
+    -- 2026-06-30 (P3): added during migration 057 backfill.
+    IF v_status = 401 AND v_body ~* '((api[ _-]?key|token|credential|secret|unauthor|forbidden|access.denied|subscription|plan|billing|payment).{0,40}(expired|invalid|revoked|terminated|failed|required|missing|expire|disable))|(invalid|wrong|bad).{0,30}(api[ _-]?key|token|credential|secret|key)|login.fail|please.carry|the.api.secret' THEN
+        RETURN 'auth';
+    END IF;
+
     IF v_has_minimax_auth THEN
         RETURN 'auth';
     END IF;
@@ -134,12 +164,35 @@ BEGIN
         RETURN 'upstream_down';
     END IF;
 
-    IF v_status IN (400, 422) AND NOT v_has_tool AND NOT v_has_ctx_window THEN
-        -- A 4xx body that doesn't match any of the above patterns
-        -- (e.g. upstream returning a generic HTML page or a JSON
-        -- payload we don't yet understand) is best classified as a
-        -- non-retryable client/provider error rather than transient.
+    -- Generic "not found" / "page not found" body on 404 — the
+    -- Go-side ClassifyErrorWithBody doesn't have a regex for this
+    -- generic shape, so it falls through to status-only which
+    -- returns KindTransient. That's wrong: a 404 from the upstream
+    -- means the requested resource (model / endpoint / function)
+    -- doesn't exist, which is non-retryable. Classify as
+    -- unsupported_feature so the circuit isn't cooled and the
+    -- cross-credential retry fast-path is skipped (no other
+    -- credential will return a different 404 for the same client_model).
+    -- 2026-06-30 (P3): added during migration 057 backfill
+    -- validation when 2540 'upstream 404: 404 page not found' rows
+    -- surfaced as KindTransient instead of unsupported_feature.
+    IF v_status IN (400, 404, 422) AND NOT v_has_tool AND NOT v_has_ctx_window THEN
         RETURN 'unsupported_feature';
+    END IF;
+
+    -- 403 with a "subscription expired" / "plan limit" body
+    -- should be KindAuth or KindQuota, not transient. The Go-side
+    -- ClassifyResponseStatus maps 401/403 → KindAuth, but with a
+    -- status-only body the function also returns auth via the
+    -- v_body = '' branch. When a body IS present and matches
+    -- subscription-style strings, upgrade to auth (it IS a
+    -- credential-level failure — operator wants the credential
+    -- pulled from rotation).
+    -- 2026-06-30 (P3): added during migration 057 backfill
+    -- validation when 'Coding Plan subscription is expired' rows
+    -- surfaced as KindTransient.
+    IF v_status = 403 AND v_body ~* '(subscription|plan|quota|billing|payment|expired|cancelled|canceled|terminated).*(expired|invalid|revoked|terminated|failed)|access.denied|forbidden|payment.required' THEN
+        RETURN 'auth';
     END IF;
 
     RETURN 'transient';
@@ -312,6 +365,21 @@ DECLARE
         ARRAY['503', '', 'concurrent'],
         -- 4xx unknown body → unsupported_feature (NOT transient)
         ARRAY['400', 'some html page', 'unsupported_feature'],
+        -- 404 page not found (no body shape) → unsupported_feature,
+        -- not transient (regression test for 2540 rows in
+        -- migration 057 backfill).
+        ARRAY['404', '404 page not found', 'unsupported_feature'],
+        -- 403 with "subscription expired" body → auth, not transient
+        -- (regression test for migration 057 backfill).
+        ARRAY['403',
+              '{"error":{"message":"Coding Plan subscription is expired","code":"403"}}',
+              'auth'],
+        -- 403 with "access denied" body → auth
+        ARRAY['403', 'access denied', 'auth'],
+        -- 401 with any body → auth (status-only check catches empty
+        -- body; here we verify a non-empty body still classifies
+        -- correctly).
+        ARRAY['401', '{"error":"invalid api key"}', 'auth'],
         -- Model not found (note: Go-side regex requires lowercase
         -- model names per P5 tightening 2026-06-18; "MiniMax-M9"
         -- with capital letters would not match the Go regex either,
