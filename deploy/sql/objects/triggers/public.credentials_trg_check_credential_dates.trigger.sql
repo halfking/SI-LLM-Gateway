@@ -2,7 +2,7 @@
 -- Object:   credentials trg_check_credential_dates
 -- Type:     TRIGGER
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: credentials trg_check_credential_dates; Type: TRIGGER; Schema: public; Owner: -
 --

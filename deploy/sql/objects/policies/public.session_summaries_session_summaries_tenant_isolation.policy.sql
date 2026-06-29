@@ -2,7 +2,7 @@
 -- Object:   session_summaries session_summaries_tenant_isolation
 -- Type:     POLICY
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: session_summaries session_summaries_tenant_isolation; Type: POLICY; Schema: public; Owner: -
 --

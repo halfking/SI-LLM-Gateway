@@ -2,7 +2,7 @@
 -- Object:   check_credential_dates()
 -- Type:     FUNCTION
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: check_credential_dates(); Type: FUNCTION; Schema: public; Owner: -
 --

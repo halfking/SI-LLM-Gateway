@@ -2,7 +2,7 @@
 -- Object:   customer_cost_view
 -- Type:     VIEW
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: customer_cost_view; Type: VIEW; Schema: public; Owner: -
 --

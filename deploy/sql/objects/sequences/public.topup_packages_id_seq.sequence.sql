@@ -2,7 +2,7 @@
 -- Object:   topup_packages_id_seq
 -- Type:     SEQUENCE
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: topup_packages_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --

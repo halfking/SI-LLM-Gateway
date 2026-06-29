@@ -2,7 +2,7 @@
 -- Object:   idx_tenant_settings_kv_category
 -- Type:     INDEX
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: idx_tenant_settings_kv_category; Type: INDEX; Schema: public; Owner: -
 --

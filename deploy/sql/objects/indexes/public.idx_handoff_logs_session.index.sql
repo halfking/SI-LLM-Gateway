@@ -2,7 +2,7 @@
 -- Object:   idx_handoff_logs_session
 -- Type:     INDEX
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: idx_handoff_logs_session; Type: INDEX; Schema: public; Owner: -
 --

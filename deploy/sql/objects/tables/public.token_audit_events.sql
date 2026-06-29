@@ -2,7 +2,7 @@
 -- Object:   token_audit_events
 -- Type:     TABLE
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: token_audit_events; Type: TABLE; Schema: public; Owner: -
 --

@@ -2,7 +2,7 @@
 -- Object:   request_logs trg_update_api_key_model_cost
 -- Type:     TRIGGER
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: request_logs trg_update_api_key_model_cost; Type: TRIGGER; Schema: public; Owner: -
 --

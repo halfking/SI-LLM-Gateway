@@ -2,7 +2,7 @@
 -- Object:   update_api_key_model_cost()
 -- Type:     FUNCTION
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: update_api_key_model_cost(); Type: FUNCTION; Schema: public; Owner: -
 --

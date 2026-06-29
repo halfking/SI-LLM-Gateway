@@ -2,7 +2,7 @@
 -- Object:   tool_usage_stats_2026_06_created_at_idx
 -- Type:     INDEX
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: tool_usage_stats_2026_06_created_at_idx; Type: INDEX; Schema: public; Owner: -
 --

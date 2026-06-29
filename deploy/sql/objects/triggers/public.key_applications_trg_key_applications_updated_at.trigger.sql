@@ -2,7 +2,7 @@
 -- Object:   key_applications trg_key_applications_updated_at
 -- Type:     TRIGGER
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: key_applications trg_key_applications_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --

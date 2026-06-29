@@ -2,7 +2,7 @@
 -- Object:   idx_applications_tenant_code
 -- Type:     INDEX
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: idx_applications_tenant_code; Type: INDEX; Schema: public; Owner: -
 --

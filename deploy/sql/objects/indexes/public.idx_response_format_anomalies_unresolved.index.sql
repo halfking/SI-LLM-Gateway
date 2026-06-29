@@ -2,7 +2,7 @@
 -- Object:   idx_response_format_anomalies_unresolved
 -- Type:     INDEX
 -- Schema:   public
--- Source:   184_full_schema.sql (pg_dump --schema-only)
+-- Source:   full_schema.sql (pg_dump --schema-only)
 -- ===========================================================================
 -- Name: idx_response_format_anomalies_unresolved; Type: INDEX; Schema: public; Owner: -
 --
