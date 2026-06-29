@@ -1,5 +1,5 @@
 # Multi-stage build for llm-gateway-go data plane
-# Build with: docker build -t [IMAGE_NAME]:latest .
+# Build with: docker build -t kx-llm-gateway-go:latest .
 #
 # This Dockerfile is self-contained: the builder stage compiles the Go
 # binary AND builds the Vue SPA from source. The resulting image is
@@ -7,10 +7,10 @@
 # build context.
 
 # ── Build stage ──────────────────────────────────────────────────────────────
-ARG REGISTRY_DOMAIN=[INTERNAL_REGISTRY]
-FROM --platform=linux/amd64 ${REGISTRY_DOMAIN}/[KBASE]:go-vue AS builder
+ARG REGISTRY_DOMAIN=registry.kxpms.cn
+FROM --platform=linux/amd64 ${REGISTRY_DOMAIN}/kx-base:go-vue AS builder
 
-# Defensive: [KBASE]:go-vue already provides git/ca-certificates, nodejs + npm.
+# Defensive: kx-base:go-vue already provides git/ca-certificates, nodejs + npm.
 # Verify availability; fail fast if any are missing.
 RUN for cmd in git node npm; do command -v "$cmd" >/dev/null 2>&1 || (echo "ERROR: $cmd not found in base image" && exit 1); done
 
@@ -46,22 +46,22 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto \
     go build -a -ldflags="-s -w" -o /llm-gateway-go ./cmd/gateway
 
 # ── Runtime stage ───────────────────────────────────────────────────────────
-# 2026-06-22 T14: switched from [KBASE]:go-vue-amd64 (1.09GB Debian) to
-# [KBASE]:go-vue-alpine-slim-runtime (15.6MB alpine 3.20). Runtime only
+# 2026-06-22 T14: switched from kx-base:go-vue-amd64 (1.09GB Debian) to
+# kx-base:go-vue-alpine-slim-runtime (15.6MB alpine 3.20). Runtime only
 # needs ca-certs + tzdata + non-root appuser; no Go SDK / nodejs / pip
-# packages (those are build-time only). 预估 [IMAGE_NAME] 镜像
+# packages (those are build-time only). 预估 llm-gateway 镜像
 # 2.14GB → ~0.95GB (-55%).
-# Builder stage (above) still uses [KBASE]:go-vue for Go toolchain
+# Builder stage (above) still uses kx-base:go-vue for Go toolchain
 # compatibility (Q2 decision: only swap runtime, keep builder).
-ARG REGISTRY_DOMAIN=[INTERNAL_REGISTRY]
-FROM --platform=linux/amd64 ${REGISTRY_DOMAIN}/[KBASE]:go-vue-alpine-slim-runtime
+ARG REGISTRY_DOMAIN=registry.kxpms.cn
+FROM --platform=linux/amd64 ${REGISTRY_DOMAIN}/kx-base:go-vue-alpine-slim-runtime
 
 ARG GIT_TAG=""
 ARG GIT_SHA=""
 ARG BUILD_DATE=""
 ARG BUILD_SEQ="0"
 
-# [KBASE]:go-vue already provides ca-certificates + tzdata + a non-root
+# kx-base:go-vue already provides ca-certificates + tzdata + a non-root
 # 'appuser' (uid=1001). The runtime runs as this user (matches the
 # original alpine llmgw user spec: uid=1001, no shell). No additional
 # user creation is needed.
