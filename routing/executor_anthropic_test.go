@@ -543,3 +543,70 @@ func strconvItoa(n int) string {
 	}
 	return string(buf[i:])
 }
+
+// TestExtractAnthropicUsageFromBody_CacheFields covers the 2026-06-30
+// fix to extractAnthropicUsageFromBody. Before the fix, the function
+// returned nil for cache_read_input_tokens / cache_creation_input_tokens
+// and the request_logs row showed NULL for cache_read_tokens /
+// cache_write_tokens on every Anthropic cached-prompt call.
+func TestExtractAnthropicUsageFromBody_CacheFields(t *testing.T) {
+	body := []byte(`{
+		"id": "msg_01",
+		"type": "message",
+		"role": "assistant",
+		"content": [],
+		"model": "claude-3-5-sonnet-20241022",
+		"stop_reason": "end_turn",
+		"usage": {
+			"input_tokens": 100,
+			"output_tokens": 50,
+			"cache_read_input_tokens": 80,
+			"cache_creation_input_tokens": 20
+		}
+	}`)
+	in, out, cr, cw := extractAnthropicUsageFromBody(body)
+	if in == nil || *in != 100 {
+		t.Errorf("input_tokens = %v, want pointer to 100", in)
+	}
+	if out == nil || *out != 50 {
+		t.Errorf("output_tokens = %v, want pointer to 50", out)
+	}
+	if cr == nil || *cr != 80 {
+		t.Errorf("cache_read_input_tokens = %v, want pointer to 80", cr)
+	}
+	if cw == nil || *cw != 20 {
+		t.Errorf("cache_creation_input_tokens = %v, want pointer to 20", cw)
+	}
+}
+
+// TestExtractAnthropicUsageFromBody_NoCache confirms that cache
+// pointers are nil when the upstream does not report cache usage.
+// This is the non-cached-prompt path; the columns in request_logs
+// should stay NULL.
+func TestExtractAnthropicUsageFromBody_NoCache(t *testing.T) {
+	body := []byte(`{
+		"id": "msg_02",
+		"type": "message",
+		"role": "assistant",
+		"content": [],
+		"model": "claude-3-5-sonnet-20241022",
+		"stop_reason": "end_turn",
+		"usage": {
+			"input_tokens": 100,
+			"output_tokens": 50
+		}
+	}`)
+	in, out, cr, cw := extractAnthropicUsageFromBody(body)
+	if in == nil || *in != 100 {
+		t.Errorf("input_tokens = %v, want pointer to 100", in)
+	}
+	if out == nil || *out != 50 {
+		t.Errorf("output_tokens = %v, want pointer to 50", out)
+	}
+	if cr != nil {
+		t.Errorf("cache_read_input_tokens = %v, want nil for non-cached request", *cr)
+	}
+	if cw != nil {
+		t.Errorf("cache_creation_input_tokens = %v, want nil for non-cached request", *cw)
+	}
+}
