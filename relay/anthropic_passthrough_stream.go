@@ -127,12 +127,24 @@ func StreamAnthropicPassthrough(
 // and updates the side-channel audit capture accordingly. It handles
 // the three event types that carry state worth recording:
 //
-//   - message_start: contains usage.input_tokens (initial value)
-//   - message_delta:  contains usage.output_tokens (cumulative final)
+//   - message_start: contains usage.input_tokens (initial value), plus
+//     cache_creation_input_tokens and cache_read_input_tokens for
+//     prompt-cached prompts
+//   - message_delta:  contains usage.output_tokens (cumulative final),
+//     plus the FINAL cache_read_input_tokens tally (Anthropic emits the
+//     cache_read value on message_delta, not on message_start, so the
+//     stream capture would otherwise stay nil even though upstream
+//     charged the request for cache hits).
 //   - content_block_start with type=thinking: marks the response as
 //     containing reasoning, increments the thinking-block counter
 //   - any event with a "message.model" field: triggers model-mismatch
 //     check against the requested model
+//
+// 2026-06-30: the message_start and message_delta branches now also
+// lift cache_creation_input_tokens / cache_read_input_tokens into the
+// capture. Before this fix, request_logs.cache_read_tokens and
+// cache_write_tokens stayed NULL for every Anthropic cached-prompt
+// call, hiding the cache discount from billing rollups.
 func observeAnthropicPayload(c *audit.StreamCapture, payload, clientModel, outboundModel string) {
 	if payload == "" || payload == "[DONE]" {
 		return
@@ -142,12 +154,16 @@ func observeAnthropicPayload(c *audit.StreamCapture, payload, clientModel, outbo
 		Message *struct {
 			Model string `json:"model"`
 			Usage struct {
-				InputTokens  *int `json:"input_tokens"`
-				OutputTokens *int `json:"output_tokens"`
+				InputTokens              *int `json:"input_tokens"`
+				OutputTokens             *int `json:"output_tokens"`
+				CacheReadInputTokens     *int `json:"cache_read_input_tokens"`
+				CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
 			} `json:"usage"`
 		} `json:"message"`
 		Usage *struct {
-			OutputTokens *int `json:"output_tokens"`
+			OutputTokens             *int `json:"output_tokens"`
+			CacheReadInputTokens     *int `json:"cache_read_input_tokens"`
+			CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
 		} `json:"usage"`
 		Index        *int `json:"index"`
 		ContentBlock *struct {
@@ -164,14 +180,41 @@ func observeAnthropicPayload(c *audit.StreamCapture, payload, clientModel, outbo
 				pt := *v.Message.Usage.InputTokens
 				c.InputTokens = &pt
 			}
+			// message_start may also carry the initial cache counts when
+			// the prompt was served from cache. Forward to the capture
+			// so the WAL can persist cache_read_tokens / cache_write_tokens
+			// even if message_delta is never reached (e.g. interrupted
+			// stream before the delta fires).
+			if v.Message.Usage.CacheReadInputTokens != nil {
+				cr := *v.Message.Usage.CacheReadInputTokens
+				c.CacheReadTokens = &cr
+			}
+			if v.Message.Usage.CacheCreationInputTokens != nil {
+				cw := *v.Message.Usage.CacheCreationInputTokens
+				c.CacheWriteTokens = &cw
+			}
 			if v.Message.Model != "" {
 				checkAnthropicModelMismatch(c, clientModel, outboundModel, v.Message.Model)
 			}
 		}
 	case "message_delta":
-		if v.Usage != nil && v.Usage.OutputTokens != nil {
-			ot := *v.Usage.OutputTokens
-			c.OutputTokens = &ot
+		if v.Usage != nil {
+			if v.Usage.OutputTokens != nil {
+				ot := *v.Usage.OutputTokens
+				c.OutputTokens = &ot
+			}
+			// Anthropic emits the cumulative cache_read count on
+			// message_delta, not on message_start. Promote it here
+			// (overwriting the message_start value) so the capture
+			// ends with the final billing-relevant number.
+			if v.Usage.CacheReadInputTokens != nil {
+				cr := *v.Usage.CacheReadInputTokens
+				c.CacheReadTokens = &cr
+			}
+			if v.Usage.CacheCreationInputTokens != nil {
+				cw := *v.Usage.CacheCreationInputTokens
+				c.CacheWriteTokens = &cw
+			}
 		}
 	case "message_stop":
 		c.MarkDone()

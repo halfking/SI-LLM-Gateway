@@ -60,9 +60,21 @@ type ProtocolHandler interface {
 
 	// ExtractUsage pulls token counts out of the upstream response.
 	// For OpenAI, this is a single body read. For Anthropic, the
-	// handler MUST accumulate across message_start (input_tokens)
-	// and message_delta (output_tokens) events.
-	ExtractUsage(resp *http.Response, body []byte) (inputTokens, outputTokens *int)
+	// handler MUST accumulate across message_start (input_tokens,
+	// cache_creation_input_tokens, cache_read_input_tokens) and
+	// message_delta (output_tokens) events.
+	//
+	// The returned cache pointers MUST be nil when the upstream
+	// did not report cache token usage. Returning non-nil pointers
+	// is required so request_logs.cache_read_tokens / cache_write_tokens
+	// are populated for billing rollups.
+	//
+	// 2026-06-30: extended from (input, output) to (input, output,
+	// cacheRead, cacheWrite) so the executor can persist Anthropic
+	// prompt-caching fields. Cache writes are the tokens charged
+	// when a prompt cache is first created; cache reads are the
+	// discounted tokens served from a pre-existing cache.
+	ExtractUsage(resp *http.Response, body []byte) (inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens *int)
 
 	// CheckSoftMismatch returns true if the upstream model name
 	// doesn't match the requested one. Used to detect silent

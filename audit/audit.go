@@ -112,8 +112,16 @@ type StreamCapture struct {
 	textContent      []byte
 	promptTokens     *int
 	completionTokens *int
-	cacheReadTokens  *int
-	cacheWriteTokens *int
+	// 2026-06-30: CacheReadTokens / CacheWriteTokens are now exported
+	// so the Q4 Anthropic passthrough observer (which sets them from
+	// the message_start / message_delta usage block) can write to
+	// them directly, mirroring the InputTokens / OutputTokens pattern
+	// used a few lines below. Reads from outside the package should
+	// prefer the GetCacheReadTokens / GetCacheWriteTokens accessors
+	// so the read is mutex-guarded. The mutex still serialises
+	// concurrent writes, so direct assignment is safe.
+	CacheReadTokens  *int
+	CacheWriteTokens *int
 	// HasThinking is set when the stream contained at least one
 	// Anthropic-style thinking content block. Detected in the
 	// side-channel audit of the Q4 passthrough path.
@@ -211,8 +219,8 @@ func (sc *StreamCapture) Reset() {
 	sc.textContent = sc.textContent[:0]
 	sc.promptTokens = nil
 	sc.completionTokens = nil
-	sc.cacheReadTokens = nil
-	sc.cacheWriteTokens = nil
+	sc.CacheReadTokens = nil
+	sc.CacheWriteTokens = nil
 	sc.HasThinking = false
 	sc.ThinkingBlocksN = 0
 	sc.ModelMismatch = false
@@ -341,11 +349,40 @@ func (sc *StreamCapture) ObserveUsage(promptTokens, completionTokens, cacheRead,
 		sc.completionTokens = completionTokens
 	}
 	if cacheRead != nil {
-		sc.cacheReadTokens = cacheRead
+		sc.CacheReadTokens = cacheRead
 	}
 	if cacheWrite != nil {
-		sc.cacheWriteTokens = cacheWrite
+		sc.CacheWriteTokens = cacheWrite
 	}
+}
+
+// GetCacheReadTokens returns the captured cache_read_input_tokens (or
+// prompt_tokens_details.cached_tokens, depending on upstream shape).
+// nil when the upstream did not report a cache hit. Public accessor
+// mirroring the existing InputTokens / OutputTokens fields — methods
+// use the "Get" prefix so they don't collide with the exported field
+// of the same name (Go forbids field+method name collisions on a
+// struct). The method acquires the capture mutex so the read is
+// safe against concurrent writes from the stream reader.
+func (sc *StreamCapture) GetCacheReadTokens() *int {
+	if sc == nil {
+		return nil
+	}
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	return sc.CacheReadTokens
+}
+
+// GetCacheWriteTokens returns the captured cache_creation_input_tokens
+// (Anthropic native). nil when the upstream did not create a cache
+// during this request. Mirror of GetCacheReadTokens.
+func (sc *StreamCapture) GetCacheWriteTokens() *int {
+	if sc == nil {
+		return nil
+	}
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	return sc.CacheWriteTokens
 }
 
 func (sc *StreamCapture) MarkInterruptedWithReason(finishReason string) {
@@ -492,11 +529,11 @@ func (sc *StreamCapture) SummaryAsMap() map[string]any {
 	if sc.completionTokens != nil {
 		m["completion_tokens"] = *sc.completionTokens
 	}
-	if sc.cacheReadTokens != nil {
-		m["cache_read_tokens"] = *sc.cacheReadTokens
+	if sc.CacheReadTokens != nil {
+		m["cache_read_tokens"] = *sc.CacheReadTokens
 	}
-	if sc.cacheWriteTokens != nil {
-		m["cache_write_tokens"] = *sc.cacheWriteTokens
+	if sc.CacheWriteTokens != nil {
+		m["cache_write_tokens"] = *sc.CacheWriteTokens
 	}
 	if sc.InputTokens != nil {
 		m["input_tokens"] = *sc.InputTokens

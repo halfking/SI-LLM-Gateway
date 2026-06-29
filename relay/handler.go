@@ -2010,6 +2010,33 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 	// Check both nil AND zero: providers like minimax emit `"usage": null` in
 	// every SSE chunk, which results in stream-captured pointers to 0 that
 	// would otherwise suppress this fallback.
+
+	// 2026-06-30: for non-streaming requests (capture == nil above) the
+	// response body itself is the full upstream response, which always
+	// includes a `usage` block when the upstream reports it. Pull the
+	// prompt / completion / cache_read / cache_write tokens directly
+	// from the body so the request_logs row is populated even when
+	// capture was not involved. For streaming the same logic was
+	// already applied inside the `if capture != nil` branch above;
+	// here we only fill the non-streaming gap.
+	if capture == nil {
+		pt, ct, crt, cwt := extractTokensFromResponseBody(result.ResponseBody)
+		if pt > 0 || ct > 0 {
+			if reqLog.PromptTokens == nil {
+				reqLog.PromptTokens = &pt
+			}
+			if reqLog.CompletionTokens == nil {
+				reqLog.CompletionTokens = &ct
+			}
+			if reqLog.CacheReadTokens == nil && crt > 0 {
+				reqLog.CacheReadTokens = &crt
+			}
+			if reqLog.CacheWriteTokens == nil && cwt > 0 {
+				reqLog.CacheWriteTokens = &cwt
+			}
+		}
+	}
+
 	promptZero := reqLog.PromptTokens == nil || *reqLog.PromptTokens == 0
 	completionZero := reqLog.CompletionTokens == nil || *reqLog.CompletionTokens == 0
 	if promptZero && completionZero {
