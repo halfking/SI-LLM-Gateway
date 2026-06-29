@@ -361,9 +361,10 @@ func (m *Manager) Acquire(ctx context.Context, credentialID int, limit *int, hol
 						"inflight", newInflight,
 					)
 					
+					egress := identity.BuildEgressIdentity(credentialID, slot, tenantID)
 					return &Lease{
 						SlotIndex:    slot,
-						Egress:       identity.NewEgressIdentity(credentialID, slot),
+						Egress:       &egress,
 						Unlimited:    false,
 						CredentialID: credentialID,
 						Holder:       holder,
