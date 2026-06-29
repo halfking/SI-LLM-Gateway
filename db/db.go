@@ -49,7 +49,10 @@ func Open(ctx context.Context, databaseURL string) (*DB, error) {
 	// pingCtx above is only for the initial Ping() check; reusing it
 	// for the migrations makes a real DB with many tables (15+ ALTER/
 	// CREATE INDEX / MATERIALIZED VIEW statements) time out at boot.
-	migCtx, migCancel := context.WithTimeout(ctx, 60*time.Second)
+	// 2026-06-30: Increased timeout from 60s to 300s (5 minutes) to handle
+	// large tables (e.g., request_logs_2026_06 with 2.6GB data) where
+	// CREATE INDEX operations can take longer than 60 seconds.
+	migCtx, migCancel := context.WithTimeout(ctx, 300*time.Second)
 	defer migCancel()
 	if err := db.ensureRequestLogSchema(migCtx); err != nil {
 		return nil, err
