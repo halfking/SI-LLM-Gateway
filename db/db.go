@@ -332,6 +332,7 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	    USING gin (search_text public.gin_trgm_ops);
 `)
 	if err != nil {
+		slog.Error("ensureRequestLogSchema failed", "error", err)
 		return err
 	}
 	slog.Info("request_logs schema ensured (gw_session_id, gw_task_id, request_status, api_key_prefix, api_key_owner_user, application_code, parent_request_id, compression_reason, compression_strategy, compression_meta, outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes, quality_flags, quality_fix_actions, quality_score, client_request_id, listing-path indexes 056, provider_model 057, request_status backfill 058, search_text trgm 059)")
