@@ -15,6 +15,7 @@
 | `ca0e53ae` | P1.2 | Go helper（写入路径解析 provider_model） |
 | `9a20359b` | P1.3 | 读路径 LATERAL 移除 |
 | `6babecfc` | P2.1 | 058 物化 request_status + 读路径去掉 COALESCE |
+| `<P2.2 commit-sha>` | P2.2 | 059 GIN trgm 索引加速 ?q= 过滤 |
 
 **部署脚本**：`scripts/deploy-to-71.sh`（处理 build → SCP → systemd restart 全流程）。
 
@@ -392,6 +393,82 @@ ssh <PROD_HOST> "cd /opt/llm-gateway-go && git revert 6babecfc && systemctl rest
 
 ---
 
+## 🚦 P2.2 — 059 search_text GIN trgm 索引（commit `<P2.2 commit-sha>`）
+
+### 6.1 部署（71 上执行）
+
+059 是纯加法（CREATE INDEX IF NOT EXISTS，不改 schema，不改 SQL），可与 P1.4 / P2.1 一并部署。**没有部署顺序耦合**。
+
+```bash
+./scripts/deploy-to-71.sh  # 本地执行，会拉取 059 commit 并部署
+```
+
+启动时 `EnsureRequestLogSchema` 自动跑 CREATE INDEX，首次启动会建立索引（**注意：首次建立需 10-30 分钟**，见下方"在线构建"建议）。
+
+### 6.2 在线构建建议
+
+CREATE INDEX 在生产 100M+ 行表上**默认会阻塞写操作**。如果生产不能接受 30 分钟的写阻塞，请按以下步骤手动在 psql 里用 `CONCURRENTLY` 构建：
+
+```bash
+# 1. 暂时关掉 EnsureRequestLogSchema 的镜像（git revert db.go 的 059 块）
+# 2. 在 psql 里手动建索引：
+ssh <PROD_HOST> "docker exec -i r112_postgres psql -U <DB_USER> -d llm_gateway -c '
+CREATE INDEX CONCURRENTLY idx_request_logs_search_text_trgm
+ON public.request_logs USING gin (search_text public.gin_trgm_ops);
+'"
+# 3. 重新部署 gateway binary（恢复 EnsureRequestLogSchema 镜像），重启即可
+```
+
+CONCURRENTLY 不锁表，分区表也支持（PG 11+）。
+
+### 6.3 P2.2 验证
+
+**索引已建立**：
+```bash
+ssh <PROD_HOST> "docker exec r112_postgres psql -U <DB_USER> -d llm_gateway -c '
+SELECT indexname, indexdef FROM pg_indexes
+WHERE schemaname = '\''public'\'' AND indexname = '\''idx_request_logs_search_text_trgm'\'';
+'"
+
+# 期望：1 row，显示 USING gin (search_text public.gin_trgm_ops)
+```
+
+**EXPLAIN 验证（?q= 走 GIN）**：
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT rl.ts, rl.request_id, rl.client_model
+FROM request_logs rl
+WHERE rl.ts BETWEEN now() - interval '24 hours' AND now()
+  AND rl.search_text ILIKE '%rate_limit%'
+ORDER BY rl.ts DESC
+LIMIT 100;
+
+-- 期望：plan 包含 "Bitmap Heap Scan" + "Bitmap Index Scan on idx_request_logs_search_text_trgm"
+-- 不再是 "Seq Scan on request_logs"
+```
+
+**接口 smoke**：
+```bash
+time curl -s -H "Cookie: <admin session>" \
+  'https://llm.kxpms.cn/api/logs?page=1&page_size=50&q=rate_limit'
+
+# 期望：< 200ms（之前 ?q= 强制 Seq Scan，500ms-2s）
+```
+
+### 6.4 P2.2 回滚
+
+```bash
+ssh <PROD_HOST> "cd /opt/llm-gateway-go && git revert <P2.2 commit-sha> && systemctl restart llm-gateway"
+# 同步 DROP 索引（CONCURRENTLY 风格）：
+ssh <PROD_HOST> "docker exec -i r112_postgres psql -U <DB_USER> -d llm_gateway -c '
+DROP INDEX CONCURRENTLY IF EXISTS public.idx_request_logs_search_text_trgm;
+'"
+```
+
+回滚后 `?q=` 过滤回到 Seq Scan；UI 仍可用，只是慢。
+
+---
+
 ## 🆘 应急预案（71 上）
 
 ### 场景 A：helper 把新行 provider_model 写成 NULL（bug）
@@ -453,14 +530,15 @@ ORDER BY rl.ts DESC LIMIT 5;
 
 ## 📊 性能对比（部署前后，71 上）
 
-| 指标 | 部署前（P0 之前） | P0 + P1 + P2.1 部署后 |
+| 指标 | 部署前（P0 之前） | P0 + P1 + P2.1 + P2.2 部署后 |
 |---|---|---|
 | `/api/logs?page=1&page_size=50` 端到端 | 3-5s | < 200ms |
 | 主查询耗时 | ~3s | < 50ms |
 | LATERAL 子查询次数/页 | 100 | 0 |
 | `model_offers` 表读放大 | 每页 100× | 0 |
 | `?request_status=failure` 过滤 | 1-2s（COALESCE 表达式） | < 200ms（partial index 命中） |
-| `request_logs` 体积影响 | 0 | +1 text 列（典型 < 64 bytes/行） |
+| `?q=foo` 过滤 | 500ms-2s（Seq Scan on request_logs） | < 200ms（GIN trgm 命中） |
+| `request_logs` 体积影响 | 0 | +1 text 列 + GIN 索引（典型 2-3× B-tree 大小） |
 
 ---
 
@@ -477,6 +555,9 @@ ORDER BY rl.ts DESC LIMIT 5;
 - [ ] P2.1 — `request_status` 列无 NULL/'' 值
 - [ ] P2.1 — `?request_status=failure` 过滤走 `idx_request_logs_status_ts` 索引
 - [ ] P2.1 — `?request_status=` 接口响应时间 < 200ms
+- [ ] P2.2 — `idx_request_logs_search_text_trgm` 索引已建立
+- [ ] P2.2 — `?q=rate_limit` 过滤走 `idx_request_logs_search_text_trgm` GIN 索引（EXPLAIN 验证）
+- [ ] P2.2 — `?q=` 接口响应时间 < 200ms
 
 ---
 
@@ -499,6 +580,7 @@ ORDER BY rl.ts DESC LIMIT 5;
 - `docs/FINAL_SOLUTION_REPORT_minimax_20260630.md` — MiniMax-M3 incident 总结（provider_model 在该报告内被提及为加速 request_logs 的关键）
 - `deploy/sql/migrations/057_request_logs_provider_model_column.sql` — 迁移 DDL
 - `deploy/sql/migrations/058_request_logs_status_materialize.sql` — 058 迁移 DDL
+- `deploy/sql/migrations/059_request_logs_search_text_trgm.sql` — 059 迁移 DDL
 - `scripts/backfill_request_logs_provider_model.sh` — backfill 脚本（含注释）
 - `scripts/deploy-to-71.sh` — 71 服务器部署脚本
 

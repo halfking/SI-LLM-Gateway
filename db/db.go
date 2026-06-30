@@ -314,11 +314,27 @@ WHERE upstream_finish_reason IS NOT NULL
 	END
 	WHERE rl.request_status IS NULL
 	   OR rl.request_status = '';
+	-- 2026-07-01: migration 059 — GIN trgm index on search_text to
+	-- accelerate the ?q= substring filter in /api/logs
+	-- (admin/logs.go:420). See
+	-- deploy/sql/migrations/059_request_logs_search_text_trgm.sql
+	-- for rationale and CONCURRENTLY-style operator notes.
+	--
+	-- Parent-level only: request_logs is PARTITION BY RANGE(ts); on
+	-- PG 11+ the index is automatically propagated to existing and
+	-- future partitions. Mirrors the pattern used by
+	-- idx_request_logs_quality_flags, idx_request_logs_tool_calls,
+	-- and idx_request_logs_client_model_trgm.
+	--
+	-- Idempotent via CREATE INDEX IF NOT EXISTS.
+	CREATE INDEX IF NOT EXISTS idx_request_logs_search_text_trgm
+	    ON public.request_logs
+	    USING gin (search_text public.gin_trgm_ops);
 `)
 	if err != nil {
 		return err
 	}
-	slog.Info("request_logs schema ensured (gw_session_id, gw_task_id, request_status, api_key_prefix, api_key_owner_user, application_code, parent_request_id, compression_reason, compression_strategy, compression_meta, outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes, quality_flags, quality_fix_actions, quality_score, client_request_id, listing-path indexes 056, provider_model 057, request_status backfill 058)")
+	slog.Info("request_logs schema ensured (gw_session_id, gw_task_id, request_status, api_key_prefix, api_key_owner_user, application_code, parent_request_id, compression_reason, compression_strategy, compression_meta, outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes, quality_flags, quality_fix_actions, quality_score, client_request_id, listing-path indexes 056, provider_model 057, request_status backfill 058, search_text trgm 059)")
 	return nil
 }
 
