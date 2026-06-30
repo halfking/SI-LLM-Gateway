@@ -88,32 +88,32 @@ func (idx *Index) Recommend(task TaskType, sigs ClassificationSignals, profile P
 	all := idx.entries
 	idx.mu.RUnlock()
 
-// Pre-filter: routable + has some tag match.
-// Fallback: if NO candidate has any tag match for this task type,
-// return all candidates (chat-style fallback) rather than 0 candidates.
-// This handles the common case where models_canonical.tags is empty
-// (which is the default for newly-discovered models) — without this
-// fallback, every task_type other than chat would always 503.
-filtered := make([]Candidate, 0, len(all))
-for i := range all {
-	c := all[i]
-	// Compute TaskMatchScore inline so admins can change the
-	// required-tag map without a code redeploy.
-	c.TaskMatchScore = TaskMatchScore(task, c.Tags)
-	filtered = append(filtered, c)
-}
+	// Pre-filter: routable + has some tag match.
+	// Fallback: if NO candidate has any tag match for this task type,
+	// return all candidates (chat-style fallback) rather than 0 candidates.
+	// This handles the common case where models_canonical.tags is empty
+	// (which is the default for newly-discovered models) — without this
+	// fallback, every task_type other than chat would always 503.
+	filtered := make([]Candidate, 0, len(all))
+	for i := range all {
+		c := all[i]
+		// Compute TaskMatchScore inline so admins can change the
+		// required-tag map without a code redeploy.
+		c.TaskMatchScore = TaskMatchScore(task, c.Tags)
+		filtered = append(filtered, c)
+	}
 
-// Sort: candidates with non-zero TaskMatchScore first, then all others.
-// We don't strictly filter (which would 503 every task type when tags
-// are empty); instead we keep all and let the MatchScore (0-100)
-// contribute to the weighted composite.
-sort.SliceStable(filtered, func(i, j int) bool {
-	return filtered[i].TaskMatchScore > filtered[j].TaskMatchScore
-})
+	// Sort: candidates with non-zero TaskMatchScore first, then all others.
+	// We don't strictly filter (which would 503 every task type when tags
+	// are empty); instead we keep all and let the MatchScore (0-100)
+	// contribute to the weighted composite.
+	sort.SliceStable(filtered, func(i, j int) bool {
+		return filtered[i].TaskMatchScore > filtered[j].TaskMatchScore
+	})
 
-if len(filtered) == 0 {
-	return nil
-}
+	if len(filtered) == 0 {
+		return nil
+	}
 
 	// Compute cohort baselines
 	costCtx := computeCostContext(filtered)
@@ -210,7 +210,11 @@ func (idx *Index) Refresh(ctx context.Context) error {
 	}
 	rows, err := idx.pool.Query(ctx, refreshIndexSQL)
 	if err != nil {
-		return fmt.Errorf("query credential_model_index: %w", err)
+		// 2026-06-30: 明确记录数据库查询错误
+		slog.Error("autoroute.Index.Refresh: database query error",
+			"error", err,
+		)
+		return fmt.Errorf("routing data query error (credential_model_index): %w", err)
 	}
 	defer rows.Close()
 
@@ -228,7 +232,11 @@ func (idx *Index) Refresh(ctx context.Context) error {
 		out = append(out, c)
 	}
 	if rows.Err() != nil {
-		return fmt.Errorf("iterate credential_model_index: %w", rows.Err())
+		// 2026-06-30: 明确记录数据库迭代错误
+		slog.Error("autoroute.Index.Refresh: database iteration error",
+			"error", rows.Err(),
+		)
+		return fmt.Errorf("routing data processing error (credential_model_index): %w", rows.Err())
 	}
 
 	// Log what was loaded

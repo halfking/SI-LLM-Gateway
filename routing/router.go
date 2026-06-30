@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"sort"
+	"time"
 
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/provider"
@@ -41,7 +42,7 @@ func NewRouter(sticky *StickyCache, lim *limiter.Limiter) *Router {
 // 与原签名相比，把 stickyCredentialID 保留为单独字段（向后兼容），
 // 同时新增 sessionPreferredCredential 用于"会话级偏好优先于 client 级 sticky"。
 type PlanCandidatesInputs struct {
-	StickyCredentialID        *int
+	StickyCredentialID         *int
 	SessionPreferredCredential *int
 }
 
@@ -106,6 +107,7 @@ func (r *Router) PlanCandidates(
 }
 
 // filterByRouteNodeHealth 过滤 RouteNodeStore.IsUsable()==false 的候选。
+// 2026-06-30: 增加fallback机制 - 如果所有节点都被过滤，使用宽容模式重试
 func (r *Router) filterByRouteNodeHealth(ctx context.Context, candidates []provider.Candidate) []provider.Candidate {
 	if r.RouteNodeStore == nil {
 		return candidates
@@ -123,6 +125,45 @@ func (r *Router) filterByRouteNodeHealth(ctx context.Context, candidates []provi
 			)
 		}
 	}
+
+	// 2026-06-30 fallback: 如果所有节点都被过滤，尝试宽容模式
+	// 这种情况通常是短时间内大量失败导致所有节点都在冷却期
+	// 宽容模式：只排除显式禁用且仍在冷却期内的节点
+	if len(out) == 0 && filtered > 0 {
+		slog.Warn("router: all candidates filtered by health check, trying lenient mode",
+			"filtered_count", filtered,
+			"total_candidates", len(candidates),
+		)
+		now := time.Now()
+		for _, c := range candidates {
+			state, found, err := r.RouteNodeStore.Get(ctx, c.CredentialID, c.RawModel)
+			// 2026-06-30: 明确记录数据库错误
+			if err != nil {
+				slog.Error("router: RouteNodeStore.Get error in lenient mode",
+					"error", err,
+					"credential_id", c.CredentialID,
+					"raw_model", c.RawModel,
+				)
+			}
+			// 只排除显式禁用且仍在冷却期的节点
+			// nil state 或已过冷却期的节点允许使用
+			if !found || state == nil || !state.Disabled || now.After(state.DisabledUntil) {
+				out = append(out, c)
+				slog.Info("router: lenient mode admitted candidate",
+					"credential_id", c.CredentialID,
+					"raw_model", c.RawModel,
+					"disabled", state != nil && state.Disabled,
+					"disabled_until", state != nil && !state.DisabledUntil.IsZero(),
+				)
+			}
+		}
+		if len(out) > 0 {
+			slog.Info("router: lenient mode recovered candidates",
+				"recovered_count", len(out),
+			)
+		}
+	}
+
 	if filtered > 0 {
 		slog.Info("router: filtered candidates by route_node health",
 			"filtered_count", filtered,

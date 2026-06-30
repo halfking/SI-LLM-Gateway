@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kaixuan/llm-gateway-go/credentialhealth"
 	"github.com/kaixuan/llm-gateway-go/errorsx"
 	"github.com/kaixuan/llm-gateway-go/provider"
@@ -16,12 +17,17 @@ type HealthTracker struct {
 	recorder *credentialhealth.Recorder
 	tuner    *credentialhealth.Tuner
 	checker  *credentialhealth.Checker
+	antiFlap *credentialhealth.AntiFlap // anti-flapping logic
 }
 
 // NewHealthTracker creates a health tracker for the executor.
+// pool 用于 anti-flap 的验证写入（需 *pgxpool.Pool 而非 DBQuerier 接口）；
+// probe 为 anti-flap 二次验证用的同步探测函数（nil 则禁用 anti-flap）。
 func NewHealthTracker(
 	redisClient *redis.Client,
 	db credentialhealth.DBQuerier,
+	pool *pgxpool.Pool,
+	probe credentialhealth.ProbeFunc,
 	windowTTL time.Duration,
 	maxSize int,
 ) *HealthTracker {
@@ -31,6 +37,15 @@ func NewHealthTracker(
 
 	recorder := credentialhealth.NewRecorder(redisClient, windowTTL, maxSize)
 	tuner := credentialhealth.NewTuner(db, credentialhealth.DefaultTunerConfig())
+
+	// Anti-flap: 复用 recorder 做失败计数（不每失败必写库），pool 为空则禁用。
+	var antiFlap *credentialhealth.AntiFlap
+	if pool != nil && probe != nil {
+		afCfg := credentialhealth.DefaultAntiFlapConfig()
+		afCfg.InvalidateCandidateCache = provider.InvalidateAllCandidateCache
+		antiFlap = credentialhealth.NewAntiFlap(recorder, pool, afCfg, probe)
+	}
+
 	// Wire the candidate-cache invalidator so a continuous-failure flip
 	// of (cred, model) is visible to the next request — without this, the
 	// 30s availableModelsCache would still serve the just-degraded
@@ -43,12 +58,24 @@ func NewHealthTracker(
 		recorder: recorder,
 		tuner:    tuner,
 		checker:  checker,
+		antiFlap: antiFlap,
 	}
 }
 
 // Enabled returns true if health tracking is enabled.
 func (h *HealthTracker) Enabled() bool {
 	return h != nil && h.recorder != nil && h.tuner != nil && h.checker != nil
+}
+
+// SetAntiFlap 在 healthTracker 创建后注入 anti-flap（用于 keyring 在 tracker
+// 初始化之后才就绪的启动顺序）。pool 为 *pgxpool.Pool；probe 为同步探测函数。
+func (h *HealthTracker) SetAntiFlap(pool *pgxpool.Pool, probe credentialhealth.ProbeFunc) {
+	if h == nil || pool == nil || probe == nil {
+		return
+	}
+	cfg := credentialhealth.DefaultAntiFlapConfig()
+	cfg.InvalidateCandidateCache = provider.InvalidateAllCandidateCache
+	h.antiFlap = credentialhealth.NewAntiFlap(h.recorder, pool, cfg, probe)
 }
 
 // OnSuccess records a successful call and checks for auto-scaleup opportunity.
@@ -82,6 +109,16 @@ func (h *HealthTracker) OnSuccess(ctx context.Context, credentialID int, model s
 				"credential_id", credentialID,
 				"model", model,
 				"error", err)
+		}
+
+		// Anti-flap: reset transient failure window on success
+		if h.antiFlap != nil && h.antiFlap.Enabled() {
+			if err := h.antiFlap.OnSuccess(bgCtx, credentialID, model); err != nil {
+				slog.Warn("health_tracker: anti_flap reset failed",
+					"credential_id", credentialID,
+					"model", model,
+					"error", err)
+			}
 		}
 	}()
 
@@ -148,6 +185,16 @@ func (h *HealthTracker) OnError(ctx context.Context, credentialID int, model str
 				"credential_id", credentialID,
 				"model", model,
 				"error", err)
+		}
+
+		// 4. Anti-flap: track transient failures and trigger double verification.
+		if h.antiFlap != nil && h.antiFlap.Enabled() {
+			if err := h.antiFlap.OnFailure(bgCtx, credentialID, model); err != nil {
+				slog.Warn("health_tracker: anti_flap failed",
+					"credential_id", credentialID,
+					"model", model,
+					"error", err)
+			}
 		}
 	}()
 }

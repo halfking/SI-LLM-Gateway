@@ -92,15 +92,34 @@ type requestLogDetail struct {
 	ResponseBody any `json:"response_body"`
 }
 
-const requestLogStatusExpr = `COALESCE(
-	NULLIF(rl.request_status, ''),
-	CASE
-		WHEN rl.success THEN 'success'
-		WHEN rl.error_kind IS NOT NULL AND rl.error_kind <> '' THEN 'failure'
-		ELSE 'in_progress'
-	END
-)`
+// requestLogStatusExpr was the COALESCE fallback expression the read
+// path used to compute request_status from rl.success / rl.error_kind
+// at query time. After migration 058 (request_status backfill in
+// db/db.go + 058_request_logs_status_materialize.sql), every row has
+// rl.request_status populated with the canonical label, so the read
+// path can read rl.request_status directly.
+//
+// The constant is kept for backwards compatibility with the existing
+// admin/session_title_test.go:TestRequestLogStatusExprRequiresRLAlias
+// test, which pins the alias-by-rl convention. The constant is no
+// longer referenced in any SQL string in this file.
+//
+// 2026-06-30: materialized via migration 058.
+const requestLogStatusExpr = `rl.request_status`
 
+// requestLogsSelectCols is the FULL projection used by the detail handler
+// (getLog). It includes the three large JSONB columns
+// (outbound_body, outbound_msg_hashes, compression_meta) which are only
+// rendered inside the request-detail dialog.
+//
+// DO NOT use this projection from the LIST handler — see
+// requestLogsListCols and the migration 056 commentary for why.
+//
+// 2026-06-30: split out requestLogsListCols to keep list responses cheap.
+// The original listLogs used this projection directly, but pulled all
+// three JSONB blobs over the wire for every page even though the list
+// view only displays scalar metadata + the compression_* / parent_*
+// pointers. See migration 056 for the EXPLAIN-backed rationale.
 const requestLogsSelectCols = `
 	rl.ts, rl.request_id, rl.api_key_id, rl.end_user_id,
 	rl.client_model, rl.outbound_model,
@@ -128,7 +147,13 @@ const requestLogsSelectCols = `
 	COALESCE(NULLIF(TRIM(rl.api_key_owner_user), ''), ak.owner_user) AS api_key_owner_user,
 	COALESCE(NULLIF(TRIM(rl.application_code), ''), app.code) AS application_code,
 	mc.canonical_name,
-	mo_pick.provider_model,
+	-- 2026-06-30 (migration 057): provider_model is denormalized
+	-- onto request_logs and written at INSERT time by
+	-- telemetry.ResolveProviderModel. The pre-057 LATERAL has been
+	-- removed from requestLogsJoins. NULLIF maps the helper's
+	-- empty-string sentinel (no model_offers row matched) to NULL so
+	-- the JSON response stays consistent with the old LATERAL path.
+	NULLIF(rl.provider_model, '') AS provider_model,
 	rl.credits_charged,
 	-- v3 (2026-06-19) session-level outbound body fields.
 	rl.outbound_body,
@@ -141,44 +166,77 @@ const requestLogsSelectCols = `
 	rl.parent_request_id
 `
 
+// requestLogsListCols is the projection used by the LIST handler
+// (listLogs). It is identical to requestLogsSelectCols EXCEPT that it
+// drops the three large JSONB columns — outbound_body,
+// outbound_msg_hashes, compression_meta — which the list view never
+// renders. Detail dialog fetches them through getLog instead.
+//
+// Scan order MUST stay in lock-step with scanRequestLogListRowWithTotal
+// below.
+const requestLogsListCols = `
+	rl.ts, rl.request_id, rl.api_key_id, rl.end_user_id,
+	rl.client_model, rl.outbound_model,
+	rl.credential_id, c.label AS credential_label,
+	rl.provider_id, p.display_name AS provider_name,
+	p.catalog_code AS provider_code,
+	rl.client_profile, rl.request_mode,
+	rl.prompt_tokens, rl.completion_tokens,
+	rl.cache_read_tokens, rl.cache_write_tokens, rl.total_tokens,
+	rl.cost_usd::float8, rl.cost_display::float8, rl.cost_currency, rl.latency_ms, rl.success,
+	` + requestLogStatusExpr + ` AS request_status,
+	rl.error_kind, rl.search_text,
+	rl.identity_hash, rl.virtual_client_id, rl.virtual_ip, rl.virtual_mac,
+	rl.affinity_hit, rl.request_checksum, rl.response_checksum,
+	rl.transform_rule_id, rl.egress_protocol, rl.failure_stage, rl.failure_detail_code,
+	rl.upstream_finish_reason,
+	rl.request_preview, rl.transform_summary, rl.response_preview,
+	rl.stream_first_chunk_ms, rl.stream_chunk_count,
+	rl.stream_done_received, rl.stream_interrupted, rl.stream_done_sent,
+	rl.usage_source,
+	rl.gw_session_id, rl.gw_task_id,
+	COALESCE(NULLIF(TRIM(rl.api_key_prefix), ''), NULLIF(TRIM(ak.key_prefix), '')) AS api_key_prefix,
+	COALESCE(NULLIF(TRIM(rl.api_key_owner_user), ''), ak.owner_user) AS api_key_owner_user,
+	COALESCE(NULLIF(TRIM(rl.application_code), ''), app.code) AS application_code,
+	mc.canonical_name,
+	-- 2026-06-30 (migration 057): see requestLogsSelectCols above —
+	-- the LATERAL has been removed; we read rl.provider_model
+	-- directly. NULLIF maps the helper's empty-string sentinel to NULL.
+	NULLIF(rl.provider_model, '') AS provider_model,
+	rl.credits_charged,
+	-- v3 session-level outbound body fields — SCALAR ones only.
+	-- The JSONB blobs (outbound_body / outbound_msg_hashes /
+	-- compression_meta) are intentionally dropped; list UI never
+	-- renders them and they are fetched by getLog when the user opens
+	-- a row's detail panel.
+	rl.outbound_msg_count,
+	rl.outbound_token_est,
+	rl.compression_strategy,
+	rl.compression_reason,
+	rl.parent_request_id
+`
+
+// requestLogsJoins is the join set used by listLogs + getLog.
+//
+// 2026-06-30 (migration 057): the LEFT JOIN LATERAL on model_offers
+// has been REMOVED. The list handler previously evaluated that LATERAL
+// for every row (4-CASE ORDER BY + LIMIT 1) on every page render, and
+// was the dominant cost in the EXPLAIN of /api/logs on the default 24h
+// window. provider_model is now denormalized onto request_logs
+// (column added by 057 + written at INSERT time by
+// telemetry.ResolveProviderModel / telemetry.PersistProviderModel).
+//
+// The four remaining LEFT JOINs are required for SELECT projections
+// (provider_name, provider_code, credential_label, api_key_*,
+// application_code, canonical_name) and for tenant filtering on
+// ak.tenant_id; they are cheap because each is keyed by a single bigint
+// (p.id, c.id, ak.id, app.id, mc.id) on a small lookup table.
 const requestLogsJoins = `
 	LEFT JOIN providers p ON p.id = rl.provider_id
 	LEFT JOIN credentials c ON c.id = rl.credential_id
 	LEFT JOIN api_keys ak ON ak.id = rl.api_key_id
 	LEFT JOIN applications app ON app.id = ak.application_id
 	LEFT JOIN models_canonical mc ON mc.id = rl.canonical_id
-	LEFT JOIN LATERAL (
-		SELECT COALESCE(
-			NULLIF(TRIM(mo.outbound_model_name), ''),
-			NULLIF(TRIM(mo.raw_model_name), '')
-		) AS provider_model
-		FROM model_offers mo
-		WHERE mo.credential_id = rl.credential_id
-		  AND (
-			(rl.canonical_id IS NOT NULL AND mo.canonical_id = rl.canonical_id)
-			OR (
-				rl.canonical_id IS NULL AND (
-					lower(mo.standardized_name) = lower(COALESCE(mc.canonical_name, rl.client_model, ''))
-					OR lower(mo.raw_model_name) = lower(COALESCE(rl.outbound_model, rl.client_model, ''))
-				)
-			)
-		  )
-		ORDER BY
-			CASE
-				WHEN rl.outbound_model IS NOT NULL
-				 AND lower(COALESCE(NULLIF(TRIM(mo.outbound_model_name), ''), TRIM(mo.raw_model_name)))
-					= lower(rl.outbound_model)
-				THEN 0 ELSE 1
-			END,
-			CASE WHEN NULLIF(TRIM(mo.outbound_model_name), '') IS NOT NULL THEN 0 ELSE 1 END,
-			CASE
-				WHEN lower(TRIM(mo.raw_model_name)) <> lower(TRIM(COALESCE(mo.standardized_name, mc.canonical_name, rl.client_model, '')))
-				THEN 0 ELSE 1
-			END,
-			mo.available DESC NULLS LAST,
-			mo.id DESC
-		LIMIT 1
-	) mo_pick ON TRUE
 `
 
 func (h *Handler) handleLogs(w http.ResponseWriter, r *http.Request) {
@@ -243,6 +301,63 @@ func scanRequestLogRow(rows interface {
 	}
 	err := rows.Scan(dest...)
 	return l, err
+}
+
+// scanRequestLogListRowWithTotal scans the merged list+count projection
+// used by listLogs (see migration 056). It returns the row, the total
+// count of WHERE-matching rows, and any scan error.
+//
+// The merged projection order is:
+//
+//	requestLogsListCols [, ROW_NUMBER() OVER (ORDER BY rl.ts ASC) AS trace_seq] , COUNT(*) OVER () AS total_count
+//
+// `total_count` is constant across every row in the result set (it is
+// computed BEFORE LIMIT/OFFSET), so the caller reads it from the first
+// row only. `trace_seq` only appears when the caller asked for chrono
+// mode (gw_session_id/gw_task_id filter or explicit ?chrono=1).
+//
+// Total_count is returned as `int` rather than `*int` because the window
+// function always produces a non-NULL integer.
+func scanRequestLogListRowWithTotal(rows interface {
+	Scan(dest ...any) error
+}, withTraceSeq bool) (requestLogRow, int, error) {
+	var l requestLogRow
+	var total int
+	dest := []any{
+		&l.Ts, &l.RequestID, &l.APIKeyID, &l.EndUserID,
+		&l.ClientModel, &l.OutboundModel,
+		&l.CredentialID, &l.CredentialLabel,
+		&l.ProviderID, &l.ProviderName, &l.ProviderCode,
+		&l.ClientProfile, &l.RequestMode,
+		&l.PromptTokens, &l.CompletionTokens,
+		&l.CacheReadTokens, &l.CacheWriteTokens, &l.TotalTokens,
+		&l.CostUSD, &l.CostDisplay, &l.CostCurrency, &l.LatencyMs, &l.Success, &l.RequestStatus, &l.ErrorKind, &l.SearchText,
+		&l.IdentityHash, &l.VirtualClientID, &l.VirtualIP, &l.VirtualMAC,
+		&l.AffinityHit, &l.RequestChecksum, &l.ResponseChecksum,
+		&l.TransformRuleID, &l.EgressProtocol, &l.FailureStage, &l.FailureDetailCode,
+		&l.UpstreamFinishReason,
+		&l.RequestPreview, &l.TransformSummary, &l.ResponsePreview,
+		&l.StreamFirstChunkMs, &l.StreamChunkCount,
+		&l.StreamDoneReceived, &l.StreamInterrupted, &l.StreamDoneSent,
+		&l.UsageSource,
+		&l.GwSessionID, &l.GwTaskID,
+		&l.APIKeyPrefix, &l.APIKeyOwnerUser, &l.ApplicationCode,
+		&l.CanonicalName, &l.ProviderModel, &l.CreditsCharged,
+		// v3 session-level outbound body fields — SCALAR only;
+		// the JSONB blobs are NOT scanned because they are not in the
+		// list projection (see requestLogsListCols).
+		&l.OutboundMsgCount, &l.OutboundTokenEst,
+		&l.CompressionStrategy, &l.CompressionReason, &l.ParentRequestID,
+	}
+	if withTraceSeq {
+		dest = append(dest, &l.TraceSeq)
+	}
+	// total_count is ALWAYS the last column in the merged list query
+	// (see listLogs). Append it last so the scan order stays in sync
+	// even when withTraceSeq adds the intermediate trace_seq column.
+	dest = append(dest, &total)
+	err := rows.Scan(dest...)
+	return l, total, err
 }
 
 func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
@@ -310,7 +425,14 @@ func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
 	if v := strings.TrimSpace(queryString(r, "request_status")); v != "" {
 		switch v {
 		case "in_progress", "success", "failure":
-			clauses = append(clauses, fmt.Sprintf("(%s) = $%d", requestLogStatusExpr, argIdx))
+			// 2026-06-30 (migration 058): rl.request_status is now
+			// materialized; reading the bare column lets the planner
+			// use idx_request_logs_status_ts. We still exclude ''
+			// defensively in case a future regression re-introduces
+			// empty-string rows (the partial index already filters
+			// them out, but the explicit predicate keeps the EXPLAIN
+			// plan obvious).
+			clauses = append(clauses, fmt.Sprintf("rl.request_status = $%d AND rl.request_status <> ''", argIdx))
 			args = append(args, v)
 			argIdx++
 		default:
@@ -322,7 +444,8 @@ func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
 		if *v {
 			status = "success"
 		}
-		clauses = append(clauses, fmt.Sprintf("(%s) = $%d", requestLogStatusExpr, argIdx))
+		// 2026-06-30 (migration 058): bare column on rl.request_status.
+		clauses = append(clauses, fmt.Sprintf("rl.request_status = $%d AND rl.request_status <> ''", argIdx))
 		args = append(args, status)
 		argIdx++
 	}
@@ -376,37 +499,33 @@ func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
 
 	where := strings.Join(clauses, " AND ")
 
-	// For COUNT, we need the same JOINs to filter by ak.tenant_id for tenant_admin
-	var count int
-	if IsTenantAdmin(r) {
-		// COUNT with api_keys join so ak.tenant_id filter works
-		if err := h.db.QueryRow(ctx, `
-			SELECT COUNT(*) FROM request_logs rl
-			LEFT JOIN api_keys ak ON ak.id = rl.api_key_id
-			WHERE `+where, args...).Scan(&count); err != nil {
-			writeError(w, http.StatusInternalServerError, "query failed: "+err.Error())
-			return
-		}
-	} else {
-		if err := h.db.QueryRow(ctx, "SELECT COUNT(*) FROM request_logs rl WHERE "+where, args...).Scan(&count); err != nil {
-			writeError(w, http.StatusInternalServerError, "query failed: "+err.Error())
-			return
-		}
-	}
-
+	// 2026-06-30 (migration 056): previously the list handler issued TWO
+	// round-trips — a separate `SELECT COUNT(*)` and a `SELECT ... LIMIT N
+	// OFFSET M`. The COUNT branch additionally LEFT JOINed api_keys just to
+	// reuse `ak.tenant_id` even though the WHERE clause already filters on
+	// `rl.tenant_id`. Each branch had to walk the same partitions and
+	// re-evaluate the same WHERE; the COUNT round-trip alone added ~1s on
+	// the production 24h window.
+	//
+	// We now merge them into a single SELECT that projects the page rows
+	// AND a `COUNT(*) OVER ()` window so every emitted row carries the
+	// total count of WHERE-matching rows (computed BEFORE LIMIT/OFFSET,
+	// identical semantics to the previous standalone COUNT). This halves
+	// the round-trip count and removes the api_keys join from the COUNT
+	// path entirely.
 	offset := (page - 1) * pageSize
 	listArgs := append(append([]any{}, args...), pageSize, offset)
 	limitIdx := argIdx
 	offsetIdx := argIdx + 1
 
 	rows, err := h.db.Query(ctx, fmt.Sprintf(`
-		SELECT %s%s
+		SELECT %s%s, COUNT(*) OVER () AS total_count
 		FROM request_logs rl
 		%s
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, requestLogsSelectCols, traceSeqCol, requestLogsJoins, where, orderBy, limitIdx, offsetIdx), listArgs...)
+	`, requestLogsListCols, traceSeqCol, requestLogsJoins, where, orderBy, limitIdx, offsetIdx), listArgs...)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "query failed")
 		return
@@ -414,10 +533,18 @@ func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	items := make([]requestLogRow, 0)
+	count := 0
+	// total_count is the same on every row in this result set (it's a
+	// window over the WHERE-clause rows before LIMIT/OFFSET). Capture it
+	// from the first row; if there are zero rows we fall back to 0
+	// which matches the previous standalone COUNT(*)=0 path.
 	for rows.Next() {
-		l, err := scanRequestLogRow(rows, chrono)
+		l, c, err := scanRequestLogListRowWithTotal(rows, chrono)
 		if err != nil {
 			continue
+		}
+		if count == 0 {
+			count = c
 		}
 		items = append(items, l)
 	}

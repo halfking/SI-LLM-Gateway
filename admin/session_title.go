@@ -114,7 +114,8 @@ func (h *Handler) loadTaskLogsForTitle(ctx context.Context, taskID string, sc se
 	rows, err := h.db.Query(ctx, `
 		SELECT rl.ts, rl.request_preview, rl.response_preview,
 		       rl.request_body::text, rl.response_body::text,
-		       `+requestLogStatusExpr+` AS request_status,
+		       -- 2026-06-30 (migration 058): bare column.
+		       rl.request_status,
 		       rl.error_kind, rl.client_model
 		FROM request_logs rl
 		`+where+`

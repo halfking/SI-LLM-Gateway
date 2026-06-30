@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/kaixuan/llm-gateway-go/telemetry"
 )
 
 type decisionLogInput struct {
@@ -298,6 +300,24 @@ func (t *telemetryIngester) persistRequestLog(ctx context.Context, e *requestLog
 	if err != nil {
 		slog.Warn("telemetry ingest request_logs failed", "error", err)
 		return
+	}
+
+	// 2026-06-30 (migration 057): denormalize provider_model so the
+	// read path can drop the LATERAL. Same fire-and-forget contract
+	// as telemetry.Client: tolerant of column-not-yet-migrated and
+	// credential-not-in-model_offers cases.
+	if providerModel, resolveErr := telemetry.ResolveProviderModel(
+		ctx, tx,
+		e.CredentialID, e.CanonicalID,
+		e.OutboundModel, e.ClientModel,
+	); resolveErr != nil {
+		slog.Warn("telemetry ingest ResolveProviderModel failed; row will fall back to LATERAL",
+			"request_id", e.RequestID, "error", resolveErr.Error())
+	} else if providerModel != "" {
+		if err := telemetry.PersistProviderModel(ctx, tx, e.RequestID, providerModel); err != nil {
+			slog.Warn("telemetry ingest PersistProviderModel failed; row will fall back to LATERAL",
+				"request_id", e.RequestID, "error", err.Error())
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

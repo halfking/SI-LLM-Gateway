@@ -253,7 +253,7 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	CREATE INDEX IF NOT EXISTS idx_request_logs_upstream_finish_reason
 	    ON request_logs (upstream_finish_reason, ts DESC)
 	    WHERE upstream_finish_reason IS NOT NULL
-	      AND upstream_finish_reason <> '';
+	          AND upstream_finish_reason <> '';
 	-- 2026-06-23: structured tool_calls (042_tool_calls_column.sql).
 	-- Populated from both streaming and non-streaming responses.
 	ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS tool_calls JSONB;
@@ -263,11 +263,78 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	CREATE INDEX IF NOT EXISTS idx_request_logs_provider_tool_calls
 	    ON request_logs (provider_id, ts DESC)
 	    WHERE tool_calls IS NOT NULL AND jsonb_array_length(tool_calls) > 0;
+	-- 2026-06-30: migration 056 — listing-path indexes for /api/logs.
+	-- See deploy/sql/migrations/056_request_logs_listing_indexes.sql for
+	-- the full rationale. The indexes added here are:
+	--   - provider_models.canonical_id
+	--   - provider_models.lower(standardized_name)
+	--   - provider_models.lower(raw_model_name)
+	--   - credential_model_bindings (credential_id, provider_model_id)
+	--   - model_aliases PK + (lower(raw_name), status) WHERE status='active'
+	--   - request_logs (ts DESC) for the default 24h list window
+	CREATE INDEX IF NOT EXISTS idx_provider_models_canonical_id
+	    ON public.provider_models (canonical_id);
+	CREATE INDEX IF NOT EXISTS idx_provider_models_lower_standardized_name
+	    ON public.provider_models (lower(standardized_name));
+	CREATE INDEX IF NOT EXISTS idx_provider_models_lower_raw_model_name
+	    ON public.provider_models (lower(raw_model_name));
+	CREATE INDEX IF NOT EXISTS idx_cmb_credential_provider_model
+	    ON public.credential_model_bindings (credential_id, provider_model_id);
+	ALTER TABLE public.model_aliases
+	    ADD CONSTRAINT IF NOT EXISTS model_aliases_pkey PRIMARY KEY (id);
+	CREATE INDEX IF NOT EXISTS idx_model_aliases_lower_raw_name_status
+	    ON public.model_aliases (lower(raw_name), status)
+	    WHERE status = 'active';
+	CREATE INDEX IF NOT EXISTS idx_request_logs_ts_desc
+	    ON public.request_logs (ts DESC);
+	-- 2026-06-30: migration 057 — denormalize provider_model onto
+	-- request_logs so the read path can drop its LEFT JOIN LATERAL on
+	-- model_offers. See deploy/sql/migrations/057_request_logs_provider_model_column.sql.
+	ALTER TABLE public.request_logs
+	    ADD COLUMN IF NOT EXISTS provider_model text;
+	CREATE INDEX IF NOT EXISTS idx_request_logs_provider_model
+	    ON public.request_logs (provider_model, ts DESC)
+	    WHERE provider_model IS NOT NULL;
+	-- 2026-06-30: migration 058 — materialize request_status. The
+	-- schema does not change (column already exists, index already
+	-- exists with partial predicate); this block only backfills NULL
+	-- and '' values to the canonical label (success / failure /
+	-- in_progress) derived from success + error_kind. After the
+	-- backfill the read path can drop the COALESCE wrapper and read
+	-- rl.request_status directly, so WHERE request_status = $1 can
+	-- use idx_request_logs_status_ts.
+	--
+	-- Idempotent: WHERE request_status IS NULL OR request_status = ''
+	-- matches nothing once the first run completes.
+	UPDATE request_logs rl
+	SET request_status = CASE
+	    WHEN rl.success THEN 'success'
+	    WHEN rl.error_kind IS NOT NULL AND rl.error_kind <> '' THEN 'failure'
+	    ELSE 'in_progress'
+	END
+	WHERE rl.request_status IS NULL
+	   OR rl.request_status = '';
+	-- 2026-07-01: migration 059 — GIN trgm index on search_text to
+	-- accelerate the ?q= substring filter in /api/logs
+	-- (admin/logs.go:420). See
+	-- deploy/sql/migrations/059_request_logs_search_text_trgm.sql
+	-- for rationale and CONCURRENTLY-style operator notes.
+	--
+	-- Parent-level only: request_logs is PARTITION BY RANGE(ts); on
+	-- PG 11+ the index is automatically propagated to existing and
+	-- future partitions. Mirrors the pattern used by
+	-- idx_request_logs_quality_flags, idx_request_logs_tool_calls,
+	-- and idx_request_logs_client_model_trgm.
+	--
+	-- Idempotent via CREATE INDEX IF NOT EXISTS.
+	CREATE INDEX IF NOT EXISTS idx_request_logs_search_text_trgm
+	    ON public.request_logs
+	    USING gin (search_text public.gin_trgm_ops);
 `)
 	if err != nil {
 		return err
 	}
-	slog.Info("request_logs schema ensured (gw_session_id, gw_task_id, request_status, api_key_prefix, api_key_owner_user, application_code, parent_request_id, compression_reason, compression_strategy, compression_meta, outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes, quality_flags, quality_fix_actions, quality_score, client_request_id)")
+	slog.Info("request_logs schema ensured (gw_session_id, gw_task_id, request_status, api_key_prefix, api_key_owner_user, application_code, parent_request_id, compression_reason, compression_strategy, compression_meta, outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes, quality_flags, quality_fix_actions, quality_score, client_request_id, listing-path indexes 056, provider_model 057, request_status backfill 058, search_text trgm 059)")
 	return nil
 }
 

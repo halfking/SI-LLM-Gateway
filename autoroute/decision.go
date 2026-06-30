@@ -1,10 +1,10 @@
 package autoroute
 
 import (
-	"github.com/jackc/pgx/v5/pgxpool"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"log/slog"
 	"strings"
 	"sync"
@@ -13,9 +13,9 @@ import (
 
 // Decision is the top-level output of Decider.Decide. Consumed by
 // relay/handler.go to:
-//   1. Substitute the model field with ChosenModel
-//   2. Add X-Gw-Auto-Decision header
-//   3. Persist auto_decision JSONB to request_logs
+//  1. Substitute the model field with ChosenModel
+//  2. Add X-Gw-Auto-Decision header
+//  3. Persist auto_decision JSONB to request_logs
 type Decision struct {
 	// ChosenModel is the canonical_name of the winning credential's model.
 	// The relay substitutes this into the request body's "model" field
@@ -65,21 +65,21 @@ type IndexAccessor interface {
 
 // Decider orchestrates the auto-route pipeline:
 //
-//   1. Resolve profile (header > sticky > default)
-//   2. Classify (heuristic, with LLM fallback if confidence < threshold)
-//   3. Score candidates (via index)
-//   4. Return Decision
+//  1. Resolve profile (header > sticky > default)
+//  2. Classify (heuristic, with LLM fallback if confidence < threshold)
+//  3. Score candidates (via index)
+//  4. Return Decision
 //
 // All inputs are read-only after construction (except the index, which
 // is refreshed by bg/auto_index_refresher.go).
 type Decider struct {
-	classifier Classifier   // heuristic
-	fallback   Classifier   // optional LLM
-	index      IndexAccessor // candidate pool
-	profileStore ProfileStore // per-API-Key sticky profile
-	intentCache  *SessionIntentCache // per-session intent cache (v2.0.4)
-	tuningStore    *TuningStore    // optional dynamic params (v2.1)
-	overrideStore  *OverrideStore  // optional admin ban/pin overrides (P7.6)
+	classifier    Classifier          // heuristic
+	fallback      Classifier          // optional LLM
+	index         IndexAccessor       // candidate pool
+	profileStore  ProfileStore        // per-API-Key sticky profile
+	intentCache   *SessionIntentCache // per-session intent cache (v2.0.4)
+	tuningStore   *TuningStore        // optional dynamic params (v2.1)
+	overrideStore *OverrideStore      // optional admin ban/pin overrides (P7.6)
 
 	// DefaultProfile is used when no header AND no sticky entry exists.
 	// Default: ProfileSmart.
@@ -160,12 +160,12 @@ func (d *Decider) effectiveLLMThreshold() float64 {
 //
 // Parameters:
 //
-//   ctx              : request context (used for timeout propagation)
-//   sigs             : request fingerprint
-//   apiKeyID         : the resolved API key ID (0 for unauthenticated)
-//   headerProfile    : X-Gw-Auto-Profile header value (empty = no override)
-//   taskHint         : X-Gw-Task-Hint header value (optional client hint)
-//   sessionID        : X-Gw-Session-Id (empty = no session, always reclassify)
+//	ctx              : request context (used for timeout propagation)
+//	sigs             : request fingerprint
+//	apiKeyID         : the resolved API key ID (0 for unauthenticated)
+//	headerProfile    : X-Gw-Auto-Profile header value (empty = no override)
+//	taskHint         : X-Gw-Task-Hint header value (optional client hint)
+//	sessionID        : X-Gw-Session-Id (empty = no session, always reclassify)
 //
 // Side effects:
 //
@@ -253,9 +253,9 @@ func (d *Decider) Decide(ctx context.Context, sigs ClassificationSignals, apiKey
 
 // resolveProfile applies the profile precedence:
 //
-//   1. X-Gw-Auto-Profile header (if valid)
-//   2. Sticky entry for apiKeyID (if not expired)
-//   3. DefaultProfile (ProfileSmart by default)
+//  1. X-Gw-Auto-Profile header (if valid)
+//  2. Sticky entry for apiKeyID (if not expired)
+//  3. DefaultProfile (ProfileSmart by default)
 //
 // Side effect: if the header overrides a stale sticky entry, persist the
 // new value via ProfileStore.Put (best-effort, error swallowed).
@@ -376,7 +376,6 @@ type ProfileStore interface {
 	Put(ctx context.Context, apiKeyID int, p Profile, ttl time.Duration) error
 }
 
-
 // DBProfileStore is the production-grade, multi-instance-safe
 // implementation of ProfileStore. Sticky state is persisted to the
 // api_key_auto_profile table (added in v2.0.0 SQL migration).
@@ -418,10 +417,10 @@ func NewDBProfileStore(pool *pgxpool.Pool) *DBProfileStore {
 // Get implements ProfileStore.
 //
 // Order of operations:
-//   1. Check in-process cache (RLock). If fresh, return.
-//   2. If miss or stale, query api_key_auto_profile.
-//   3. If found, update cache and return.
-//   4. If not found, return "" + false (caller falls back to default).
+//  1. Check in-process cache (RLock). If fresh, return.
+//  2. If miss or stale, query api_key_auto_profile.
+//  3. If found, update cache and return.
+//  4. If not found, return "" + false (caller falls back to default).
 func (s *DBProfileStore) Get(ctx context.Context, apiKeyID int) (Profile, bool) {
 	if apiKeyID <= 0 {
 		return "", false
@@ -442,12 +441,17 @@ func (s *DBProfileStore) Get(ctx context.Context, apiKeyID int) (Profile, bool) 
 		WHERE api_key_id = $1
 	`, apiKeyID).Scan(&profile)
 	if err != nil {
-		// No row or DB error. We log the error but return false so
-		// the caller falls back to default. Caching an empty profile
-		// would mask DB outages.
-		if !errors.Is(err, pgxNoRows()) {
-			slog.Warn("DBProfileStore.Get query failed", "error", err, "api_key_id", apiKeyID)
+		// 2026-06-30: 区分"未找到"和"数据库错误"
+		// 未找到记录是正常情况（返回 false），但数据库错误应该被明确记录
+		if errors.Is(err, pgxNoRows()) {
+			// 正常情况：没有 profile 记录
+			return "", false
 		}
+		// 数据库错误：不伪装，明确记录为错误
+		slog.Error("DBProfileStore.Get: database query error",
+			"error", err,
+			"api_key_id", apiKeyID,
+		)
 		return "", false
 	}
 

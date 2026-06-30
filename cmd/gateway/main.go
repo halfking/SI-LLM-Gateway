@@ -33,6 +33,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/compressor"
 	"github.com/kaixuan/llm-gateway-go/config"
 	"github.com/kaixuan/llm-gateway-go/credentialfpslot"
+	"github.com/kaixuan/llm-gateway-go/credentialhealth"
 	"github.com/kaixuan/llm-gateway-go/credentialstate"
 	"github.com/kaixuan/llm-gateway-go/db"
 	"github.com/kaixuan/llm-gateway-go/discovery"
@@ -551,10 +552,13 @@ func main() {
 		routingExec.FpSlots = fpSlots
 
 		// Health tracking (2026-06-22): sliding window recorder + concurrency tuner + continuous failure checker
+		// (2026-06-30): anti-flap 通过 SetAntiFlap 在 keyring 就绪后注入
 		if fpSlotRedis != nil && dbConn != nil {
 			healthTracker := routing.NewHealthTracker(
 				fpSlotRedis,
 				dbConn.Pool(),
+				nil,         // pool: anti-flap 延迟注入
+				nil,         // probe: anti-flap 延迟注入
 				2*time.Hour, // window TTL
 				100,         // max size
 			)
@@ -721,6 +725,17 @@ func main() {
 				keyring = kr
 				slog.Info("AES-GCM keyring initialized")
 			}
+		}
+
+		// Initialize anti-flap for health tracker now that keyring is available.
+		// probe 复用 bg.ProbeCredentialModel（协议感知，与后台探测同一套逻辑）。
+		if routingExec != nil && routingExec.HealthTracker != nil && keyring != nil && fernetKey != nil {
+			pool := dbConn.Pool()
+			probe := credentialhealth.ProbeFunc(func(ctx context.Context, credentialID int, model string) (bool, string) {
+				return bg.ProbeCredentialModel(ctx, pool, keyring, fernetKey, credentialID, model)
+			})
+			routingExec.HealthTracker.SetAntiFlap(pool, probe)
+			slog.Info("anti_flap initialized for health_tracker")
 		}
 
 		if !bgDataPlaneOnly {

@@ -66,27 +66,27 @@ const maxWireDecisionBytes = 16 * 1024
 // autoRouteDecision is the wire format of X-Gw-Auto-Decision. Stable
 // JSON schema — clients may parse it for observability.
 type autoRouteDecision struct {
-	TaskType        string                 `json:"task_type"`
-	Confidence      float64                `json:"confidence"`
-	Profile         string                 `json:"profile"`
-	Classifier      string                 `json:"classifier"`
-	Reason          string                 `json:"reason"`
-	ChosenModel     string                 `json:"chosen_model"`
-	ChosenRawModel  string                 `json:"chosen_raw_model"`
-	ChosenCredID    int64                  `json:"chosen_credential_id"`
-	CandidatesTop3  []autoRouteCandidate   `json:"candidates_top3"`
+	TaskType       string               `json:"task_type"`
+	Confidence     float64              `json:"confidence"`
+	Profile        string               `json:"profile"`
+	Classifier     string               `json:"classifier"`
+	Reason         string               `json:"reason"`
+	ChosenModel    string               `json:"chosen_model"`
+	ChosenRawModel string               `json:"chosen_raw_model"`
+	ChosenCredID   int64                `json:"chosen_credential_id"`
+	CandidatesTop3 []autoRouteCandidate `json:"candidates_top3"`
 }
 
 // autoRouteCandidate is one row of the top-N audit list.
 type autoRouteCandidate struct {
-	Model          string  `json:"model"`
-	Score          float64 `json:"composite_score"`
-	Price          float64 `json:"price_score"`
-	Speed          float64 `json:"speed_score"`
-	Stability      float64 `json:"stability_score"`
-	Match          float64 `json:"match_score"`
-	Pressure       float64 `json:"pressure_score"`
-	ContextFit     float64 `json:"context_fit"`
+	Model      string  `json:"model"`
+	Score      float64 `json:"composite_score"`
+	Price      float64 `json:"price_score"`
+	Speed      float64 `json:"speed_score"`
+	Stability  float64 `json:"stability_score"`
+	Match      float64 `json:"match_score"`
+	Pressure   float64 `json:"pressure_score"`
+	ContextFit float64 `json:"context_fit"`
 }
 
 // extractSignalsForAuto builds the ClassificationSignals from the
@@ -106,9 +106,9 @@ type autoRouteCandidate struct {
 // count as ~1.5 tokens each (more efficient packing).
 func extractSignalsForAuto(reqBody *chatRequestBody, rawBody []byte) autoroute.ClassificationSignals {
 	sigs := autoroute.ClassificationSignals{
-		ToolCount:      countToolsInBody(rawBody),
-		HasImages:      false,
-		HasCodeBlock:   bytes.Contains(rawBody, []byte("```")),
+		ToolCount:       countToolsInBody(rawBody),
+		HasImages:       false,
+		HasCodeBlock:    bytes.Contains(rawBody, []byte("```")),
 		EstimatedTokens: estimateTokens(rawBody),
 	}
 
@@ -261,10 +261,10 @@ func countJSONArrayLen(raw json.RawMessage) int {
 //
 // Returns:
 //   - newBody     : possibly-rewritten body bytes (nil if not auto or
-//                   no rewrite performed)
+//     no rewrite performed)
 //   - decision    : non-nil when auto-route ran (success or failure)
 //   - shouldFail  : true when auto-route was attempted and failed;
-//                   caller should return 502 immediately
+//     caller should return 502 immediately
 //
 // On non-auto requests, returns (nil, nil, false) — zero overhead.
 func (h *ChatHandler) maybeResolveAuto(reqBody *chatRequestBody, rawBody []byte, r *http.Request, apiKeyID int) ([]byte, *autoRouteDecision, bool) {
@@ -291,15 +291,14 @@ func (h *ChatHandler) maybeResolveAuto(reqBody *chatRequestBody, rawBody []byte,
 
 	decision, err := h.decider.Decide(r.Context(), sigs, apiKeyID, headerProfile, taskHint, sessionID)
 	if err != nil {
-		slog.Warn("auto-route: decider failed, falling back",
+		slog.Error("auto-route: decider failed - routing data query error",
 			"error", err,
 			"task_hint", string(taskHint),
 			"profile_header", headerProfile,
 		)
-		// Fall back to a default chat model rather than 502 — clients
-		// should not be punished for the gateway's transient issues.
-		reqBody.Model = autoFallbackModel()
-		return rewriteBodyWithModel(rawBody, autoFallbackModel()), nil, false
+		// 2026-06-30: 不伪装错误，直接返回路由数据查询错误，让用户和运维知道真实原因
+		// 以前的做法是静默降级到 fallback 模型，这会误导用户和运维人员
+		return nil, nil, true // shouldFail=true，调用方应该返回 502
 	}
 
 	reqBody.Model = decision.ChosenModel

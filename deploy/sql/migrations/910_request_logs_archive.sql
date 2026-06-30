@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS public.request_logs_archive (
     transform_rule_id text,
     egress_protocol text,
     client_request_id text,  -- 2026-06-27: added per 5373d963 hotfix
+    provider_model text,     -- 2026-06-30: per 057_request_logs_provider_model_column.sql
     CONSTRAINT chk_archive_compression_parent_single CHECK (((parent_request_id IS NULL) OR (compression_reason IS NOT NULL))),
     CONSTRAINT request_logs_archive_strategy_used_check CHECK (((strategy_used IS NULL) OR (strategy_used = ANY (ARRAY['baseline_heuristic'::text, 'pattern_layered'::text, 'llm_fallback'::text]))))
 ) PARTITION BY RANGE (ts);
