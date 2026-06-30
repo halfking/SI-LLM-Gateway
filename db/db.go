@@ -280,8 +280,16 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	    ON public.provider_models (lower(raw_model_name));
 	CREATE INDEX IF NOT EXISTS idx_cmb_credential_provider_model
 	    ON public.credential_model_bindings (credential_id, provider_model_id);
-	ALTER TABLE public.model_aliases
-	    ADD CONSTRAINT IF NOT EXISTS model_aliases_pkey PRIMARY KEY (id);
+	DO $$
+	BEGIN
+	    IF NOT EXISTS (
+	        SELECT 1 FROM pg_constraint
+	        WHERE conname = 'model_aliases_pkey'
+	          AND conrelid = 'public.model_aliases'::regclass
+	    ) THEN
+	        ALTER TABLE public.model_aliases ADD CONSTRAINT model_aliases_pkey PRIMARY KEY (id);
+	    END IF;
+	END $$;
 	CREATE INDEX IF NOT EXISTS idx_model_aliases_lower_raw_name_status
 	    ON public.model_aliases (lower(raw_name), status)
 	    WHERE status = 'active';
