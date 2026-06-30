@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -361,4 +362,64 @@ func TestIsRevealableKeyCiphertext(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestWriteCodedError pins the JSON envelope shape that the frontend's req()
+// helper (web/src/api/_core.ts) parses into ApiError.code / .context. If this
+// shape changes, every revealKey 404/409 branch must be re-verified.
+func TestWriteCodedError(t *testing.T) {
+	t.Run("emits envelope with detail, code, and context", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		writeCodedError(w, http.StatusNotFound, "key_not_found",
+			"key not found", map[string]any{"key_id": 42})
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", w.Code)
+		}
+		if ct := w.Header().Get("Content-Type"); ct == "" || !strings.HasPrefix(ct, "application/json") {
+			t.Fatalf("Content-Type = %q, want application/json...", ct)
+		}
+
+		var body map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("body is not JSON: %v (raw=%q)", err, w.Body.String())
+		}
+		errObj, ok := body["error"].(map[string]any)
+		if !ok {
+			t.Fatalf("missing error envelope: %+v", body)
+		}
+		if errObj["detail"] != "key not found" {
+			t.Fatalf("detail = %v, want %q", errObj["detail"], "key not found")
+		}
+		if errObj["code"] != "key_not_found" {
+			t.Fatalf("code = %v, want %q", errObj["code"], "key_not_found")
+		}
+		ctx, ok := errObj["context"].(map[string]any)
+		if !ok {
+			t.Fatalf("context is not an object: %+v", errObj["context"])
+		}
+		// JSON numbers decode as float64
+		if id, _ := ctx["key_id"].(float64); int(id) != 42 {
+			t.Fatalf("context.key_id = %v, want 42", ctx["key_id"])
+		}
+	})
+
+	t.Run("nil context becomes empty object", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		writeCodedError(w, http.StatusConflict, "key_ciphertext_format_unsupported",
+			"unsupported", nil)
+
+		var body map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("body is not JSON: %v", err)
+		}
+		errObj := body["error"].(map[string]any)
+		ctx, ok := errObj["context"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected empty object, got %T (%v)", errObj["context"], errObj["context"])
+		}
+		if len(ctx) != 0 {
+			t.Fatalf("expected empty context, got %+v", ctx)
+		}
+	})
 }

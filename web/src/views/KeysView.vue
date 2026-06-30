@@ -3,6 +3,7 @@ import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getKeys, createKey, revokeKey, revealKey, approveKey, disableKey, enableKey, patchKeyProfile, getDefaultLimits, setDefaultLimits, getKeyConflict, type ApiKey, type KeyCreatedResponse, type DefaultLimits, type KeyConflict } from '../api'
 import { store, clearApiKey, setApiKey, setPreferredChatKeyId, isSuperAdmin, isDefaultTenant, getCurrentTenantId } from '../store'
+import { ApiError } from '../api/_core'
 import FilterInput from '../components/FilterInput.vue'
 
 const router = useRouter()
@@ -371,24 +372,43 @@ async function copyText(val: string): Promise<void> {
 
 // Copy a row key — fetches full decrypted key from backend first
 async function copyKey(k: ApiKey, id: string) {
-  try {
-    let val: string
-    if (k.key_prefix) {
-      const result = await revealKey(k.id)
-      val = result.api_key
-    } else {
-      val = k.key_prefix
+  const REISSUE_HINT = '此密钥不支持复制完整内容，请重新签发密钥'
+  // Codes emitted by admin.revealKey when the stored ciphertext cannot be
+  // recovered retroactively (key provisioned before AES-GCM was rolled out,
+  // wrong keyring, row missing/revoked, etc.). See admin/keys.go:revealKey.
+  const REISSUE_CODES = new Set([
+    'key_not_found_or_revoked',
+    'key_has_no_ciphertext',
+    'key_ciphertext_format_unsupported',
+    'key_ciphertext_decryption_failed',
+  ])
+  const isReissueError = (e: unknown): boolean => {
+    if (e instanceof ApiError) {
+      if (e.code && REISSUE_CODES.has(e.code)) return true
+      // Fallback for older servers that don't emit codes yet: match by status.
+      if (e.status === 404 || e.status === 409) return true
     }
-    await copyText(val)
+    return false
+  }
+
+  try {
+    const result = await revealKey(k.id)
+    await copyText(result.api_key)
     copiedId.value = id
     copyNotice.value = '已复制完整密钥'
   } catch (e) {
-    // 409 means key was created before encrypted storage feature - can't reveal retroactively
-    const msg = e instanceof Error ? e.message : String(e)
-    if (msg.includes('No encrypted key stored') || msg.includes('409')) {
-      copyNotice.value = '此密钥不支持复制完整内容，请重新签发密钥'
+    if (isReissueError(e)) {
+      // The server explicitly told us the full plaintext is not recoverable.
+      // Fall back to copying the prefix so the user's clipboard isn't empty —
+      // it's still useful as a search/disambiguator while they reissue.
+      try {
+        if (k.key_prefix) await copyText(k.key_prefix)
+      } catch {
+        /* clipboard fallback is best-effort */
+      }
+      copyNotice.value = REISSUE_HINT
     } else {
-      copyNotice.value = msg || '复制失败'
+      copyNotice.value = (e instanceof Error ? e.message : String(e)) || '复制失败'
     }
   }
   if (copyNoticeTimer) window.clearTimeout(copyNoticeTimer)

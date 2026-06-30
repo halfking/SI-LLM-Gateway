@@ -492,6 +492,26 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	})
 }
 
+// writeCodedError is writeError plus a machine-readable code and an optional
+// context object. The frontend's req() helper (web/src/api/_core.ts) parses
+// {error: {detail, code, context}} into ApiError.code / .context, so callers
+// can branch on a stable string instead of substring-matching the detail.
+//
+// Pass context=nil when there is nothing meaningful to attach (it is still
+// emitted as an empty object so the shape is predictable).
+func writeCodedError(w http.ResponseWriter, status int, code, detail string, context map[string]any) {
+	if context == nil {
+		context = map[string]any{}
+	}
+	writeJSON(w, status, map[string]any{
+		"error": map[string]any{
+			"detail":  detail,
+			"code":    code,
+			"context": context,
+		},
+	})
+}
+
 func readJSON(r *http.Request, v any) error {
 	if r.Body == nil {
 		return nil
