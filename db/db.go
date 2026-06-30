@@ -190,7 +190,7 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 		    ADD COLUMN IF NOT EXISTS application_code TEXT,
 		    -- Round 47 (2026-06-18) compression v7 T1: parent-child chain tracking.
 		    -- See db/migrations/013_compression_columns.sql and
-		    -- docs/llm-gateway-go/2026-06-18-compression-v7-final.md §3.1.
+		    -- docs/llm-gateway-go/2026-06-18-compression-v7-final.md section 3.1.
 		    ADD COLUMN IF NOT EXISTS parent_request_id TEXT,
 		    ADD COLUMN IF NOT EXISTS compression_reason TEXT,
 		    ADD COLUMN IF NOT EXISTS compression_strategy TEXT,
