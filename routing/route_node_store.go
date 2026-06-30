@@ -15,7 +15,8 @@ import (
 // RouteNodeStore 是 RouteNodeState 的 Redis 持久化层。
 //
 // Redis Key 设计（V3.1）：
-//   route_node:<credID>:<model>  String (JSON)  TTL=1h
+//
+//	route_node:<credID>:<model>  String (JSON)  TTL=1h
 //
 // 线程安全：
 //   - 内部使用 singleflight 风格锁（in-process dedup）避免并发请求穿透到 Redis
