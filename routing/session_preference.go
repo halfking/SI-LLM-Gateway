@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -148,7 +149,14 @@ var (
 //
 // 调用方如果不关心 model 字段，可以用这个。返回 (credentialID, found)。
 func (s *SessionPreferenceStore) GetCredentialID(ctx context.Context, sessionID string) (int, bool) {
-	entry, found, _ := s.Get(ctx, sessionID)
+	entry, found, err := s.Get(ctx, sessionID)
+	if err != nil {
+		// 2026-06-30: 不用 _ 丢弃错误，明确记录（Get 内部已记 ERROR）
+		slog.Debug("SessionPreferenceStore.GetCredentialID: degraded due to data access error",
+			"session_id", sessionID, "error", err,
+		)
+		return 0, false
+	}
 	if !found {
 		return 0, false
 	}
