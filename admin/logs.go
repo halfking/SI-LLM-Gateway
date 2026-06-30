@@ -160,7 +160,8 @@ const requestLogsSelectCols = `
 // outbound_msg_hashes, compression_meta — which the list view never
 // renders. Detail dialog fetches them through getLog instead.
 //
-// Scan order MUST stay in lock-step with scanRequestLogListRow below.
+// Scan order MUST stay in lock-step with scanRequestLogListRowWithTotal
+// below.
 const requestLogsListCols = `
 	rl.ts, rl.request_id, rl.api_key_id, rl.end_user_id,
 	rl.client_model, rl.outbound_model,
