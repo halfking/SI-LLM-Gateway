@@ -680,6 +680,26 @@ func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
 		}
 	}
 
+	// 2026-06-30 (migration 057): denormalize provider_model so the
+	// read path can drop the LATERAL. We resolve + UPDATE within the
+	// same transaction as the INSERT so partial failures roll back.
+	// The helper swallows column-not-yet-migrated errors (SQLSTATE
+	// 42703) and credential-not-in-model_offers cases (no row), so
+	// this is safe to fire-and-forget during the backfill window.
+	if providerModel, resolveErr := ResolveProviderModel(
+		ctx, tx,
+		entry.CredentialID, entry.CanonicalID,
+		entry.OutboundModel, entry.ClientModel,
+	); resolveErr != nil {
+		slog.Warn("telemetry: ResolveProviderModel failed; row will fall back to LATERAL",
+			"request_id", entry.RequestID, "error", resolveErr.Error())
+	} else if providerModel != "" {
+		if err := PersistProviderModel(ctx, tx, entry.RequestID, providerModel); err != nil {
+			slog.Warn("telemetry: PersistProviderModel failed; row will fall back to LATERAL",
+				"request_id", entry.RequestID, "error", err.Error())
+		}
+	}
+
 	return tx.Commit(ctx)
 }
 
@@ -1018,7 +1038,14 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 	// updateRequestLog without a normalised status field.
 	normalizeRequestStatus(entry)
 
-	_, err := c.dbPool.Exec(ctx, `
+	tx, txErr := c.dbPool.Begin(ctx)
+	if txErr != nil {
+		return txErr
+	}
+	//nolint:errcheck // deferred rollback, best-effort
+	defer tx.Rollback(ctx)
+
+	_, err := tx.Exec(ctx, `
 		INSERT INTO request_logs (
 			request_id, ts, tenant_id,
 			client_model, outbound_model,
@@ -1167,7 +1194,29 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 		strPtrValue(entry.UpstreamFinishReason), // $50
 		entry.ClientRequestID,                   // $51
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// 2026-06-30 (migration 057): denormalize provider_model so the
+	// read path can drop the LATERAL. Same fire-and-forget contract
+	// as insertRequestLog: tolerant of column-not-yet-migrated and
+	// credential-not-in-model_offers cases.
+	if providerModel, resolveErr := ResolveProviderModel(
+		ctx, tx,
+		entry.CredentialID, entry.CanonicalID,
+		entry.OutboundModel, entry.ClientModel,
+	); resolveErr != nil {
+		slog.Warn("telemetry: fallback ResolveProviderModel failed; row will fall back to LATERAL",
+			"request_id", entry.RequestID, "error", resolveErr.Error())
+	} else if providerModel != "" {
+		if err := PersistProviderModel(ctx, tx, entry.RequestID, providerModel); err != nil {
+			slog.Warn("telemetry: fallback PersistProviderModel failed; row will fall back to LATERAL",
+				"request_id", entry.RequestID, "error", err.Error())
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func nonEmpty(value, fallback string) string {
