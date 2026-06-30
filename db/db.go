@@ -287,11 +287,19 @@ WHERE upstream_finish_reason IS NOT NULL
 	    WHERE status = 'active';
 	CREATE INDEX IF NOT EXISTS idx_request_logs_ts_desc
 	    ON public.request_logs (ts DESC);
+	-- 2026-06-30: migration 057 — denormalize provider_model onto
+	-- request_logs so the read path can drop its LEFT JOIN LATERAL on
+	-- model_offers. See deploy/sql/migrations/057_request_logs_provider_model_column.sql.
+	ALTER TABLE public.request_logs
+	    ADD COLUMN IF NOT EXISTS provider_model text;
+	CREATE INDEX IF NOT EXISTS idx_request_logs_provider_model
+	    ON public.request_logs (provider_model, ts DESC)
+	    WHERE provider_model IS NOT NULL;
 `)
 	if err != nil {
 		return err
 	}
-	slog.Info("request_logs schema ensured (gw_session_id, gw_task_id, request_status, api_key_prefix, api_key_owner_user, application_code, parent_request_id, compression_reason, compression_strategy, compression_meta, outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes, quality_flags, quality_fix_actions, quality_score, client_request_id, listing-path indexes 056)")
+	slog.Info("request_logs schema ensured (gw_session_id, gw_task_id, request_status, api_key_prefix, api_key_owner_user, application_code, parent_request_id, compression_reason, compression_strategy, compression_meta, outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes, quality_flags, quality_fix_actions, quality_score, client_request_id, listing-path indexes 056, provider_model 057)")
 	return nil
 }
 
