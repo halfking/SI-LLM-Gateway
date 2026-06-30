@@ -101,6 +101,19 @@ const requestLogStatusExpr = `COALESCE(
 	END
 )`
 
+// requestLogsSelectCols is the FULL projection used by the detail handler
+// (getLog). It includes the three large JSONB columns
+// (outbound_body, outbound_msg_hashes, compression_meta) which are only
+// rendered inside the request-detail dialog.
+//
+// DO NOT use this projection from the LIST handler — see
+// requestLogsListCols and the migration 056 commentary for why.
+//
+// 2026-06-30: split out requestLogsListCols to keep list responses cheap.
+// The original listLogs used this projection directly, but pulled all
+// three JSONB blobs over the wire for every page even though the list
+// view only displays scalar metadata + the compression_* / parent_*
+// pointers. See migration 056 for the EXPLAIN-backed rationale.
 const requestLogsSelectCols = `
 	rl.ts, rl.request_id, rl.api_key_id, rl.end_user_id,
 	rl.client_model, rl.outbound_model,
@@ -138,6 +151,52 @@ const requestLogsSelectCols = `
 	rl.compression_strategy,
 	rl.compression_reason,
 	rl.compression_meta,
+	rl.parent_request_id
+`
+
+// requestLogsListCols is the projection used by the LIST handler
+// (listLogs). It is identical to requestLogsSelectCols EXCEPT that it
+// drops the three large JSONB columns — outbound_body,
+// outbound_msg_hashes, compression_meta — which the list view never
+// renders. Detail dialog fetches them through getLog instead.
+//
+// Scan order MUST stay in lock-step with scanRequestLogListRow below.
+const requestLogsListCols = `
+	rl.ts, rl.request_id, rl.api_key_id, rl.end_user_id,
+	rl.client_model, rl.outbound_model,
+	rl.credential_id, c.label AS credential_label,
+	rl.provider_id, p.display_name AS provider_name,
+	p.catalog_code AS provider_code,
+	rl.client_profile, rl.request_mode,
+	rl.prompt_tokens, rl.completion_tokens,
+	rl.cache_read_tokens, rl.cache_write_tokens, rl.total_tokens,
+	rl.cost_usd::float8, rl.cost_display::float8, rl.cost_currency, rl.latency_ms, rl.success,
+	` + requestLogStatusExpr + ` AS request_status,
+	rl.error_kind, rl.search_text,
+	rl.identity_hash, rl.virtual_client_id, rl.virtual_ip, rl.virtual_mac,
+	rl.affinity_hit, rl.request_checksum, rl.response_checksum,
+	rl.transform_rule_id, rl.egress_protocol, rl.failure_stage, rl.failure_detail_code,
+	rl.upstream_finish_reason,
+	rl.request_preview, rl.transform_summary, rl.response_preview,
+	rl.stream_first_chunk_ms, rl.stream_chunk_count,
+	rl.stream_done_received, rl.stream_interrupted, rl.stream_done_sent,
+	rl.usage_source,
+	rl.gw_session_id, rl.gw_task_id,
+	COALESCE(NULLIF(TRIM(rl.api_key_prefix), ''), NULLIF(TRIM(ak.key_prefix), '')) AS api_key_prefix,
+	COALESCE(NULLIF(TRIM(rl.api_key_owner_user), ''), ak.owner_user) AS api_key_owner_user,
+	COALESCE(NULLIF(TRIM(rl.application_code), ''), app.code) AS application_code,
+	mc.canonical_name,
+	mo_pick.provider_model,
+	rl.credits_charged,
+	-- v3 session-level outbound body fields — SCALAR ones only.
+	-- The JSONB blobs (outbound_body / outbound_msg_hashes /
+	-- compression_meta) are intentionally dropped; list UI never
+	-- renders them and they are fetched by getLog when the user opens
+	-- a row's detail panel.
+	rl.outbound_msg_count,
+	rl.outbound_token_est,
+	rl.compression_strategy,
+	rl.compression_reason,
 	rl.parent_request_id
 `
 
@@ -243,6 +302,63 @@ func scanRequestLogRow(rows interface {
 	}
 	err := rows.Scan(dest...)
 	return l, err
+}
+
+// scanRequestLogListRowWithTotal scans the merged list+count projection
+// used by listLogs (see migration 056). It returns the row, the total
+// count of WHERE-matching rows, and any scan error.
+//
+// The merged projection order is:
+//
+//	requestLogsListCols [, ROW_NUMBER() OVER (ORDER BY rl.ts ASC) AS trace_seq] , COUNT(*) OVER () AS total_count
+//
+// `total_count` is constant across every row in the result set (it is
+// computed BEFORE LIMIT/OFFSET), so the caller reads it from the first
+// row only. `trace_seq` only appears when the caller asked for chrono
+// mode (gw_session_id/gw_task_id filter or explicit ?chrono=1).
+//
+// Total_count is returned as `int` rather than `*int` because the window
+// function always produces a non-NULL integer.
+func scanRequestLogListRowWithTotal(rows interface {
+	Scan(dest ...any) error
+}, withTraceSeq bool) (requestLogRow, int, error) {
+	var l requestLogRow
+	var total int
+	dest := []any{
+		&l.Ts, &l.RequestID, &l.APIKeyID, &l.EndUserID,
+		&l.ClientModel, &l.OutboundModel,
+		&l.CredentialID, &l.CredentialLabel,
+		&l.ProviderID, &l.ProviderName, &l.ProviderCode,
+		&l.ClientProfile, &l.RequestMode,
+		&l.PromptTokens, &l.CompletionTokens,
+		&l.CacheReadTokens, &l.CacheWriteTokens, &l.TotalTokens,
+		&l.CostUSD, &l.CostDisplay, &l.CostCurrency, &l.LatencyMs, &l.Success, &l.RequestStatus, &l.ErrorKind, &l.SearchText,
+		&l.IdentityHash, &l.VirtualClientID, &l.VirtualIP, &l.VirtualMAC,
+		&l.AffinityHit, &l.RequestChecksum, &l.ResponseChecksum,
+		&l.TransformRuleID, &l.EgressProtocol, &l.FailureStage, &l.FailureDetailCode,
+		&l.UpstreamFinishReason,
+		&l.RequestPreview, &l.TransformSummary, &l.ResponsePreview,
+		&l.StreamFirstChunkMs, &l.StreamChunkCount,
+		&l.StreamDoneReceived, &l.StreamInterrupted, &l.StreamDoneSent,
+		&l.UsageSource,
+		&l.GwSessionID, &l.GwTaskID,
+		&l.APIKeyPrefix, &l.APIKeyOwnerUser, &l.ApplicationCode,
+		&l.CanonicalName, &l.ProviderModel, &l.CreditsCharged,
+		// v3 session-level outbound body fields — SCALAR only;
+		// the JSONB blobs are NOT scanned because they are not in the
+		// list projection (see requestLogsListCols).
+		&l.OutboundMsgCount, &l.OutboundTokenEst,
+		&l.CompressionStrategy, &l.CompressionReason, &l.ParentRequestID,
+	}
+	if withTraceSeq {
+		dest = append(dest, &l.TraceSeq)
+	}
+	// total_count is ALWAYS the last column in the merged list query
+	// (see listLogs). Append it last so the scan order stays in sync
+	// even when withTraceSeq adds the intermediate trace_seq column.
+	dest = append(dest, &total)
+	err := rows.Scan(dest...)
+	return l, total, err
 }
 
 func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
@@ -376,37 +492,33 @@ func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
 
 	where := strings.Join(clauses, " AND ")
 
-	// For COUNT, we need the same JOINs to filter by ak.tenant_id for tenant_admin
-	var count int
-	if IsTenantAdmin(r) {
-		// COUNT with api_keys join so ak.tenant_id filter works
-		if err := h.db.QueryRow(ctx, `
-			SELECT COUNT(*) FROM request_logs rl
-			LEFT JOIN api_keys ak ON ak.id = rl.api_key_id
-			WHERE `+where, args...).Scan(&count); err != nil {
-			writeError(w, http.StatusInternalServerError, "query failed: "+err.Error())
-			return
-		}
-	} else {
-		if err := h.db.QueryRow(ctx, "SELECT COUNT(*) FROM request_logs rl WHERE "+where, args...).Scan(&count); err != nil {
-			writeError(w, http.StatusInternalServerError, "query failed: "+err.Error())
-			return
-		}
-	}
-
+	// 2026-06-30 (migration 056): previously the list handler issued TWO
+	// round-trips — a separate `SELECT COUNT(*)` and a `SELECT ... LIMIT N
+	// OFFSET M`. The COUNT branch additionally LEFT JOINed api_keys just to
+	// reuse `ak.tenant_id` even though the WHERE clause already filters on
+	// `rl.tenant_id`. Each branch had to walk the same partitions and
+	// re-evaluate the same WHERE; the COUNT round-trip alone added ~1s on
+	// the production 24h window.
+	//
+	// We now merge them into a single SELECT that projects the page rows
+	// AND a `COUNT(*) OVER ()` window so every emitted row carries the
+	// total count of WHERE-matching rows (computed BEFORE LIMIT/OFFSET,
+	// identical semantics to the previous standalone COUNT). This halves
+	// the round-trip count and removes the api_keys join from the COUNT
+	// path entirely.
 	offset := (page - 1) * pageSize
 	listArgs := append(append([]any{}, args...), pageSize, offset)
 	limitIdx := argIdx
 	offsetIdx := argIdx + 1
 
 	rows, err := h.db.Query(ctx, fmt.Sprintf(`
-		SELECT %s%s
+		SELECT %s%s, COUNT(*) OVER () AS total_count
 		FROM request_logs rl
 		%s
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, requestLogsSelectCols, traceSeqCol, requestLogsJoins, where, orderBy, limitIdx, offsetIdx), listArgs...)
+	`, requestLogsListCols, traceSeqCol, requestLogsJoins, where, orderBy, limitIdx, offsetIdx), listArgs...)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "query failed")
 		return
@@ -414,10 +526,18 @@ func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	items := make([]requestLogRow, 0)
+	count := 0
+	// total_count is the same on every row in this result set (it's a
+	// window over the WHERE-clause rows before LIMIT/OFFSET). Capture it
+	// from the first row; if there are zero rows we fall back to 0
+	// which matches the previous standalone COUNT(*)=0 path.
 	for rows.Next() {
-		l, err := scanRequestLogRow(rows, chrono)
+		l, c, err := scanRequestLogListRowWithTotal(rows, chrono)
 		if err != nil {
 			continue
+		}
+		if count == 0 {
+			count = c
 		}
 		items = append(items, l)
 	}
