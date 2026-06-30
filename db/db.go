@@ -252,8 +252,8 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS upstream_finish_reason TEXT;
 	CREATE INDEX IF NOT EXISTS idx_request_logs_upstream_finish_reason
 	    ON request_logs (upstream_finish_reason, ts DESC)
-WHERE upstream_finish_reason IS NOT NULL
-		      AND upstream_finish_reason <> '';
+	    WHERE upstream_finish_reason IS NOT NULL
+	          AND upstream_finish_reason <> '';
 	-- 2026-06-23: structured tool_calls (042_tool_calls_column.sql).
 	-- Populated from both streaming and non-streaming responses.
 	ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS tool_calls JSONB;
