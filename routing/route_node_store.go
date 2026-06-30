@@ -93,9 +93,15 @@ func (s *RouteNodeStore) Get(ctx context.Context, credID int, model string) (*Ro
 	// 2. 读 Redis
 	val, err := s.client.Get(ctx, key).Result()
 	if err == redis.Nil {
-		return nil, false, nil
+		return nil, false, nil // 正常情况：key 不存在
 	}
 	if err != nil {
+		// 2026-06-30: Redis 错误明确记录
+		slog.Error("RouteNodeStore.Get: Redis access error",
+			"error", err,
+			"credential_id", credID,
+			"model", model,
+		)
 		return nil, false, err
 	}
 
@@ -204,11 +210,22 @@ func (s *RouteNodeStore) RecordFailure(ctx context.Context, credID int, model, r
 
 // IsUsable 是常用查询便捷方法：返回该 (credID, model) 是否可用于路由。
 //
-// 即使 Redis 中没有记录（首次访问），也返回 true（让请求能进入；后续失败会建立记录）。
+// 2026-06-30 修改：区分"未找到记录"和"Redis错误"
+//   - 未找到记录（首次访问）：返回 true（让请求能进入；后续失败会建立记录）
+//   - Redis 错误：记录 ERROR 日志，返回 true 作为降级策略，但明确标记这是数据访问错误
 func (s *RouteNodeStore) IsUsable(ctx context.Context, credID int, model string) bool {
 	state, found, err := s.Get(ctx, credID, model)
-	if err != nil || !found {
-		return true // 降级：视作可用
+	if err != nil {
+		// 2026-06-30: Redis 错误不伪装，明确记录
+		slog.Error("RouteNodeStore.IsUsable: Redis query error, degrading to available",
+			"error", err,
+			"credential_id", credID,
+			"model", model,
+		)
+		return true // 降级策略：仍返回可用，但已明确记录错误
+	}
+	if !found {
+		return true // 正常情况：首次访问，无状态记录
 	}
 	return state.IsUsable(time.Now(), s.cfg)
 }

@@ -442,12 +442,17 @@ func (s *DBProfileStore) Get(ctx context.Context, apiKeyID int) (Profile, bool) 
 		WHERE api_key_id = $1
 	`, apiKeyID).Scan(&profile)
 	if err != nil {
-		// No row or DB error. We log the error but return false so
-		// the caller falls back to default. Caching an empty profile
-		// would mask DB outages.
-		if !errors.Is(err, pgxNoRows()) {
-			slog.Warn("DBProfileStore.Get query failed", "error", err, "api_key_id", apiKeyID)
+		// 2026-06-30: 区分"未找到"和"数据库错误"
+		// 未找到记录是正常情况（返回 false），但数据库错误应该被明确记录
+		if errors.Is(err, pgxNoRows()) {
+			// 正常情况：没有 profile 记录
+			return "", false
 		}
+		// 数据库错误：不伪装，明确记录为错误
+		slog.Error("DBProfileStore.Get: database query error", 
+			"error", err, 
+			"api_key_id", apiKeyID,
+		)
 		return "", false
 	}
 
