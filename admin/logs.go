@@ -141,7 +141,13 @@ const requestLogsSelectCols = `
 	COALESCE(NULLIF(TRIM(rl.api_key_owner_user), ''), ak.owner_user) AS api_key_owner_user,
 	COALESCE(NULLIF(TRIM(rl.application_code), ''), app.code) AS application_code,
 	mc.canonical_name,
-	mo_pick.provider_model,
+	-- 2026-06-30 (migration 057): provider_model is denormalized
+	-- onto request_logs and written at INSERT time by
+	-- telemetry.ResolveProviderModel. The pre-057 LATERAL has been
+	-- removed from requestLogsJoins. NULLIF maps the helper's
+	-- empty-string sentinel (no model_offers row matched) to NULL so
+	-- the JSON response stays consistent with the old LATERAL path.
+	NULLIF(rl.provider_model, '') AS provider_model,
 	rl.credits_charged,
 	-- v3 (2026-06-19) session-level outbound body fields.
 	rl.outbound_body,
@@ -187,7 +193,10 @@ const requestLogsListCols = `
 	COALESCE(NULLIF(TRIM(rl.api_key_owner_user), ''), ak.owner_user) AS api_key_owner_user,
 	COALESCE(NULLIF(TRIM(rl.application_code), ''), app.code) AS application_code,
 	mc.canonical_name,
-	mo_pick.provider_model,
+	-- 2026-06-30 (migration 057): see requestLogsSelectCols above —
+	-- the LATERAL has been removed; we read rl.provider_model
+	-- directly. NULLIF maps the helper's empty-string sentinel to NULL.
+	NULLIF(rl.provider_model, '') AS provider_model,
 	rl.credits_charged,
 	-- v3 session-level outbound body fields — SCALAR ones only.
 	-- The JSONB blobs (outbound_body / outbound_msg_hashes /
@@ -201,44 +210,27 @@ const requestLogsListCols = `
 	rl.parent_request_id
 `
 
+// requestLogsJoins is the join set used by listLogs + getLog.
+//
+// 2026-06-30 (migration 057): the LEFT JOIN LATERAL on model_offers
+// has been REMOVED. The list handler previously evaluated that LATERAL
+// for every row (4-CASE ORDER BY + LIMIT 1) on every page render, and
+// was the dominant cost in the EXPLAIN of /api/logs on the default 24h
+// window. provider_model is now denormalized onto request_logs
+// (column added by 057 + written at INSERT time by
+// telemetry.ResolveProviderModel / telemetry.PersistProviderModel).
+//
+// The four remaining LEFT JOINs are required for SELECT projections
+// (provider_name, provider_code, credential_label, api_key_*,
+// application_code, canonical_name) and for tenant filtering on
+// ak.tenant_id; they are cheap because each is keyed by a single bigint
+// (p.id, c.id, ak.id, app.id, mc.id) on a small lookup table.
 const requestLogsJoins = `
 	LEFT JOIN providers p ON p.id = rl.provider_id
 	LEFT JOIN credentials c ON c.id = rl.credential_id
 	LEFT JOIN api_keys ak ON ak.id = rl.api_key_id
 	LEFT JOIN applications app ON app.id = ak.application_id
 	LEFT JOIN models_canonical mc ON mc.id = rl.canonical_id
-	LEFT JOIN LATERAL (
-		SELECT COALESCE(
-			NULLIF(TRIM(mo.outbound_model_name), ''),
-			NULLIF(TRIM(mo.raw_model_name), '')
-		) AS provider_model
-		FROM model_offers mo
-		WHERE mo.credential_id = rl.credential_id
-		  AND (
-			(rl.canonical_id IS NOT NULL AND mo.canonical_id = rl.canonical_id)
-			OR (
-				rl.canonical_id IS NULL AND (
-					lower(mo.standardized_name) = lower(COALESCE(mc.canonical_name, rl.client_model, ''))
-					OR lower(mo.raw_model_name) = lower(COALESCE(rl.outbound_model, rl.client_model, ''))
-				)
-			)
-		  )
-		ORDER BY
-			CASE
-				WHEN rl.outbound_model IS NOT NULL
-				 AND lower(COALESCE(NULLIF(TRIM(mo.outbound_model_name), ''), TRIM(mo.raw_model_name)))
-					= lower(rl.outbound_model)
-				THEN 0 ELSE 1
-			END,
-			CASE WHEN NULLIF(TRIM(mo.outbound_model_name), '') IS NOT NULL THEN 0 ELSE 1 END,
-			CASE
-				WHEN lower(TRIM(mo.raw_model_name)) <> lower(TRIM(COALESCE(mo.standardized_name, mc.canonical_name, rl.client_model, '')))
-				THEN 0 ELSE 1
-			END,
-			mo.available DESC NULLS LAST,
-			mo.id DESC
-		LIMIT 1
-	) mo_pick ON TRUE
 `
 
 func (h *Handler) handleLogs(w http.ResponseWriter, r *http.Request) {
