@@ -440,21 +440,21 @@ GROUP BY lifecycle_status, availability_state;
 
 ```bash
 # 查看探测状态
-ssh prod-app "PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"
+ssh prod-app "PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"
 SELECT c.id, c.label, c.last_probe_at, c.last_probe_success, 
        c.probe_consecutive_failures, c.availability_state
 FROM credentials c WHERE c.id IN (6, 8, 18, 19);
 \""
 
 # 查看最近错误率
-ssh prod-app "PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"
+ssh prod-app "PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"
 SELECT COUNT(*) as total, COUNT(CASE WHEN NOT success THEN 1 END) as errors
 FROM request_logs
 WHERE client_model LIKE '%minimax%' AND ts > NOW() - INTERVAL '10 minutes';
 \""
 
 # 查看探测历史
-ssh prod-app "PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"
+ssh prod-app "PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"
 SELECT * FROM credential_probes ORDER BY created_at DESC LIMIT 10;
 \""
 ```

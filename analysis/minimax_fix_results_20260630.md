@@ -248,11 +248,11 @@
 
 ```bash
 # 实时错误率 (每30秒刷新)
-watch -n 30 "ssh prod-app \"PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c 'SELECT COUNT(*) as total, COUNT(CASE WHEN NOT success THEN 1 END) as errors, ROUND(100.0 * COUNT(CASE WHEN NOT success THEN 1 END) / COUNT(*), 2) as error_rate FROM request_logs WHERE client_model LIKE '\''%minimax%'\'' AND ts > NOW() - INTERVAL '\''5 minutes'\'';'\""
+watch -n 30 "ssh prod-app \"PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c 'SELECT COUNT(*) as total, COUNT(CASE WHEN NOT success THEN 1 END) as errors, ROUND(100.0 * COUNT(CASE WHEN NOT success THEN 1 END) / COUNT(*), 2) as error_rate FROM request_logs WHERE client_model LIKE '\''%minimax%'\'' AND ts > NOW() - INTERVAL '\''5 minutes'\'';'\""
 
 # 错误类型分布
-ssh prod-app "PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"SELECT error_kind, COUNT(*) FROM request_logs WHERE client_model LIKE '%minimax%' AND NOT success AND ts > NOW() - INTERVAL '10 minutes' GROUP BY error_kind;\""
+ssh prod-app "PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"SELECT error_kind, COUNT(*) FROM request_logs WHERE client_model LIKE '%minimax%' AND NOT success AND ts > NOW() - INTERVAL '10 minutes' GROUP BY error_kind;\""
 
 # 确认不再有empty_response
-ssh prod-app "PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"SELECT COUNT(*) FROM request_logs WHERE client_model LIKE '%minimax%' AND error_kind = 'empty_response' AND ts > NOW() - INTERVAL '30 minutes';\""
+ssh prod-app "PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"SELECT COUNT(*) FROM request_logs WHERE client_model LIKE '%minimax%' AND error_kind = 'empty_response' AND ts > NOW() - INTERVAL '30 minutes';\""
 ```

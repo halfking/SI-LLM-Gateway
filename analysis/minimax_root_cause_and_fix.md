@@ -202,14 +202,14 @@ WHERE client_model = 'minimax-m3'
 ssh prod-app
 
 # 查看当前状态
-PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c "
+PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c "
 SELECT id, provider_id, label, status, lifecycle_status 
 FROM credentials 
 WHERE id IN (8, 18, 19);
 "
 
 # 禁用错误配置的credentials
-PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c "
+PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c "
 UPDATE credentials 
 SET lifecycle_status = 'disabled',
     manual_disabled = true,
@@ -222,7 +222,7 @@ WHERE id IN (8, 18, 19);
 
 ```bash
 # 实时监控错误率
-watch -n 30 "PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"
+watch -n 30 "PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c \"
 SELECT 
   COUNT(*) as total,
   COUNT(CASE WHEN NOT success THEN 1 END) as errors,
@@ -237,7 +237,7 @@ WHERE client_model LIKE '%minimax%'
 
 ```bash
 # 检查最近10分钟的错误类型
-PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c "
+PGPASSWORD='[REDACTED_PASSWORD]' psql -h 127.0.0.1 -U llm_gateway -d llm_gateway -c "
 SELECT error_kind, COUNT(*) 
 FROM request_logs 
 WHERE client_model LIKE '%minimax%' 

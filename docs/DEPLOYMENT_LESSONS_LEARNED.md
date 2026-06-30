@@ -12,9 +12,9 @@
 ```
 用户浏览器
     ↓ HTTPS
-56服务器 (14.103.169.56) — 只运行 nginx，反向代理
+56服务器 ([PROD_SERVER_IP_56]) — 只运行 nginx，反向代理
     ↓ proxy_pass
-71服务器 (14.103.174.71) — Docker 容器运行 llm-gateway-go
+71服务器 ([PROD_SERVER_IP_71]) — Docker 容器运行 llm-gateway-go
     ↓ 监听 :8781
 容器内：/usr/local/bin/llm-gateway-go
 ```
@@ -119,11 +119,11 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
     -o bin/llm-gateway ./cmd/gateway
 
 # ── 2. 上传到71 ──
-scp -P 25022 bin/llm-gateway root@14.103.174.71:/opt/build-src/
-scp -P 25022 version.json root@14.103.174.71:/opt/build-src/
+scp -P [SSH_PORT] bin/llm-gateway root@[PROD_SERVER_IP_71]:/opt/build-src/
+scp -P [SSH_PORT] version.json root@[PROD_SERVER_IP_71]:/opt/build-src/
 
 # ── 3. 在71上构建镜像 ──
-ssh -p 25022 root@14.103.174.71
+ssh -p [SSH_PORT] root@[PROD_SERVER_IP_71]
 cd /opt/build-src
 docker build -f Dockerfile -t kx-llm-gateway-go:gitsha-<sha>-r718 .
 
