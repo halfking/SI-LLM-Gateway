@@ -291,15 +291,14 @@ func (h *ChatHandler) maybeResolveAuto(reqBody *chatRequestBody, rawBody []byte,
 
 	decision, err := h.decider.Decide(r.Context(), sigs, apiKeyID, headerProfile, taskHint, sessionID)
 	if err != nil {
-		slog.Warn("auto-route: decider failed, falling back",
+		slog.Error("auto-route: decider failed - routing data query error",
 			"error", err,
 			"task_hint", string(taskHint),
 			"profile_header", headerProfile,
 		)
-		// Fall back to a default chat model rather than 502 — clients
-		// should not be punished for the gateway's transient issues.
-		reqBody.Model = autoFallbackModel()
-		return rewriteBodyWithModel(rawBody, autoFallbackModel()), nil, false
+		// 2026-06-30: 不伪装错误，直接返回路由数据查询错误，让用户和运维知道真实原因
+		// 以前的做法是静默降级到 fallback 模型，这会误导用户和运维人员
+		return nil, nil, true // shouldFail=true，调用方应该返回 502
 	}
 
 	reqBody.Model = decision.ChosenModel

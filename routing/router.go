@@ -126,17 +126,25 @@ func (r *Router) filterByRouteNodeHealth(ctx context.Context, candidates []provi
 		}
 	}
 	
-	// 2026-06-30 fallback: 如果所有节点都被过滤，尝试宽容模式
-	// 这种情况通常是短时间内大量失败导致所有节点都在冷却期
-	// 宽容模式：只排除显式禁用且仍在冷却期内的节点
-	if len(out) == 0 && filtered > 0 {
-		slog.Warn("router: all candidates filtered by health check, trying lenient mode",
-			"filtered_count", filtered,
-			"total_candidates", len(candidates),
-		)
-		now := time.Now()
-		for _, c := range candidates {
-			state, found, _ := r.RouteNodeStore.Get(ctx, c.CredentialID, c.RawModel)
+		// 2026-06-30 fallback: 如果所有节点都被过滤，尝试宽容模式
+		// 这种情况通常是短时间内大量失败导致所有节点都在冷却期
+		// 宽容模式：只排除显式禁用且仍在冷却期内的节点
+		if len(out) == 0 && filtered > 0 {
+			slog.Warn("router: all candidates filtered by health check, trying lenient mode",
+				"filtered_count", filtered,
+				"total_candidates", len(candidates),
+			)
+			now := time.Now()
+			for _, c := range candidates {
+				state, found, err := r.RouteNodeStore.Get(ctx, c.CredentialID, c.RawModel)
+				// 2026-06-30: 明确记录数据库错误
+				if err != nil {
+					slog.Error("router: RouteNodeStore.Get error in lenient mode",
+						"error", err,
+						"credential_id", c.CredentialID,
+						"raw_model", c.RawModel,
+					)
+				}
 			// 只排除显式禁用且仍在冷却期的节点
 			// nil state 或已过冷却期的节点允许使用
 			if !found || state == nil || !state.Disabled || now.After(state.DisabledUntil) {

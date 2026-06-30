@@ -210,7 +210,11 @@ func (idx *Index) Refresh(ctx context.Context) error {
 	}
 	rows, err := idx.pool.Query(ctx, refreshIndexSQL)
 	if err != nil {
-		return fmt.Errorf("query credential_model_index: %w", err)
+		// 2026-06-30: 明确记录数据库查询错误
+		slog.Error("autoroute.Index.Refresh: database query error",
+			"error", err,
+		)
+		return fmt.Errorf("routing data query error (credential_model_index): %w", err)
 	}
 	defer rows.Close()
 
@@ -228,7 +232,11 @@ func (idx *Index) Refresh(ctx context.Context) error {
 		out = append(out, c)
 	}
 	if rows.Err() != nil {
-		return fmt.Errorf("iterate credential_model_index: %w", rows.Err())
+		// 2026-06-30: 明确记录数据库迭代错误
+		slog.Error("autoroute.Index.Refresh: database iteration error",
+			"error", rows.Err(),
+		)
+		return fmt.Errorf("routing data processing error (credential_model_index): %w", rows.Err())
 	}
 
 	// Log what was loaded
