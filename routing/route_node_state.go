@@ -50,10 +50,11 @@ type RouteNodeRecord struct {
 }
 
 // 默认参数（V3 校准），可以从 config 注入，但这里给出编译期常量便于单测。
+// 2026-06-30 调整: 提高失败阈值到5次，缩短冷却到3分钟，提高容错性，减少"no candidate"误判
 const (
 	DefaultRouteNodeWindowSeconds    = 300  // 5 分钟滑动窗口
-	DefaultRouteNodeFailStreakLimit  = 3    // 连续失败阈值
-	DefaultRouteNodeDisabledCooldown = 300  // 禁用后冷却
+	DefaultRouteNodeFailStreakLimit  = 5    // 连续失败阈值 (从3提高到5，更宽容)
+	DefaultRouteNodeDisabledCooldown = 180  // 禁用后冷却 (从5分钟缩短到3分钟，更快恢复)
 )
 
 // RouteNodeConfig 是 RouteNodeState 的运行参数，允许外部注入覆盖默认值。

@@ -5,7 +5,7 @@
 // the precise KindToolCallIdMismatch / KindContextLength / KindAuth /
 // KindQuota. The exact body strings below are copied verbatim from
 // candidate_failure_logs.error_message in the production DB
-// (14.103.112.184:11032/llm_gateway) between 2026-06-23 and 2026-06-30.
+// ([PROD_SERVER_IP]:[DB_PORT]/llm_gateway) between 2026-06-23 and 2026-06-30.
 package errorsx
 
 import (

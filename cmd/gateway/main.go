@@ -15,6 +15,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -122,7 +123,13 @@ func main() {
 
 	cfgStore := config.NewStore(cfg)
 	relay.SetConfigStore(cfgStore)
-	slog.Info("gateway starting", "listen", cfg.Listen, "log_level", cfg.LogLevel)
+	slog.Info("gateway starting",
+		"listen", cfg.Listen,
+		"log_level", cfg.LogLevel,
+		"version", Version,
+		"build_number", BuildNumber,
+		"git_commit", GitCommit,
+		"build_time", BuildTime)
 
 	// ── Dependencies ──────────────────────────────────────────────────────
 	dbConn, err := db.Open(context.Background(), cfg.DatabaseURL)
@@ -1229,7 +1236,9 @@ func main() {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				//nolint:errcheck // HTTP write error non-recoverable
-				w.Write([]byte(`{"service":"llm-gateway-go","version":"0.3.0"}`))
+				versionJSON := fmt.Sprintf(`{"service":"llm-gateway-go","version":"%s","build_number":"%s","git_commit":"%s","build_time":"%s"}`,
+					Version, BuildNumber, GitCommit, BuildTime)
+				w.Write([]byte(versionJSON))
 				return
 			}
 			http.NotFound(w, r)
