@@ -286,6 +286,8 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	        SELECT 1 FROM pg_constraint
 	        WHERE conname = 'model_aliases_pkey'
 	          AND conrelid = 'public.model_aliases'::regclass
+	    ) AND NOT EXISTS (
+	        SELECT 1 FROM model_aliases GROUP BY id HAVING COUNT(*) > 1
 	    ) THEN
 	        ALTER TABLE public.model_aliases ADD CONSTRAINT model_aliases_pkey PRIMARY KEY (id);
 	    END IF;
