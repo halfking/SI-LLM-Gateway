@@ -6,7 +6,7 @@
 - **版本**: v2.3.0-0a5a1e74-715
 - **Git Commit**: 0a5a1e74 (comprehensive sensitive info scrub)
 - **构建序列**: 715
-- **目标服务器**: 71 (14.103.174.71)
+- **目标服务器**: 71 ([PROD_SERVER_IP_71])
 - **部署方式**: Docker 容器
 
 ## 部署步骤

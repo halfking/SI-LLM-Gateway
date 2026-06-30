@@ -43,6 +43,13 @@ type RequestLogContext struct {
 	CredentialID  *int
 	ResponseBody  []byte
 
+	// 2026-06-30 (Phase 2 P1 of the minimax-m3 transient-error fix):
+	// upstream HTTP status code, populated by relay/handler.go's
+	// Exhausted and provider_error branches via SetUpstreamStatusCode.
+	// 0 means "unknown / network-level" and the field is copied into
+	// RequestLogEntry.UpstreamStatusCode only when > 0 (BuildFailureEntry).
+	UpstreamStatusCode int
+
 	// v2.0 auto-route fields (populated when model="auto" was used)
 	IsAutoRequest  bool
 	TaskType       string
@@ -241,6 +248,16 @@ func (c *RequestLogContext) SetResponseBody(body []byte) {
 	}
 }
 
+// SetUpstreamStatusCode records the HTTP status code returned by the
+// vendor (0 means network-level failure, in which case the field is
+// left unset so request_logs.upstream_status_code stays NULL).
+// (2026-06-30, Phase 2 P1 of the minimax-m3 transient-error fix.)
+func (c *RequestLogContext) SetUpstreamStatusCode(code int) {
+	if code > 0 {
+		c.UpstreamStatusCode = code
+	}
+}
+
 // EnsureCaptured buffers the JSON body (restores r.Body) and fills key/identity meta.
 func (c *RequestLogContext) EnsureCaptured() {
 	if c == nil || c.Request == nil {
@@ -367,6 +384,13 @@ func (c *RequestLogContext) BuildFailureEntry(errCode, errMessage string, provid
 	if preview := responsePreview(c.ResponseBody); preview != "" {
 		responsePreviewPtr = strPtr(preview)
 	}
+	// 2026-06-30 (Phase 2 P1): only emit upstream_status_code when we
+	// actually have one (0 = network-level error → leave NULL).
+	var upstreamStatusCodePtr *int
+	if c.UpstreamStatusCode > 0 {
+		sc := c.UpstreamStatusCode
+		upstreamStatusCodePtr = &sc
+	}
 
 	detailCode := mapGatewayErrorToDetail(errCode)
 	failureStage := classifyFailureStage(errCode)
@@ -396,10 +420,11 @@ func (c *RequestLogContext) BuildFailureEntry(errCode, errMessage string, provid
 		ErrorKind:         strPtr(errCode),
 		FailureStage:      strPtr(failureStage),
 		FailureDetailCode: strPtr(detailCode),
-		RequestBody:       requestBodyText,
-		RequestPreview:    requestPreviewPtr,
-		ResponseBody:      responseBodyText,
-		ResponsePreview:   responsePreviewPtr,
+		RequestBody:        requestBodyText,
+		RequestPreview:     requestPreviewPtr,
+		ResponseBody:       responseBodyText,
+		ResponsePreview:    responsePreviewPtr,
+		UpstreamStatusCode: upstreamStatusCodePtr,
 		// 2026-06-26: persist the client-supplied X-Request-Id for
 		// debug / cross-system tracing. Distinct from RequestID
 		// (server-generated) so client retries do not collapse.
@@ -419,6 +444,12 @@ func (c *RequestLogContext) EmitFailure(errCode, errMessage string, providerID, 
 	if reqLog == nil {
 		return
 	}
+	// 2026-06-30 (Phase 2 P1): mirror success-path compressor propagation
+	// so failure rows also carry outbound_body / outbound_msg_* when the
+	// session compressor was active. Without this, operator queries like
+	// "which sessions failed because outbound body was too large?" were
+	// silently blind.
+	applySessionCompressorFields(reqLog, c)
 	if c.handler.requestLogHook != nil {
 		c.handler.requestLogHook(reqLog)
 	}

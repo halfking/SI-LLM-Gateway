@@ -79,7 +79,7 @@ migCtx, migCancel := context.WithTimeout(ctx, 300*time.Second)
 
 - **修复版本**: v2.3.0-0a5a1e74-715 (fixed)
 - **部署时间**: 2026-06-30 04:40
-- **服务器**: 71 (14.103.174.71)
+- **服务器**: 71 ([PROD_SERVER_IP_71])
 - **验证状态**: ✅ 完全正常
 
 ## 监控要点

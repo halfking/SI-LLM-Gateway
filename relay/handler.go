@@ -3017,15 +3017,22 @@ func mapExecuteErrorToKind(err *routing.ExecuteError) string {
 	return "unknown"
 }
 
-// errorKindOrFallback (2026-06-20) returns the real underlying error
-// kind for request_logs.error_kind. Falls back to "model_not_found"
-// when the kind is empty or "unknown" so we never write a misleading
-// empty/garbage value to the database. The HTTP error.code is handled
-// separately (see serveWithExecutor's Exhausted branch) and stays
-// "model_not_found" for backward compatibility.
+// errorKindOrFallback returns the real underlying error kind for
+// request_logs.error_kind. Previously this returned "model_not_found"
+// when the kind was empty or "unknown", which caused operators to see
+// ~65 "model_not_found" rows per day that were actually transient / 5xx /
+// 429 failures (2026-06-29 minimax-m3 incident). Now we return
+// "unknown" so SQL queries like `WHERE error_kind='unknown'` can find
+// genuinely unclassified rows; combined with the new upstream_status_code
+// + response_body columns added in 2026-06-30 migration 055, those
+// "unknown" rows are now actually diagnosable.
+//
+// The HTTP error.code stays "model_not_found" in the Exhausted branch
+// (relay/handler.go ~line 1510) for backward compatibility with old
+// clients that pattern-match on the JSON error.code.
 func errorKindOrFallback(kind string) string {
 	if kind == "" || kind == "unknown" {
-		return "model_not_found"
+		return "unknown"
 	}
 	return kind
 }
@@ -3290,6 +3297,22 @@ func detectEmptyStreamResponse(m map[string]any, reqLog *telemetry.RequestLogEnt
 	// completions. If it's set, the upstream reached a clean termination.
 	if v, ok := m["upstream_finish_reason"].(string); ok && v != "" {
 		return false
+	}
+
+	// Short-circuit 4 (2026-06-30): chunk_count == 1 通常是连接立即关闭
+	// 只有1个chunk的情况通常表示流立即中断，这是网络/连接问题而非内容问题
+	if chunkCount, ok := m["stream_chunk_count"].(int); ok && chunkCount == 1 {
+		return false
+	}
+
+	// Short-circuit 5 (2026-06-30): 响应时间很短（<2秒）可能是网络问题
+	// 快速失败通常是连接问题、超时配置问题，不是上游真的返回空内容
+	// NVIDIA NIM在大输入时可能响应很慢，但如果很快就结束且为空，
+	// 更可能是网络中断而非上游问题
+	if streamFirstChunkMs, ok := m["stream_first_chunk_ms"].(int); ok {
+		if streamFirstChunkMs > 0 && streamFirstChunkMs < 2000 {
+			return false
+		}
 	}
 
 	// Check 1: Few chunks (<= 3, tightened threshold)

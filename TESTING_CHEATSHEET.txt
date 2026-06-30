@@ -1,0 +1,121 @@
+╔════════════════════════════════════════════════════════════════════╗
+║              Minimax-m3 测试工具 - 命令速查卡                         ║
+╚════════════════════════════════════════════════════════════════════╝
+
+🚀 快速开始
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 在71服务器上（推荐）
+ssh 192.168.1.71
+cd /path/to/llm-gateway-go-2
+./scripts/test_71_complete.sh
+
+# 本地快速测试（无数据库）
+./scripts/test_71_complete.sh
+
+🔍 诊断命令
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Empty Response 诊断
+./scripts/diagnose_nvidia_nim_empty_response.sh minimax-m3
+
+# 路由问题诊断
+./scripts/diagnose_routing_issue.sh minimax-m3
+
+# 综合测试（多轮并发）
+export ROUNDS=5 REQUESTS_PER_ROUND=10
+./scripts/test_minimax_comprehensive.sh
+
+📊 查看结果
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 查看最新测试日志
+ls -lt test_logs_71/ | head -5
+cat test_logs_71/test_*.log | tail -50
+
+# 查看详细响应
+cat test_logs_71/responses_*.log
+
+# 查看错误
+grep -i "error\|empty\|fail" test_logs_71/test_*.log
+
+💾 数据库查询
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 设置数据库连接
+export LLM_GATEWAY_DATABASE_URL="postgresql://user:pass@host:port/db"
+
+# 快速统计
+psql "$LLM_GATEWAY_DATABASE_URL" -c "
+SELECT 
+    COUNT(*) as total,
+    COUNT(*) FILTER (WHERE success) as success,
+    COUNT(*) FILTER (WHERE error_kind = 'empty_response') as empty_resp
+FROM request_logs
+WHERE client_model = 'minimax-m3' AND ts > NOW() - INTERVAL '1 hour';"
+
+# 按凭据统计
+psql "$LLM_GATEWAY_DATABASE_URL" -c "
+SELECT c.id, c.label, COUNT(*) as requests,
+       COUNT(*) FILTER (WHERE rl.success) as success
+FROM request_logs rl
+JOIN credentials c ON c.id = rl.credential_id
+WHERE rl.client_model = 'minimax-m3' AND rl.ts > NOW() - INTERVAL '1 hour'
+GROUP BY c.id, c.label ORDER BY requests DESC;"
+
+🔧 自定义参数
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export TEST_ROUNDS=5                # 测试轮数
+export REQUESTS_PER_ROUND=10        # 每轮请求数
+export GATEWAY_URL="https://llm.kxpms.cn"
+export API_KEY="sk-1R7IBh2THq1Id2BDWOWHstpFu2oG09Qd1kgYn9hasxFcKZw7"
+
+🔑 可用 API Keys
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+sk-1R7IBh2THq1Id2BDWOWHstpFu2oG09Qd1kgYn9hasxFcKZw7
+sk-1vH6C2I9pywyvUXaUXj4vdMZbeYVE5VB0fBYVgqA97JrltE9
+
+📚 文档
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cat README_TESTING_TOOLS.md        # 完整文档
+cat QUICK_START_TESTING.md         # 快速开始
+cat TEST_EXECUTION_SUMMARY.md      # 执行总结
+
+⚡ 常见场景
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 场景1: 快速检查服务是否正常
+./scripts/test_71_complete.sh
+
+# 场景2: 诊断 empty_response 问题
+./scripts/diagnose_nvidia_nim_empty_response.sh minimax-m3
+
+# 场景3: 检查为什么没有候选节点
+./scripts/diagnose_routing_issue.sh minimax-m3
+
+# 场景4: 压力测试（检查节点切换）
+export TEST_ROUNDS=10 REQUESTS_PER_ROUND=20
+./scripts/test_71_complete.sh
+
+# 场景5: 实时监控
+# 终端1
+./scripts/test_71_complete.sh
+# 终端2
+tail -f /var/log/llm-gateway/app.log
+
+🎯 问题排查流程
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 运行基础测试
+   → ./scripts/test_71_complete.sh
+
+2. 如果出现 "no candidate" 错误
+   → ./scripts/diagnose_routing_issue.sh minimax-m3
+
+3. 如果出现 "empty response" 错误
+   → ./scripts/diagnose_nvidia_nim_empty_response.sh minimax-m3
+
+4. 查看详细日志
+   → cat test_logs_71/responses_*.log
+
+5. 检查服务端日志
+   → tail -f /var/log/llm-gateway/app.log
+   → grep "request_id" /var/log/llm-gateway/*.log
+
+╔════════════════════════════════════════════════════════════════════╗
+║  提示: 所有脚本都支持 --help 或直接查看脚本头部的注释了解详情       ║
+╚════════════════════════════════════════════════════════════════════╝

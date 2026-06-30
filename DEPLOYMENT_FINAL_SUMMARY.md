@@ -1,7 +1,7 @@
 # 🎉 分区归档功能 - 生产部署最终总结
 
 **部署日期**: 2026-06-30  
-**部署环境**: 生产环境 184服务器 (14.103.112.184)  
+**部署环境**: 生产环境 184服务器 ([PROD_SERVER_IP])  
 **状态**: ✅ 完全成功  
 **执行者**: ZCode AI Agent
 
@@ -91,7 +91,7 @@ llm_gateway_post_deployment_20260630_053228.dump (1.6G)
 
 **恢复命令**:
 ```bash
-pg_restore -h localhost -p 11032 -U llm_gateway \
+pg_restore -h localhost -p [DB_PORT] -U llm_gateway \
   -d llm_gateway \
   /root/db_backups/llm_gateway_post_deployment_20260630_053228.dump
 ```
@@ -341,13 +341,13 @@ bbbabea3 - fix(migration): remove ON CONFLICT from columnar table insert
 观察首次自动归档执行（2026-07-01 02:00）:
 ```bash
 # SSH到服务器
-ssh -p 25022 root@14.103.112.184
+ssh -p [SSH_PORT] root@[PROD_SERVER_IP]
 
 # 查看Pod日志
 kubectl logs -n pms-test -f $(kubectl get pods -n pms-test | grep llm-gateway-go | grep Running | awk '{print $1}')
 
 # 查看归档结果
-PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' psql -h localhost -p 11032 -U llm_gateway -d llm_gateway -c "SELECT COUNT(*) FROM routing_decision_log_archive;"
+PGPASSWORD='[REDACTED_PASSWORD]' psql -h localhost -p [DB_PORT] -U llm_gateway -d llm_gateway -c "SELECT COUNT(*) FROM routing_decision_log_archive;"
 ```
 
 ### 可选操作

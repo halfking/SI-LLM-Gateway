@@ -40,17 +40,17 @@ func TestRouteNodeState_ConsecutiveFailureStreak_Basic(t *testing.T) {
 	cfg := DefaultRouteNodeConfig()
 	now := time.Now()
 
-	// 3 次失败
-	for i := 0; i < 3; i++ {
+	// 5 次失败
+	for i := 0; i < 5; i++ {
 		s.RecordFailure(now, "req-1", "rate_limit", cfg)
 	}
-	if streak := s.ConsecutiveFailureStreak(now, cfg); streak != 3 {
-		t.Fatalf("streak=%d, want 3", streak)
+	if streak := s.ConsecutiveFailureStreak(now, cfg); streak != 5 {
+		t.Fatalf("streak=%d, want 5", streak)
 	}
 
 	// IsUsable 应返回 false
 	if s.IsUsable(now, cfg) {
-		t.Fatal("state should be unusable after 3 consecutive failures")
+		t.Fatal("state should be unusable after 5 consecutive failures")
 	}
 
 	// Disabled 状态被设置
@@ -67,13 +67,10 @@ func TestRouteNodeState_Streak_ResetAfterSuccess(t *testing.T) {
 	cfg := DefaultRouteNodeConfig()
 	now := time.Now()
 
-	// F-F-F 然后 S
-	s.RecordFailure(now, "req-1", "rate_limit", cfg)
-	s.RecordFailure(now.Add(time.Second), "req-2", "rate_limit", cfg)
-	s.RecordFailure(now.Add(2*time.Second), "req-3", "rate_limit", cfg)
+	// F-F-F-F-F 然后 S
 
 	if !s.Disabled {
-		t.Fatal("should be disabled after 3 failures")
+		t.Fatal("should be disabled after 5 failures")
 	}
 
 	// 模拟 5 分钟后冷却到期
@@ -99,7 +96,7 @@ func TestRouteNodeState_Streak_OldRecordsPruned(t *testing.T) {
 	cfg := DefaultRouteNodeConfig()
 	now := time.Now()
 
-	// 6 分钟前 3 次失败
+	// 6 分钟前 5 次失败
 	oldTime := now.Add(-6 * time.Minute)
 	s.RecordFailure(oldTime, "req-old-1", "rate_limit", cfg)
 	s.RecordFailure(oldTime.Add(time.Second), "req-old-2", "rate_limit", cfg)
@@ -121,9 +118,9 @@ func TestRouteNodeState_MixedSequence(t *testing.T) {
 	s.RecordFailure(now.Add(time.Second), "r2", "rate_limit", cfg)
 	s.RecordFailure(now.Add(2*time.Second), "r3", "rate_limit", cfg)
 
-	// 验证：3 次失败触发 Disabled
+	// 验证：5 次失败触发 Disabled
 	if !s.Disabled {
-		t.Fatal("should be disabled after 3 failures")
+		t.Fatal("should be disabled after 5 failures")
 	}
 
 	// 第 4 次成功清掉 Disabled（V3 语义：成功即恢复，不等冷却到期）
@@ -149,11 +146,11 @@ func TestRouteNodeState_MixedSequence(t *testing.T) {
 	// 再失败 1 次（达到 streak=3）
 	s.RecordFailure(now.Add(7*time.Second), "r7", "rate_limit", cfg)
 	// 现在 streak = F(5)-F(6)-F(7) = 3
-	if streak := s.ConsecutiveFailureStreak(now.Add(7*time.Second), cfg); streak != 3 {
-		t.Fatalf("streak=%d, want 3", streak)
+	if streak := s.ConsecutiveFailureStreak(now.Add(7*time.Second), cfg); streak != 5 {
+		t.Fatalf("streak=%d, want 5", streak)
 	}
 	if s.IsUsable(now.Add(7*time.Second), cfg) {
-		t.Fatal("state should be unusable after 3 consecutive failures")
+		t.Fatal("state should be unusable after 5 consecutive failures")
 	}
 }
 
@@ -162,7 +159,7 @@ func TestRouteNodeState_AutoRecoverAfterCooldown(t *testing.T) {
 	cfg := DefaultRouteNodeConfig()
 	now := time.Now()
 
-	// 3 次失败触发 Disabled
+	// 5 次失败触发 Disabled
 	s.RecordFailure(now, "r1", "rate_limit", cfg)
 	s.RecordFailure(now.Add(time.Second), "r2", "rate_limit", cfg)
 	s.RecordFailure(now.Add(2*time.Second), "r3", "rate_limit", cfg)
@@ -337,7 +334,7 @@ func TestRouteNodeStore_RecordAndGet(t *testing.T) {
 		t.Fatalf("SuccessCount=%d, want 1", got.SuccessCount)
 	}
 
-	// 3 次失败触发 Disabled
+	// 5 次失败触发 Disabled
 	_, justDisabled1, _ := store.RecordFailure(ctx, credID, model, "req-f1", "rate_limit")
 	_, justDisabled2, _ := store.RecordFailure(ctx, credID, model, "req-f2", "rate_limit")
 	_, justDisabled3, _ := store.RecordFailure(ctx, credID, model, "req-f3", "rate_limit")
@@ -351,7 +348,7 @@ func TestRouteNodeStore_RecordAndGet(t *testing.T) {
 
 	// IsUsable 应返回 false
 	if store.IsUsable(ctx, credID, model) {
-		t.Fatal("node should be unusable after 3 failures")
+		t.Fatal("node should be unusable after 5 failures")
 	}
 
 	// Delete 清理
@@ -383,7 +380,7 @@ func TestRouteNodeStore_FilterUsableCandidates(t *testing.T) {
 		_ = store.Delete(ctx, credB, model)
 	})
 
-	// credA: 3 次失败 → 不可用
+	// credA: 5 次失败 → 不可用
 	_, _, _ = store.RecordFailure(ctx, credA, model, "a1", "rate_limit")
 	_, _, _ = store.RecordFailure(ctx, credA, model, "a2", "rate_limit")
 	_, justDisabled, _ := store.RecordFailure(ctx, credA, model, "a3", "rate_limit")
