@@ -161,7 +161,7 @@ func Open(ctx context.Context, databaseURL string) (*DB, error) {
 	// bug (kaixuan) is REVERTED. The original d16131ad tried to enforce
 	// UNIQUE(request_id) at the DB layer, but request_logs is a
 	// partitioned table (by ts) and PG 11+ requires the partitioning
-	// key in every unique index — so CREATE UNIQUE INDEX ON
+	// key in every unique index -- so CREATE UNIQUE INDEX ON
 	// request_logs (request_id) fails with SQLSTATE 0A000 and
 	// postgres is disabled at startup, taking every admin /api route
 	// offline (404) and the routing executor down (503).
@@ -247,7 +247,7 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 		-- 2026-06-19 T-NEW-7: split the semantic overload of failure_detail_code.
 		-- See db/migrations/018_upstream_finish_reason.sql. The new column is
 		-- the SOLE home for the upstream finish_reason (stop, tool_calls,
-		-- length, end_turn, …). failure_detail_code now keeps only the
+		-- length, end_turn, etc.). failure_detail_code now keeps only the
 		-- actual failure code (interruption, 5xx, etc.).
 		ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS upstream_finish_reason TEXT;
 		CREATE INDEX IF NOT EXISTS idx_request_logs_upstream_finish_reason
@@ -263,7 +263,7 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 		CREATE INDEX IF NOT EXISTS idx_request_logs_provider_tool_calls
 		    ON request_logs (provider_id, ts DESC)
 		    WHERE tool_calls IS NOT NULL AND jsonb_array_length(tool_calls) > 0;
-	-- 2026-06-30: migration 056 — listing-path indexes for /api/logs.
+	-- 2026-06-30: migration 056 -- listing-path indexes for /api/logs.
 	-- See deploy/sql/migrations/056_request_logs_listing_indexes.sql for
 	-- the full rationale. The indexes added here are:
 	--   - provider_models.canonical_id
@@ -287,7 +287,7 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	    WHERE status = 'active';
 	CREATE INDEX IF NOT EXISTS idx_request_logs_ts_desc
 	    ON public.request_logs (ts DESC);
-	-- 2026-06-30: migration 057 — denormalize provider_model onto
+	-- 2026-06-30: migration 057 -- denormalize provider_model onto
 	-- request_logs so the read path can drop its LEFT JOIN LATERAL on
 	-- model_offers. See deploy/sql/migrations/057_request_logs_provider_model_column.sql.
 	ALTER TABLE public.request_logs
@@ -295,7 +295,7 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	CREATE INDEX IF NOT EXISTS idx_request_logs_provider_model
 	    ON public.request_logs (provider_model, ts DESC)
 	    WHERE provider_model IS NOT NULL;
-	-- 2026-06-30: migration 058 — materialize request_status. The
+	-- 2026-06-30: migration 058 -- materialize request_status. The
 	-- schema does not change (column already exists, index already
 	-- exists with partial predicate); this block only backfills NULL
 	-- and '' values to the canonical label (success / failure /
@@ -314,7 +314,7 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	END
 	WHERE rl.request_status IS NULL
 	   OR rl.request_status = '';
-	-- 2026-07-01: migration 059 — GIN trgm index on search_text to
+	-- 2026-07-01: migration 059 -- GIN trgm index on search_text to
 	-- accelerate the ?q= substring filter in /api/logs
 	-- (admin/logs.go:420). See
 	-- deploy/sql/migrations/059_request_logs_search_text_trgm.sql
@@ -604,8 +604,8 @@ CREATE INDEX IF NOT EXISTS idx_tenants_name ON tenants(name);
 // is slow and not indexable. This migration promotes it to a
 // proper TEXT column with two indexes:
 //
-//	idx_tuning_signals_strategy_ts    (strategy, ts DESC) — A/B summary
-//	idx_tuning_signals_strategy_task  (strategy, task_type, ts DESC) — breakdown
+//	idx_tuning_signals_strategy_ts    (strategy, ts DESC) -- A/B summary
+//	idx_tuning_signals_strategy_task  (strategy, task_type, ts DESC) -- breakdown
 //
 // Backward compatibility: rows that pre-date this column have
 // strategy = 'pattern_layered' (the historical default). The
@@ -732,8 +732,8 @@ func (d *DB) ensureSessionTitles(ctx context.Context) error {
 //
 // Two views:
 //
-//	tuning_signals_5m   — 5-minute buckets, retained 7 days
-//	tuning_signals_daily — 1-day buckets, retained 90 days
+//	tuning_signals_5m   -- 5-minute buckets, retained 7 days
+//	tuning_signals_daily -- 1-day buckets, retained 90 days
 //
 // Both are regular (not materialised) views. The bg worker
 // (bg/tuning_view_refresher.go) refreshes them every 5 minutes.
@@ -1111,7 +1111,7 @@ func (d *DB) ensureTenantModelPoliciesSchema(ctx context.Context) error {
 	return nil
 }
 
-// ensureSupplementalRLS — Round 48 (2026-06-21)
+// ensureSupplementalRLS -- Round 48 (2026-06-21)
 //
 // Adds RLS policies to tables whose CREATE TABLE statements live in
 // earlier migrations owned by other projects (022/023 settings,
@@ -1240,11 +1240,11 @@ func (d *DB) ensureApplicationsTable(ctx context.Context) error {
 // ensureCredentialColumns adds columns from db/migrations/033-034 that
 // have not been picked up by an ensure* function yet.
 //
-// 033_credential_model_call_history.sql — call_history table (consumed
+// 033_credential_model_call_history.sql -- call_history table (consumed
 //
 //	by bg/call_history_aggregator.go's GetRecent).
 //
-// 034_concurrency_limit_auto.sql — credentials.concurrency_limit_auto
+// 034_concurrency_limit_auto.sql -- credentials.concurrency_limit_auto
 //
 //	(consumed by admin/credential_monitor.go's monitor-summary).
 //
@@ -1315,7 +1315,7 @@ func (d *DB) ensureCredentialColumns(ctx context.Context) error {
 // getCredentialFpSlotStats) and provider/client.go (loadCandidatesDB)
 // all reference c.fp_slot_limit. Without this column, every SELECT /
 // INSERT / UPDATE on those paths returns SQLSTATE 42703
-// ("column does not exist") and surfaces to the API as 500 — most
+// ("column does not exist") and surfaces to the API as 500 -- most
 // visibly on GET /api/providers/{id}/credentials and on every
 // /v1/chat/completions request that needs to load candidates.
 //
@@ -1403,7 +1403,7 @@ func (d *DB) ensureFpSlotLimit(ctx context.Context) error {
 //  1. Backfill: any binding whose (credential, model) pair is currently
 //     model_probe_state='broken_confirmed' gets cmb.available=FALSE. This
 //     covers bindings that reached broken_confirmed before the P4 propagation
-//     code (2026-06-19) landed — e.g. cred-11/minimax-m3 from 2026-06-17 —
+//     code (2026-06-19) landed -- e.g. cred-11/minimax-m3 from 2026-06-17 --
 //     which otherwise stay available=TRUE forever and keep re-entering the
 //     candidate pool.
 //  2. recent_success_rate(cred, model, sample_n) helper used by
