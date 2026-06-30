@@ -295,11 +295,30 @@ WHERE upstream_finish_reason IS NOT NULL
 	CREATE INDEX IF NOT EXISTS idx_request_logs_provider_model
 	    ON public.request_logs (provider_model, ts DESC)
 	    WHERE provider_model IS NOT NULL;
+	-- 2026-06-30: migration 058 — materialize request_status. The
+	-- schema does not change (column already exists, index already
+	-- exists with partial predicate); this block only backfills NULL
+	-- and '' values to the canonical label (success / failure /
+	-- in_progress) derived from success + error_kind. After the
+	-- backfill the read path can drop the COALESCE wrapper and read
+	-- rl.request_status directly, so WHERE request_status = $1 can
+	-- use idx_request_logs_status_ts.
+	--
+	-- Idempotent: WHERE request_status IS NULL OR request_status = ''
+	-- matches nothing once the first run completes.
+	UPDATE request_logs rl
+	SET request_status = CASE
+	    WHEN rl.success THEN 'success'
+	    WHEN rl.error_kind IS NOT NULL AND rl.error_kind <> '' THEN 'failure'
+	    ELSE 'in_progress'
+	END
+	WHERE rl.request_status IS NULL
+	   OR rl.request_status = '';
 `)
 	if err != nil {
 		return err
 	}
-	slog.Info("request_logs schema ensured (gw_session_id, gw_task_id, request_status, api_key_prefix, api_key_owner_user, application_code, parent_request_id, compression_reason, compression_strategy, compression_meta, outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes, quality_flags, quality_fix_actions, quality_score, client_request_id, listing-path indexes 056, provider_model 057)")
+	slog.Info("request_logs schema ensured (gw_session_id, gw_task_id, request_status, api_key_prefix, api_key_owner_user, application_code, parent_request_id, compression_reason, compression_strategy, compression_meta, outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes, quality_flags, quality_fix_actions, quality_score, client_request_id, listing-path indexes 056, provider_model 057, request_status backfill 058)")
 	return nil
 }
 

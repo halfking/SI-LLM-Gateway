@@ -92,14 +92,20 @@ type requestLogDetail struct {
 	ResponseBody any `json:"response_body"`
 }
 
-const requestLogStatusExpr = `COALESCE(
-	NULLIF(rl.request_status, ''),
-	CASE
-		WHEN rl.success THEN 'success'
-		WHEN rl.error_kind IS NOT NULL AND rl.error_kind <> '' THEN 'failure'
-		ELSE 'in_progress'
-	END
-)`
+// requestLogStatusExpr was the COALESCE fallback expression the read
+// path used to compute request_status from rl.success / rl.error_kind
+// at query time. After migration 058 (request_status backfill in
+// db/db.go + 058_request_logs_status_materialize.sql), every row has
+// rl.request_status populated with the canonical label, so the read
+// path can read rl.request_status directly.
+//
+// The constant is kept for backwards compatibility with the existing
+// admin/session_title_test.go:TestRequestLogStatusExprRequiresRLAlias
+// test, which pins the alias-by-rl convention. The constant is no
+// longer referenced in any SQL string in this file.
+//
+// 2026-06-30: materialized via migration 058.
+const requestLogStatusExpr = `rl.request_status`
 
 // requestLogsSelectCols is the FULL projection used by the detail handler
 // (getLog). It includes the three large JSONB columns
@@ -419,7 +425,14 @@ func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
 	if v := strings.TrimSpace(queryString(r, "request_status")); v != "" {
 		switch v {
 		case "in_progress", "success", "failure":
-			clauses = append(clauses, fmt.Sprintf("(%s) = $%d", requestLogStatusExpr, argIdx))
+			// 2026-06-30 (migration 058): rl.request_status is now
+			// materialized; reading the bare column lets the planner
+			// use idx_request_logs_status_ts. We still exclude ''
+			// defensively in case a future regression re-introduces
+			// empty-string rows (the partial index already filters
+			// them out, but the explicit predicate keeps the EXPLAIN
+			// plan obvious).
+			clauses = append(clauses, fmt.Sprintf("rl.request_status = $%d AND rl.request_status <> ''", argIdx))
 			args = append(args, v)
 			argIdx++
 		default:
@@ -431,7 +444,8 @@ func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
 		if *v {
 			status = "success"
 		}
-		clauses = append(clauses, fmt.Sprintf("(%s) = $%d", requestLogStatusExpr, argIdx))
+		// 2026-06-30 (migration 058): bare column on rl.request_status.
+		clauses = append(clauses, fmt.Sprintf("rl.request_status = $%d AND rl.request_status <> ''", argIdx))
 		args = append(args, status)
 		argIdx++
 	}
