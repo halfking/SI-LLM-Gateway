@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getRequestLogDetail, type RequestLogDetail } from '../api'
+import { useFormat } from '../i18n/useFormat'
+
+const { t } = useI18n()
+const { fmtDateTime } = useFormat()
 
 const props = defineProps<{
   requestId: string | null
@@ -26,7 +31,7 @@ watch(
     try {
       detail.value = await getRequestLogDetail(id)
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : '加载失败'
+      error.value = e instanceof Error ? e.message : t('requests.common.loadFailed')
     } finally {
       loading.value = false
     }
@@ -34,13 +39,8 @@ watch(
   { immediate: true },
 )
 
-function fmtTs(v: string | null | undefined) {
-  if (!v) return '—'
-  return new Date(v).toLocaleString('zh-CN')
-}
-
 function formatJson(obj: unknown): string {
-  if (obj == null) return '(无数据)'
+  if (obj == null) return t('requests.common.noData')
   try {
     return JSON.stringify(obj, null, 2)
   } catch {
@@ -81,9 +81,15 @@ function roleColor(role: string): string {
 }
 
 function statusLabel(row: RequestLogDetail): string {
-  if (row.request_status === 'in_progress') return '请求中'
-  if (row.request_status === 'failure') return row.error_kind || '失败'
-  return row.success ? '成功' : '失败'
+  if (row.request_status === 'in_progress') return t('requests.status.in_progress')
+  if (row.request_status === 'failure') {
+    if (row.error_kind) {
+      const tr = t(`requests.errorKind.${row.error_kind}`)
+      return tr && !tr.startsWith('requests.') ? tr : row.error_kind
+    }
+    return t('requests.status.failure')
+  }
+  return row.success ? t('requests.status.success') : t('requests.status.failure')
 }
 
 function outboundModelDisplay(row: RequestLogDetail | null): string {
@@ -96,26 +102,26 @@ function outboundModelDisplay(row: RequestLogDetail | null): string {
   <div v-if="requestId" class="drawer-backdrop" @click="emit('close')">
     <div class="drawer-panel card drawer-panel-wide" @click.stop>
       <div class="drawer-header">
-        <h3 style="margin:0">原始请求详情</h3>
-        <button class="btn btn-sm" type="button" @click="emit('close')">关闭</button>
+        <h3 style="margin:0">{{ t('requests.detail.drawerTitle') }}</h3>
+        <button class="btn btn-sm" type="button" @click="emit('close')">{{ t('requests.common.close') }}</button>
       </div>
 
-      <div v-if="loading" class="drawer-loading">加载中…</div>
+      <div v-if="loading" class="drawer-loading">{{ t('requests.detail.loading') }}</div>
       <div v-else-if="error" class="drawer-error">{{ error }}</div>
 
       <template v-else-if="detail">
         <div class="drawer-section">
           <div class="meta-line">
-            <span><strong>请求ID:</strong> <code>{{ detail.request_id }}</code></span>
-            <span><strong>时间:</strong> {{ fmtTs(detail.ts) }}</span>
-            <span><strong>模型:</strong> {{ detail.client_model ?? '—' }}</span>
-            <span><strong>出站:</strong> {{ outboundModelDisplay(detail) }}</span>
-            <span><strong>状态:</strong>
+            <span><strong>{{ t('requests.detail.field.requestId') }}:</strong> <code>{{ detail.request_id }}</code></span>
+            <span><strong>{{ t('requests.detail.field.time') }}:</strong> {{ fmtDateTime(detail.ts) }}</span>
+            <span><strong>{{ t('requests.detail.field.model') }}:</strong> {{ detail.client_model ?? '—' }}</span>
+            <span><strong>{{ t('requests.detail.field.outbound') }}:</strong> {{ outboundModelDisplay(detail) }}</span>
+            <span><strong>{{ t('requests.detail.field.status') }}:</strong>
               <span :style="{ color: detail.success ? 'var(--success)' : 'var(--danger)' }">
-                {{ detail.success ? '成功' : statusLabel(detail) }}
+                {{ detail.success ? t('requests.status.success') : statusLabel(detail) }}
               </span>
             </span>
-            <span><strong>延迟:</strong> {{ detail.latency_ms ?? '—' }}ms</span>
+            <span><strong>{{ t('requests.detail.field.latency') }}:</strong> {{ detail.latency_ms ?? '—' }}ms</span>
             <span><strong>Token:</strong> {{ detail.prompt_tokens ?? '—' }} / {{ detail.completion_tokens ?? '—' }}</span>
             <span v-if="detail.gw_session_id"><strong>Session:</strong> {{ detail.gw_session_id }}</span>
             <span v-if="detail.gw_task_id"><strong>Task:</strong> {{ detail.gw_task_id }}</span>
@@ -124,8 +130,8 @@ function outboundModelDisplay(row: RequestLogDetail | null): string {
 
         <div class="drawer-section">
           <div class="tab-row">
-            <button class="btn btn-sm" type="button" :class="{ 'btn-primary': tab === 'request' }" @click="tab = 'request'">请求消息</button>
-            <button class="btn btn-sm" type="button" :class="{ 'btn-primary': tab === 'response' }" @click="tab = 'response'">响应内容</button>
+            <button class="btn btn-sm" type="button" :class="{ 'btn-primary': tab === 'request' }" @click="tab = 'request'">{{ t('requests.detail.tab.request') }}</button>
+            <button class="btn btn-sm" type="button" :class="{ 'btn-primary': tab === 'response' }" @click="tab = 'response'">{{ t('requests.detail.tab.response') }}</button>
           </div>
         </div>
 
@@ -136,12 +142,12 @@ function outboundModelDisplay(row: RequestLogDetail | null): string {
                 <div class="msg-role" :style="{ color: roleColor(String(msg.role || '')) }">[{{ msg.role || 'unknown' }}]</div>
                 <pre class="msg-pre">{{ formatJson(msg.content ?? msg) }}</pre>
                 <div v-if="msg.tool_calls" class="tool-block">
-                  <div class="tool-label">工具调用:</div>
+                  <div class="tool-label">{{ t('requests.detail.toolCalls') }}</div>
                   <pre v-for="(tc, j) in (msg.tool_calls as unknown[])" :key="j" class="tool-pre">{{ formatJson(tc) }}</pre>
                 </div>
               </div>
             </template>
-            <div v-else class="text-muted">(无请求数据)</div>
+            <div v-else class="text-muted">{{ t('requests.detail.noRequest') }}</div>
           </template>
 
           <template v-else>
@@ -161,7 +167,7 @@ function outboundModelDisplay(row: RequestLogDetail | null): string {
                     </div>
                     <pre v-if="(choice.message as Record<string, unknown>).content" class="msg-pre">{{ (choice.message as Record<string, unknown>).content }}</pre>
                     <div v-if="(choice.message as Record<string, unknown>).tool_calls" class="tool-block">
-                      <div class="tool-label">工具调用:</div>
+                      <div class="tool-label">{{ t('requests.detail.toolCalls') }}</div>
                       <pre
                         v-for="(tc, j) in ((choice.message as Record<string, unknown>).tool_calls as unknown[])"
                         :key="j"
@@ -173,7 +179,7 @@ function outboundModelDisplay(row: RequestLogDetail | null): string {
               </template>
               <pre v-else class="msg-pre">{{ formatJson(detail.response_body) }}</pre>
             </template>
-            <div v-else class="text-muted">(无响应数据)</div>
+            <div v-else class="text-muted">{{ t('requests.detail.noResponse') }}</div>
           </template>
         </div>
       </template>

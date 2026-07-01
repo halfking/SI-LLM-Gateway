@@ -6,6 +6,7 @@ import app from './app'
 import errors from './errors'
 import users from './users'
 import keys from './keys'
+import requests from './requests'
 
 export default {
   common,
@@ -15,4 +16,5 @@ export default {
   errors,
   users,
   keys,
+  requests,
 }
