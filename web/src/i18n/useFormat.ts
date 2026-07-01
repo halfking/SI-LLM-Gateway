@@ -18,7 +18,7 @@ export function useFormat() {
   const locale = computed(() => localeRef.value)
 
   /** "2026/07/02 14:03" style short date+time. */
-  function fmtDateTime(input: string | number | Date): string {
+  function fmtDateTime(input: string | number | Date | null | undefined): string {
     if (!input) return ''
     const d = new Date(input)
     if (isNaN(d.getTime())) return String(input)
@@ -26,7 +26,7 @@ export function useFormat() {
   }
 
   /** Date-only short form. */
-  function fmtDate(input: string | number | Date): string {
+  function fmtDate(input: string | number | Date | null | undefined): string {
     if (!input) return ''
     const d = new Date(input)
     if (isNaN(d.getTime())) return String(input)
@@ -34,7 +34,7 @@ export function useFormat() {
   }
 
   /** Time-only short form. */
-  function fmtTime(input: string | number | Date): string {
+  function fmtTime(input: string | number | Date | null | undefined): string {
     if (!input) return ''
     const d = new Date(input)
     if (isNaN(d.getTime())) return String(input)
