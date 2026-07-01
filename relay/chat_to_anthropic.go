@@ -3,6 +3,7 @@ package relay
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // ConvertChatRequestToAnthropic converts an OpenAI Chat Completions
@@ -116,11 +117,24 @@ func convertChatMessageToAnthropic(m map[string]any) map[string]any {
 				blocks = append(blocks, map[string]any{"type": "text", "text": bb["text"]})
 			case "image_url":
 				if iu, ok := bb["image_url"].(map[string]any); ok {
-					if u, ok := iu["url"].(string); ok {
-						blocks = append(blocks, map[string]any{
-							"type":   "image",
-							"source": map[string]any{"type": "url", "url": u},
-						})
+					if u, ok := iu["url"].(string); ok && u != "" {
+						// OpenAI sends images as `data:<media>;base64,<payload>`
+						// or http(s) URLs. Anthropic splits these into two
+						// source types: "base64" (media_type + data) and
+						// "url" (http(s) only). Passing a data URL through
+						// source.type=url is rejected by the Anthropic API,
+						// so we parse data URLs back into base64 source.
+						if src, ok := parseDataURLToAnthropicSource(u); ok {
+							blocks = append(blocks, map[string]any{
+								"type":   "image",
+								"source": src,
+							})
+						} else {
+							blocks = append(blocks, map[string]any{
+								"type":   "image",
+								"source": map[string]any{"type": "url", "url": u},
+							})
+						}
 					}
 				}
 			}
@@ -192,4 +206,34 @@ func convertChatToolChoiceToAnthropic(tc any) any {
 		}
 	}
 	return nil
+}
+
+// parseDataURLToAnthropicSource converts a `data:<media>;base64,<payload>`
+// URL into an Anthropic base64 image source map. Returns ok=false when
+// the input is not a base64 data URL (e.g. an http(s) URL), in which
+// case the caller should fall back to source.type=url.
+func parseDataURLToAnthropicSource(urlStr string) (map[string]any, bool) {
+	const prefix = "data:"
+	if !strings.HasPrefix(urlStr, prefix) {
+		return nil, false
+	}
+	body := strings.TrimPrefix(urlStr, prefix)
+	semi := strings.IndexByte(body, ';')
+	comma := strings.IndexByte(body, ',')
+	if semi < 0 || comma < 0 || comma <= semi {
+		return nil, false
+	}
+	mediaType := body[:semi]
+	if !strings.HasPrefix(body[semi+1:comma], "base64") {
+		return nil, false
+	}
+	data := body[comma+1:]
+	if mediaType == "" {
+		mediaType = "image/png"
+	}
+	return map[string]any{
+		"type":       "base64",
+		"media_type": mediaType,
+		"data":       data,
+	}, true
 }

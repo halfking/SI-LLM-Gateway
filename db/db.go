@@ -157,6 +157,10 @@ func Open(ctx context.Context, databaseURL string) (*DB, error) {
 		// pool.Close() removed - handled by defer
 		return nil, err
 	}
+	if err := db.ensureAttachmentsSchema(migCtx); err != nil {
+		// pool.Close() removed - handled by defer
+		return nil, err
+	}
 	// 2026-06-27: Schema-level P0 hotfix for request_logs duplicate-row
 	// bug (kaixuan) is REVERTED. The original d16131ad tried to enforce
 	// UNIQUE(request_id) at the DB layer, but request_logs is a

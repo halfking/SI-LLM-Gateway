@@ -13,6 +13,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -68,10 +71,33 @@ var (
 )
 
 const (
-	autoRecoveryFailureThreshold        int32 = 3
-	exponentialRecoveryFailureThreshold int32 = 2
-	permanentRecoveryFailureThreshold   int32 = 2
+	// 2026-07-01 (V3.2.0): autoRecoveryFailureThreshold 从 3 提到 10。
+	// 原因:minimax 在高负载下频繁返回 transient 错误(本质是网络
+	// blip/服务降级),3 次连续失败就开 circuit 会让用户感知 30+ 秒
+	// 完全不可用。10 次连续失败才开 + 15s 冷却(下面 defaultPolicies),
+	// 大幅降低误判,同时不牺牲对真正持续故障的检测。
+	// Override via env LLM_GATEWAY_CIRCUIT_TRANSIENT_THRESHOLD.
+	defaultAutoRecoveryFailureThreshold        int32 = 10
+	exponentialRecoveryFailureThreshold        int32 = 2
+	permanentRecoveryFailureThreshold          int32 = 2
 )
+
+// 2026-07-01 (V3.2.0): Allow runtime override of the auto-recovery
+// failure threshold via LLM_GATEWAY_CIRCUIT_TRANSIENT_THRESHOLD.
+// Operators can tune this without rebuilding the binary.
+var autoRecoveryFailureThreshold int32 = func() int32 {
+	v := strings.TrimSpace(os.Getenv("LLM_GATEWAY_CIRCUIT_TRANSIENT_THRESHOLD"))
+	if v == "" {
+		return defaultAutoRecoveryFailureThreshold
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		slog.Warn("invalid LLM_GATEWAY_CIRCUIT_TRANSIENT_THRESHOLD, using default",
+			"value", v, "default", defaultAutoRecoveryFailureThreshold)
+		return defaultAutoRecoveryFailureThreshold
+	}
+	return int32(n)
+}()
 
 // ---------------------------------------------------------------------------
 // CoolingPolicy — per-error-kind recovery strategy
@@ -96,7 +122,10 @@ const (
 
 // Default cooling policies per error kind.
 var defaultPolicies = map[ErrorKind]CoolingPolicy{
-	KindTransient:      {InitialCooling: 60 * time.Second, MaxCooling: 60 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
+	// 2026-07-01 (V3.2.0): transient 错误频发 (特别是 minimax 在 11:26 出现
+	// "all 4 candidates failed: circuit open" 错误),把冷却从 60s 缩到 15s
+	// 让用户感知更短。threshold 在 NewWithPolicy 中可以调整。
+	KindTransient:      {InitialCooling: 15 * time.Second, MaxCooling: 15 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
 	KindTimeout:        {InitialCooling: 60 * time.Second, MaxCooling: 60 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
 	KindNetwork:        {InitialCooling: 60 * time.Second, MaxCooling: 60 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
 	KindRateLimit:      {InitialCooling: 900 * time.Second, MaxCooling: 900 * time.Second, RecoveryType: RecoveryExponential, ShrinkFactor: 0.7},
@@ -368,7 +397,11 @@ func (b *Breaker) Stats() map[string]any {
 // Manager — global registry of circuit breakers
 // ---------------------------------------------------------------------------
 
-// Manager manages all circuit breakers keyed by (provider, credential).
+// Manager manages all circuit breakers keyed by (provider, credential, raw_model).
+// V3.2.1 (2026-07-01): Changed from (provider, credential) to (provider, credential, raw_model)
+// to isolate circuit state per model variant. Previously, failures on MiniMax-M2.7 would
+// open the circuit for MiniMax-M3, causing false-positive outages when the same credential
+// served multiple model variants as failover candidates.
 type Manager struct {
 	mu       sync.RWMutex
 	breakers map[string]*Breaker
@@ -379,9 +412,9 @@ func NewManager() *Manager {
 	return &Manager{breakers: make(map[string]*Breaker)}
 }
 
-// GetOrCreate returns the breaker for the given provider/credential.
-func (m *Manager) GetOrCreate(providerID, credentialID int) *Breaker {
-	key := fmt.Sprintf("%d/%d", providerID, credentialID)
+// GetOrCreate returns the breaker for the given provider/credential/rawModel.
+func (m *Manager) GetOrCreate(providerID, credentialID int, rawModel string) *Breaker {
+	key := fmt.Sprintf("%d/%d/%s", providerID, credentialID, rawModel)
 
 	m.mu.RLock()
 	b, ok := m.breakers[key]
@@ -401,9 +434,9 @@ func (m *Manager) GetOrCreate(providerID, credentialID int) *Breaker {
 	return b
 }
 
-// Get returns the breaker for the given provider/credential, or nil.
-func (m *Manager) Get(providerID, credentialID int) *Breaker {
-	key := fmt.Sprintf("%d/%d", providerID, credentialID)
+// Get returns the breaker for the given provider/credential/rawModel, or nil.
+func (m *Manager) Get(providerID, credentialID int, rawModel string) *Breaker {
+	key := fmt.Sprintf("%d/%d/%s", providerID, credentialID, rawModel)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.breakers[key]
@@ -431,28 +464,28 @@ func (m *Manager) ResetAll() {
 }
 
 // RecordFailure records a failure on the appropriate breaker.
-func (m *Manager) RecordFailure(providerID, credentialID int, kind ErrorKind) {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) RecordFailure(providerID, credentialID int, rawModel string, kind ErrorKind) {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	b.RecordFailure(kind)
 }
 
 // RecordSuccess records a success on the appropriate breaker.
-func (m *Manager) RecordSuccess(providerID, credentialID int) {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) RecordSuccess(providerID, credentialID int, rawModel string) {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	b.RecordSuccess()
 }
 
 // Allow checks if a request should be allowed through the circuit.
-func (m *Manager) Allow(providerID, credentialID int) bool {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) Allow(providerID, credentialID int, rawModel string) bool {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	return b.Allow()
 }
 
 // ProbeCheck performs a half-open probe: if the circuit is HALF_OPEN,
 // it returns true. The caller should make a lightweight probe request
 // and then call RecordSuccess/RecordFailure.
-func (m *Manager) ProbeCheck(providerID, credentialID int) bool {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) ProbeCheck(providerID, credentialID int, rawModel string) bool {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	state := b.State()
 	if state == StateHalfOpen {
 		return true
@@ -465,8 +498,8 @@ func (m *Manager) ProbeCheck(providerID, credentialID int) bool {
 }
 
 // CloseProbe completes a half-open probe by recording the result.
-func (m *Manager) CloseProbe(providerID, credentialID int, success bool, kind ErrorKind) {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) CloseProbe(providerID, credentialID int, rawModel string, success bool, kind ErrorKind) {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	if success {
 		b.RecordSuccess()
 	} else {

@@ -84,6 +84,11 @@ type requestLogRow struct {
 	CompressionReason       *string         `json:"compression_reason,omitempty"`
 	CompressionMeta         json.RawMessage `json:"compression_meta,omitempty"`
 	ParentRequestID         *string         `json:"parent_request_id,omitempty"`
+	// 2026-07-01: attachment tracking. has_attachments lets the list UI
+	// badge rows that carried images without pulling the heavy
+	// request_body. attachment_count is the number archived.
+	HasAttachments  *bool `json:"has_attachments,omitempty"`
+	AttachmentCount *int  `json:"attachment_count,omitempty"`
 }
 
 type requestLogDetail struct {
@@ -163,7 +168,9 @@ const requestLogsSelectCols = `
 	rl.compression_strategy,
 	rl.compression_reason,
 	rl.compression_meta,
-	rl.parent_request_id
+	rl.parent_request_id,
+	rl.has_attachments,
+	rl.attachment_count
 `
 
 // requestLogsListCols is the projection used by the LIST handler
@@ -213,7 +220,9 @@ const requestLogsListCols = `
 	rl.outbound_token_est,
 	rl.compression_strategy,
 	rl.compression_reason,
-	rl.parent_request_id
+	rl.parent_request_id,
+	rl.has_attachments,
+	rl.attachment_count
 `
 
 // requestLogsJoins is the join set used by listLogs + getLog.
@@ -295,6 +304,8 @@ func scanRequestLogRow(rows interface {
 		// v3 session-level outbound body fields.
 		&l.OutboundBody, &l.OutboundMsgCount, &l.OutboundTokenEst, &l.OutboundMsgHashes,
 		&l.CompressionStrategy, &l.CompressionReason, &l.CompressionMeta, &l.ParentRequestID,
+		// 2026-07-01: attachment tracking.
+		&l.HasAttachments, &l.AttachmentCount,
 	}
 	if withTraceSeq {
 		dest = append(dest, &l.TraceSeq)
@@ -348,6 +359,8 @@ func scanRequestLogListRowWithTotal(rows interface {
 		// list projection (see requestLogsListCols).
 		&l.OutboundMsgCount, &l.OutboundTokenEst,
 		&l.CompressionStrategy, &l.CompressionReason, &l.ParentRequestID,
+		// 2026-07-01: attachment tracking.
+		&l.HasAttachments, &l.AttachmentCount,
 	}
 	if withTraceSeq {
 		dest = append(dest, &l.TraceSeq)
@@ -647,6 +660,9 @@ func (h *Handler) getLog(w http.ResponseWriter, r *http.Request) {
 		&detail.CompressionReason,
 		&detail.CompressionMeta,
 		&detail.ParentRequestID,
+		// 2026-07-01: attachment tracking.
+		&detail.HasAttachments,
+		&detail.AttachmentCount,
 		&requestBodyRaw,
 		&responseBodyRaw,
 	)

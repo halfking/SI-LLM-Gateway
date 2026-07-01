@@ -83,6 +83,9 @@ type RequestLogContext struct {
 	QualityFixActions []byte
 	QualityScore      *float64
 
+	// 2026-07-01: attachment tracking
+	AttachmentCount int
+
 	meta   requestAttemptMeta
 	logged bool
 }
@@ -119,6 +122,14 @@ func (c *RequestLogContext) SetQualityScore(score *float64) {
 		return
 	}
 	c.QualityScore = score
+}
+
+// SetAttachmentCount records the number of attachments extracted from the request.
+func (c *RequestLogContext) SetAttachmentCount(count int) {
+	if c == nil {
+		return
+	}
+	c.AttachmentCount = count
 }
 
 // RecordFix merges a single {flag: {detected, renamed, dropped}} entry
@@ -432,6 +443,7 @@ func (c *RequestLogContext) BuildFailureEntry(errCode, errMessage string, provid
 	}
 	enrichRequestLogFromMeta(reqLog, c.KeyInfo, &c.meta)
 	applyAutoRouteFields(reqLog, c)
+	applyAttachmentFields(reqLog, c)
 	return reqLog
 }
 
@@ -527,4 +539,15 @@ func mergeCompressionMetaV3(existing json.RawMessage, windowTriggered, summaryMa
 		return existing
 	}
 	return b
+}
+
+// applyAttachmentFields sets has_attachments and attachment_count based on
+// the RequestLogContext.AttachmentCount value populated during attachment extraction.
+func applyAttachmentFields(entry *telemetry.RequestLogEntry, c *RequestLogContext) {
+	if entry == nil || c == nil || c.AttachmentCount == 0 {
+		return
+	}
+	hasAttachments := true
+	entry.HasAttachments = &hasAttachments
+	entry.AttachmentCount = &c.AttachmentCount
 }

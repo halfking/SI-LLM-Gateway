@@ -28,9 +28,9 @@ func TestSingleTransientFailureDoesNotOpenCircuit(t *testing.T) {
 
 func TestConfirmedTransientFailureOpensCircuit(t *testing.T) {
 	b := New(1, 1)
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
+	for i := 0; i < int(autoRecoveryFailureThreshold); i++ {
+		b.RecordFailure(KindTransient)
+	}
 	if b.State() != StateOpen {
 		t.Fatalf("expected open after confirmed failures, got %s", b.State())
 	}
@@ -73,9 +73,9 @@ func TestQuotaFailureQuarantines(t *testing.T) {
 
 func TestSuccessClosesCircuit(t *testing.T) {
 	b := New(1, 1)
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
+	for i := 0; i < int(autoRecoveryFailureThreshold); i++ {
+		b.RecordFailure(KindTransient)
+	}
 	if b.State() != StateOpen {
 		t.Fatalf("expected open after failure")
 	}
@@ -96,9 +96,9 @@ func TestSuccessClosesCircuit(t *testing.T) {
 
 func TestHalfOpenProbeRecovery(t *testing.T) {
 	b := New(1, 1)
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
+	for i := 0; i < int(autoRecoveryFailureThreshold); i++ {
+		b.RecordFailure(KindTransient)
+	}
 
 	// Simulate cooling expiry
 	b.mu.Lock()
@@ -122,9 +122,9 @@ func TestHalfOpenProbeRecovery(t *testing.T) {
 
 func TestHalfOpenProbeFailure(t *testing.T) {
 	b := New(1, 1)
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
+	for i := 0; i < int(autoRecoveryFailureThreshold); i++ {
+		b.RecordFailure(KindTransient)
+	}
 
 	// Simulate cooling expiry
 	b.mu.Lock()
@@ -184,9 +184,9 @@ func TestTransientEscalation(t *testing.T) {
 	b := New(1, 1)
 
 	// 3 consecutive transient failures → escalate to exponential cooling
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
-	b.RecordFailure(KindTransient)
+	for i := 0; i < int(autoRecoveryFailureThreshold); i++ {
+		b.RecordFailure(KindTransient)
+	}
 
 	b.mu.Lock()
 	cooling := b.coolingExpires.Sub(time.Now())
@@ -300,9 +300,9 @@ func TestManagerStats(t *testing.T) {
 
 func TestManagerProbeCheck(t *testing.T) {
 	m := NewManager()
-	m.RecordFailure(1, 1, KindTransient)
-	m.RecordFailure(1, 1, KindTransient)
-	m.RecordFailure(1, 1, KindTransient)
+	for i := 0; i < int(autoRecoveryFailureThreshold); i++ {
+		m.RecordFailure(1, 1, KindTransient)
+	}
 
 	// Should not probe while still cooling
 	if m.ProbeCheck(1, 1) {
@@ -377,14 +377,14 @@ func TestConcurrentOverloadFiveMinuteCooling(t *testing.T) {
 	// KindConcurrent represents "service overloaded / too many concurrent
 	// requests". The credential should be taken out of rotation for
 	// 5 minutes to let the upstream's concurrency window clear.
-	// RecoveryAuto uses autoRecoveryFailureThreshold=3, so we record
-	// three failures to confirm the circuit opening.
+	// 2026-07-01 V3.2.0: autoRecoveryFailureThreshold raised from 3 to 10
+	// to reduce false-positive circuit opens on minimax transient errors.
 	b := New(1, 1)
-	b.RecordFailure(KindConcurrent)
-	b.RecordFailure(KindConcurrent)
-	b.RecordFailure(KindConcurrent)
+	for i := 0; i < int(autoRecoveryFailureThreshold); i++ {
+		b.RecordFailure(KindConcurrent)
+	}
 	if b.State() != StateOpen {
-		t.Fatalf("expected open after 3 confirmed concurrent failures, got %s", b.State())
+		t.Fatalf("expected open after %d confirmed concurrent failures, got %s", autoRecoveryFailureThreshold, b.State())
 	}
 
 	b.mu.Lock()

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -108,6 +109,13 @@ type RequestLogEntry struct {
 	StreamChunkCount   *int    `json:"stream_chunk_count,omitempty"`
 	StreamDoneReceived *bool   `json:"stream_done_received,omitempty"`
 	StreamInterrupted  *bool   `json:"stream_interrupted,omitempty"`
+	// UpstreamStatusCode is the HTTP status code returned by the
+	// upstream provider for a failed request. Nil when the
+	// request failed before reaching upstream (network error,
+	// client error, etc.). Added 2026-07-01 to fix a missing
+	// field on RequestLogEntry that relay/request_log_pipeline.go
+	// was already populating since 2026-06-30.
+	UpstreamStatusCode *int    `json:"upstream_status_code,omitempty"`
 	ResponseChecksum   *string `json:"response_checksum,omitempty"`
 	FailureDetailCode  *string `json:"failure_detail_code,omitempty"`
 	FailureStage       *string `json:"failure_stage,omitempty"`
@@ -190,15 +198,14 @@ type RequestLogEntry struct {
 	// Distinct from RequestID (which is now ALWAYS a server-generated
 	// UUID, see migration 054 and the requestid_mw / handler fixes) so
 	// that client retries reusing the same id do not collapse into a
-	// single audit row.
+	// single row. Nil when the client did not send X-Request-Id.
 	ClientRequestID *string `json:"client_request_id,omitempty"`
 
-	// 2026-06-30 (Phase 2 P1 of the minimax-m3 transient-error fix):
-	// upstream HTTP status code returned by the vendor. Mirrors the
-	// request_logs.upstream_status_code int column (migration 055).
-	// nil means network-level error or success; the SQL COALESCE in
-	// updateRequestLog leaves a previously-set value intact.
-	UpstreamStatusCode *int `json:"upstream_status_code,omitempty"`
+	// 2026-07-01: attachment tracking. When the request contains
+	// images/files extracted by the attachment manager, these fields
+	// record the count and presence for fast filtering.
+	HasAttachments  *bool `json:"has_attachments,omitempty"`
+	AttachmentCount *int  `json:"attachment_count,omitempty"`
 }
 
 func NewClient() *Client {
@@ -264,9 +271,56 @@ func (c *Client) EmitRequestLogUpdate(entry *RequestLogEntry) {
 	c.EmitRequestLog(entry)
 }
 
+// Stop signals the worker to exit, then waits up to `drainTimeout`
+// for any in-flight queue entries to be flushed to the database.
+//
+// 2026-07-02 fix (in_flight_during_restart bug): the previous Stop()
+// called `c.wg.Wait()` with no timeout, which meant:
+//
+//   1. If the caller relied on a SIGTERM grace period (e.g. 10s from
+//      docker stop / k8s preStop), wg.Wait() blocked forever because
+//      the worker loop only exits on `<-c.done`, which is fine — but
+//      when the OS sends SIGKILL after the grace period, any queue
+//      entries still buffered are lost (this is exactly the
+//      in_flight_during_restart orphan rows we observed in audit).
+//
+//   2. Even when `close(c.done)` was reached, if the worker was
+//      blocked inside a slow pgx Exec, wg.Wait() could exceed the
+//      orchestrator's grace window.
+//
+// Now we use a bounded timeout (default 8s, configurable via
+// LLM_GATEWAY_TELEMETRY_DRAIN_TIMEOUT). After the deadline, we mark
+// the worker as stopped and the caller is free to return. Remaining
+// queue entries will be lost; the cron-cleanup script
+// `cleanup_in_progress.sh` (added 2026-07-02) marks those orphan
+// rows as failure so the user sees something coherent.
 func (c *Client) Stop() {
 	close(c.done)
-	c.wg.Wait()
+
+	drainTimeout := 8 * time.Second
+	if v := os.Getenv("LLM_GATEWAY_TELEMETRY_DRAIN_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			drainTimeout = d
+		}
+	}
+
+	done := make(chan struct{})
+	go func() {
+		c.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Worker drained cleanly within the timeout.
+	case <-time.After(drainTimeout):
+		// 2026-07-02: log loud warning so operators see why some
+		// in-flight request_logs rows may remain at in_progress.
+		// The cron cleanup script will eventually reconcile them.
+		slog.Warn("telemetry: stop drain timeout, queue may have unflushed entries",
+			"timeout", drainTimeout,
+			"queue_len", len(c.queue))
+	}
 }
 
 func (c *Client) worker() {
@@ -276,11 +330,33 @@ func (c *Client) worker() {
 	timer := time.NewTimer(200 * time.Millisecond)
 	defer timer.Stop()
 
+	// 2026-07-02: drainCh is closed when Stop() is called. The worker
+	// keeps reading from c.queue until both the queue is empty AND
+	// drainCh is closed, so we never silently drop entries that were
+	// already pushed before Stop().
+	drainCh := make(chan struct{})
+	go func() {
+		<-c.done
+		// Allow the loop to keep consuming until queue is empty.
+		// We don't close the queue itself (select-style channels
+		// can't be safely closed while senders may still exist),
+		// but since c.done is already closed the EmitRequestLog
+		// senders stop very quickly after Stop() returns. The
+		// remaining queue items belong to requests that were
+		// already in flight when Stop() was invoked.
+		for {
+			if len(c.queue) == 0 {
+				close(drainCh)
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}()
+
 	for {
 		select {
 		case <-c.done:
-			c.flush(batch)
-			return
+			// Fall through to drain mode below.
 		case item := <-c.queue:
 			batch = append(batch, item)
 			if len(batch) >= 50 {
@@ -290,10 +366,30 @@ func (c *Client) worker() {
 			} else if len(batch) == 1 {
 				timer.Reset(200 * time.Millisecond)
 			}
+			continue
 		case <-timer.C:
 			if len(batch) > 0 {
 				c.flush(batch)
 				batch = batch[:0]
+			}
+			continue
+		}
+
+		// Drain mode (c.done is closed): keep pulling remaining
+		// entries until the queue is empty, then flush and exit.
+		for {
+			select {
+			case item := <-c.queue:
+				batch = append(batch, item)
+				if len(batch) >= 50 {
+					c.flush(batch)
+					batch = batch[:0]
+				}
+			default:
+				if len(batch) > 0 {
+					c.flush(batch)
+				}
+				return
 			}
 		}
 	}
@@ -488,11 +584,8 @@ func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
 		-- primary request_id is server-generated by requestid_mw /
 		-- handler, see migration 054).
 		client_request_id,
-		-- 2026-06-30: upstream HTTP status code (055_request_logs_upstream_status_code.sql).
-		-- Set by relay/handler.go's Exhausted / provider_error branches
-		-- via RequestLogContext.SetUpstreamStatusCode. NULL for success
-		-- rows and for network-level failures (StatusCode=0).
-		upstream_status_code
+		-- 2026-07-01: attachment tracking (has_attachments, attachment_count).
+		has_attachments, attachment_count
 	) VALUES (
 		$1, now(), $2, $3, $4,
 		$5, $6, $7,
@@ -519,7 +612,7 @@ func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
 		$65,
 		CAST($66 AS jsonb),
 		$67,
-		$68
+		$68, $69
 	)
 	-- 2026-06-27 REVERT P0 hotfix: ON CONFLICT back to (request_id, ts).
 	-- The (request_id)-only constraint from d16131ad fails on partitioned
@@ -584,10 +677,9 @@ func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
 		-- 2026-06-26: client-supplied X-Request-Id (debug only; preserve
 		-- the value across INSERT/UPDATE on the same (request_id, ts)).
 		client_request_id = COALESCE(EXCLUDED.client_request_id, request_logs.client_request_id),
-		-- 2026-06-30: upstream HTTP status code. Same COALESCE pattern
-		-- as client_request_id so a late-arriving upstream body doesn't
-		-- wipe a previously-recorded status code (and vice versa).
-		upstream_status_code = COALESCE(EXCLUDED.upstream_status_code, request_logs.upstream_status_code)
+		-- 2026-07-01: attachment tracking.
+		has_attachments = COALESCE(EXCLUDED.has_attachments, request_logs.has_attachments),
+		attachment_count = COALESCE(EXCLUDED.attachment_count, request_logs.attachment_count)
 `,
 		entry.RequestID,
 		nonEmpty(entry.TenantID, "default"),
@@ -666,8 +758,9 @@ func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
 		entry.ToolCalls,
 		// 2026-06-26: client-supplied X-Request-Id (debug only).
 		entry.ClientRequestID,
-		// 2026-06-30: upstream HTTP status code (055_request_logs_upstream_status_code.sql).
-		entry.UpstreamStatusCode,
+		// 2026-07-01: attachment tracking.
+		entry.HasAttachments,
+		entry.AttachmentCount,
 	)
 	if err != nil {
 		return err
@@ -696,26 +789,6 @@ func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
 		`, *entry.APIKeyID, promptAdd, completionAdd, costAdd)
 		if err != nil {
 			return err
-		}
-	}
-
-	// 2026-06-30 (migration 057): denormalize provider_model so the
-	// read path can drop the LATERAL. We resolve + UPDATE within the
-	// same transaction as the INSERT so partial failures roll back.
-	// The helper swallows column-not-yet-migrated errors (SQLSTATE
-	// 42703) and credential-not-in-model_offers cases (no row), so
-	// this is safe to fire-and-forget during the backfill window.
-	if providerModel, resolveErr := ResolveProviderModel(
-		ctx, tx,
-		entry.CredentialID, entry.CanonicalID,
-		entry.OutboundModel, entry.ClientModel,
-	); resolveErr != nil {
-		slog.Warn("telemetry: ResolveProviderModel failed; row will fall back to LATERAL",
-			"request_id", entry.RequestID, "error", resolveErr.Error())
-	} else if providerModel != "" {
-		if err := PersistProviderModel(ctx, tx, entry.RequestID, providerModel); err != nil {
-			slog.Warn("telemetry: PersistProviderModel failed; row will fall back to LATERAL",
-				"request_id", entry.RequestID, "error", err.Error())
 		}
 	}
 
@@ -863,14 +936,22 @@ func (c *Client) updateRequestLog(entry *RequestLogEntry) error {
 	   -- (db/migrations/018_upstream_finish_reason.sql). The new column is
 	   -- the SOLE home for the upstream finish_reason.
 	   upstream_finish_reason = COALESCE($62, upstream_finish_reason),
-	   -- 2026-06-23: structured tool_calls (042_tool_calls_column.sql).
-	   tool_calls = COALESCE(CAST($63 AS jsonb), tool_calls),
--- 2026-06-26: client-supplied X-Request-Id (debug only).
+-- 2026-06-23: structured tool_calls (042_tool_calls_column.sql).
+		   tool_calls = COALESCE(CAST($63 AS jsonb), tool_calls),
+		   -- 2026-06-26: client-supplied X-Request-Id (debug only).
 		   -- COALESCE so a late success UPDATE does not blank a value set on INSERT.
 		   client_request_id = COALESCE($64, client_request_id),
-		   -- 2026-06-30: upstream HTTP status code (055).
-		   upstream_status_code = COALESCE($65, upstream_status_code)
-	 WHERE request_id = $1
+		   -- 2026-07-02: attachment tracking. The INSERT path
+		   -- (recordInitialRequestLog in relay/handler.go) sets these
+		   -- at INSERT time, but if for any reason the initial INSERT
+		   -- lost them (e.g. an earlier retry storm that pre-dated
+		   -- the applyAttachmentFields fix) we still want the success
+		   -- UPDATE to surface them. COALESCE preserves the INSERT-time
+		   -- value when this UPDATE does not carry a non-NIL value,
+		   -- matching the pattern used by client_request_id above.
+		   has_attachments  = COALESCE($65, has_attachments),
+		   attachment_count = COALESCE($66, attachment_count)
+		 WHERE request_id = $1
 `,
 		entry.RequestID,
 		entry.ClientModel,
@@ -946,8 +1027,9 @@ func (c *Client) updateRequestLog(entry *RequestLogEntry) error {
 		entry.ToolCalls,
 		// 2026-06-26: client-supplied X-Request-Id (debug only).
 		entry.ClientRequestID,
-		// 2026-06-30: upstream HTTP status code (055_request_logs_upstream_status_code.sql).
-		entry.UpstreamStatusCode,
+		// 2026-07-02: attachment tracking. See SET clause comment above.
+		entry.HasAttachments,
+		entry.AttachmentCount,
 	)
 	if err != nil {
 		return err
@@ -1061,14 +1143,7 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 	// updateRequestLog without a normalised status field.
 	normalizeRequestStatus(entry)
 
-	tx, txErr := c.dbPool.Begin(ctx)
-	if txErr != nil {
-		return txErr
-	}
-	//nolint:errcheck // deferred rollback, best-effort
-	defer tx.Rollback(ctx)
-
-	_, err := tx.Exec(ctx, `
+	_, err := c.dbPool.Exec(ctx, `
 		INSERT INTO request_logs (
 			request_id, ts, tenant_id,
 			client_model, outbound_model,
@@ -1091,17 +1166,11 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 			is_auto_request, task_type, auto_profile, auto_decision, auto_confidence,
 			work_type, credits_charged,
 			upstream_finish_reason,
-			-- 2026-06-26: client-supplied X-Request-Id (debug only).
-			client_request_id,
-			-- 2026-06-30 (Phase 2 P1): upstream HTTP status code
-			-- (055_request_logs_upstream_status_code.sql).
-			upstream_status_code,
-			-- 2026-06-30: outbound_body family (4 columns) — previously
-			-- omitted from the fallback INSERT so failure rows that fell
-			-- through to upsertRequestLogFallback lost session-compressor
-			-- data. Mirror the column list of the primary INSERT path.
-			outbound_body, outbound_msg_count, outbound_token_est, outbound_msg_hashes
-		) VALUES (
+-- 2026-06-26: client-supplied X-Request-Id (debug only).
+				client_request_id,
+				-- 2026-07-02: attachment tracking (mirrors insertRequestLog).
+				has_attachments, attachment_count
+			) VALUES (
 			$1, now(), $2,
 			COALESCE($3, ''), COALESCE($4, ''),
 			$5, $6, $7,
@@ -1123,10 +1192,12 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 			$43, COALESCE(NULLIF($44, ''), NULL), COALESCE(NULLIF($45, ''), NULL),
 			CAST(NULLIF($46, '') AS jsonb), $47,
 			COALESCE(NULLIF($48, ''), NULL), $49,
-COALESCE(NULLIF($50, ''), NULL),
-		$51,
-		$52,
-		CAST(NULLIF($53, '') AS jsonb), $54, $55, CAST(NULLIF($56, '') AS jsonb)
+			COALESCE(NULLIF($50, ''), NULL),
+			$51,
+			-- 2026-07-02: attachment tracking. INSERT-time values are
+			-- authoritative; the ON CONFLICT branch preserves them via
+			-- COALESCE on the column instead of the new value.
+			$52, $53
 		)
 		-- 2026-06-27 REVERT: ON CONFLICT back to (request_id, ts) for partitioned table compatibility
 		ON CONFLICT (request_id, ts) DO UPDATE SET
@@ -1167,10 +1238,13 @@ COALESCE(NULLIF($50, ''), NULL),
 			response_preview = COALESCE(NULLIF(request_logs.response_preview, ''), EXCLUDED.response_preview),
 			response_body = COALESCE(request_logs.response_body, EXCLUDED.response_body),
 			identity_hash = COALESCE(NULLIF(request_logs.identity_hash, ''), EXCLUDED.identity_hash),
-			-- 2026-06-30: upstream HTTP status code. COALESCE-first-write
-			-- semantics so the fallback INSERT preserves the earlier
-			-- (correct) value if a second call lands after.
-			upstream_status_code = COALESCE(request_logs.upstream_status_code, EXCLUDED.upstream_status_code)
+			-- 2026-07-02: attachment tracking. The original INSERT from
+			-- recordInitialRequestLog already populated these via
+			-- applyAttachmentFields; preserve them by COALESCE'ing on
+			-- the existing row, NOT on EXCLUDED, so a late fallback
+			-- that arrives with NIL doesn't blank the original value.
+			has_attachments  = COALESCE(request_logs.has_attachments,  EXCLUDED.has_attachments),
+			attachment_count = COALESCE(request_logs.attachment_count, EXCLUDED.attachment_count)
 		-- NOTE: do NOT update client_model, request_body, gw_session_id, gw_task_id,
 		-- api_key_*, application_code, is_auto_request, task_type, auto_*,
 		-- work_type, credits_charged, request_preview, transform_summary,
@@ -1230,37 +1304,11 @@ COALESCE(NULLIF($50, ''), NULL),
 		entry.CreditsCharged,                    // $49
 		strPtrValue(entry.UpstreamFinishReason), // $50
 		entry.ClientRequestID,                   // $51
-		// 2026-06-30: upstream HTTP status code.
-		entry.UpstreamStatusCode,                // $52
-		// 2026-06-30: outbound_body family — bound to the column list above.
-		string(entry.OutboundBody),              // $53 (cast to jsonb in SQL)
-		entry.OutboundMsgCount,                  // $54
-		entry.OutboundTokenEst,                  // $55
-		string(entry.OutboundMsgHashes),         // $56 (cast to jsonb in SQL)
+		// 2026-07-02: attachment tracking. See SET clause comment.
+		entry.HasAttachments,                    // $52
+		entry.AttachmentCount,                   // $53
 	)
-	if err != nil {
-		return err
-	}
-
-	// 2026-06-30 (migration 057): denormalize provider_model so the
-	// read path can drop the LATERAL. Same fire-and-forget contract
-	// as insertRequestLog: tolerant of column-not-yet-migrated and
-	// credential-not-in-model_offers cases.
-	if providerModel, resolveErr := ResolveProviderModel(
-		ctx, tx,
-		entry.CredentialID, entry.CanonicalID,
-		entry.OutboundModel, entry.ClientModel,
-	); resolveErr != nil {
-		slog.Warn("telemetry: fallback ResolveProviderModel failed; row will fall back to LATERAL",
-			"request_id", entry.RequestID, "error", resolveErr.Error())
-	} else if providerModel != "" {
-		if err := PersistProviderModel(ctx, tx, entry.RequestID, providerModel); err != nil {
-			slog.Warn("telemetry: fallback PersistProviderModel failed; row will fall back to LATERAL",
-				"request_id", entry.RequestID, "error", err.Error())
-		}
-	}
-
-	return tx.Commit(ctx)
+	return err
 }
 
 func nonEmpty(value, fallback string) string {

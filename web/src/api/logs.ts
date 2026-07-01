@@ -90,6 +90,10 @@ export interface RequestLogRow {
   upstream_finish_reason: string | null
   failure_detail_code: string | null
   failure_stage: string | null
+  
+  // 2026-07-01: attachment tracking
+  has_attachments: boolean | null
+  attachment_count: number | null
 }
 
 export interface RequestLogDetail extends RequestLogRow {
@@ -216,4 +220,28 @@ export function probeModel(model: string, messages?: Array<{role: string; conten
     client_profile: clientProfile,
     request_mode: 'chat',
   })
+}
+
+// 2026-07-01: Attachment APIs
+export interface Attachment {
+  id: string
+  request_id: string
+  tenant_id: number
+  media_type: string
+  file_size: number
+  content_hash: string
+  storage_path: string
+  created_at: string
+}
+
+export function getAttachments(requestId: string): Promise<Attachment[]> {
+  return req<Attachment[]>('GET', `/api/admin/attachments?request_id=${encodeURIComponent(requestId)}`)
+}
+
+export function getAttachmentUrl(attachmentId: string): string {
+  return `/api/admin/attachments/${attachmentId}`
+}
+
+export function getAttachmentInfo(attachmentId: string): Promise<Attachment> {
+  return req<Attachment>('GET', `/api/admin/attachments/${attachmentId}/info`)
 }

@@ -193,7 +193,18 @@ type ChatHandler struct {
 	autoTitleGenerator interface {
 		MaybeGenerateTitle(sessionID, tenantID string)
 	}
+
+	// attachmentManager (2026-07-01) archives inline base64 images to disk
+	// + DB so operators can inspect them from request_logs. It is a
+	// side-channel observer and MUST NOT modify the body forwarded
+	// upstream. nil disables archival. Returns the number of images
+	// archived.
+	attachmentManager interface {
+		Enabled() bool
+		ArchiveAttachments(ctx context.Context, body []byte, requestID, tenantID string) (int, error)
+	}
 }
+
 
 // ToolRegistryService is the interface for tool registry access.
 type ToolRegistryService interface {
@@ -351,6 +362,36 @@ func (h *ChatHandler) SetSessionGetter(sg interface {
 // feature (legacy behavior: every no-header request creates a fresh session).
 func (h *ChatHandler) SetLastSystemSessionIndex(idx *sessions.LastSystemSessionIndex) {
 	h.lastSystemSessionIndex = idx
+}
+
+// SetAttachmentManager configures the attachment manager for image archival.
+func (h *ChatHandler) SetAttachmentManager(am interface {
+	Enabled() bool
+	ArchiveAttachments(ctx context.Context, body []byte, requestID, tenantID string) (int, error)
+}) {
+	h.attachmentManager = am
+}
+
+// ArchiveAttachmentsIfEnabled is a shared helper used by both the chat
+// handler and the messages (Anthropic) handler to archive inline base64
+// images without modifying the forwarded body. Returns the number of
+// images archived. It is best-effort: errors are logged but never
+// propagate to the caller, because attachment archival must not fail the
+// user's request.
+func (h *ChatHandler) ArchiveAttachmentsIfEnabled(ctx context.Context, body []byte, requestID, tenantID string) int {
+	if h.attachmentManager == nil || !h.attachmentManager.Enabled() {
+		return 0
+	}
+	n, err := h.attachmentManager.ArchiveAttachments(ctx, body, requestID, tenantID)
+	if err != nil {
+		slog.Warn("attachment archival failed",
+			"request_id", requestID, "error", err)
+		return 0
+	}
+	if n > 0 {
+		slog.Info("attachments archived", "request_id", requestID, "count", n)
+	}
+	return n
 }
 
 // ServeHTTP handles /v1/chat/completions and /v1/completions.
@@ -853,6 +894,23 @@ func (h *ChatHandler) serveWithExecutor(
 			"error": map[string]string{"message": "request body exceeds 32 MiB limit", "type": "invalid_request", "code": "body_too-large"},
 		})
 		return
+	}
+
+	// ── Attachment archival (2026-07-01) ───────────────────────────────
+	// Archive any inline base64 images to disk + attachments table so
+	// operators can inspect them from request_logs. The request body is
+	// forwarded UNCHANGED to the upstream LLM — this is a side-channel
+	// for observability, not a transform. Replacing the body (as an
+	// earlier draft did) broke upstream image support because providers
+	// do not understand a synthetic "attachment_ref" content type.
+	if logCtx != nil {
+		tenantID := "default"
+		if keyInfo != nil {
+			tenantID = keyInfo.TenantID
+		}
+		if n := h.ArchiveAttachmentsIfEnabled(ctx, bodyBytes, requestID, tenantID); n > 0 {
+			logCtx.SetAttachmentCount(n)
+		}
 	}
 
 	var reqBody chatRequestBody
@@ -1639,6 +1697,27 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 		return
 	}
 
+	// 2026-07-02 fix: mark logCtx as logged IMMEDIATELY upon entering the
+	// success-path telemetry emission, so the deferred safety net in
+	// ChatHandler.ServeHTTP (relay/handler.go:437-487) cannot re-fire
+	// EmitFailure() and overwrite a perfectly good success row with a
+	// spurious failure (the exact symptom we saw for the
+	// `content_cache_hit` fast path on 2026-07-01: the cache hit set
+	// logCtx.ErrCode="content_cache_hit", the deferred safety net saw
+	// `ErrCode != "" && !IsLogged()` because content_cache_hit only
+	// called logCtx.MarkLogged() and not the surrounding closure
+	// markLogged(), and EmitFailure wrote a row that clobbered the
+	// in-flight success entry).
+	//
+	// Setting the flag here is safe because every code path that
+	// reaches emitTelemetry has produced a response body for the
+	// client; the deferred safety net's purpose is solely to catch
+	// paths that *bypass* emitTelemetry, not to re-process successful
+	// ones.
+	if logCtx != nil {
+		logCtx.MarkLogged()
+	}
+
 	var apiKeyID *int
 	var tenantID string = "default"
 	var applicationID *int
@@ -2131,6 +2210,8 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 	applyKeyInfoToRequestLog(reqLog, keyInfo)
 	// v3: merge session compressor outbound fields into the log entry.
 	applySessionCompressorFields(reqLog, logCtx)
+	applyAutoRouteFields(reqLog, logCtx)
+	applyAttachmentFields(reqLog, logCtx)
 	h.telemetryClient.EmitRequestLogUpdate(reqLog)
 	if h.requestLogHook != nil {
 		h.requestLogHook(reqLog)
@@ -2462,6 +2543,14 @@ func (h *ChatHandler) recordInitialRequestLog(
 		reqLog.StreamChunkCount = &zero
 	}
 	applyAutoRouteFields(reqLog, autoCtx)
+	// 2026-07-02: attachment tracking. Without this, INSERT writes
+	// has_attachments=NULL even when attachments have been archived,
+	// because updateRequestLog's UPDATE SQL (telemetry/client.go:865)
+	// does not include has_attachments / attachment_count. Setting
+	// them at INSERT time is the only place that survives the rest of
+	// the request lifecycle (the COALESCE in updateRequestLog's
+	// INSERT-conflict branch keeps the original NULL).
+	applyAttachmentFields(reqLog, autoCtx)
 	if h.requestLogHook != nil {
 		h.requestLogHook(reqLog)
 	}
@@ -3002,6 +3091,14 @@ func writeErrorJSONWithKind(w http.ResponseWriter, status int, requestID, msg, e
 // lookup table for the cases where LastKind is empty (e.g. no
 // candidates returned at all from the router).
 //
+// 2026-07-01 (V3.1.2): if every failed attempt recorded in Attempts
+// is "circuit open for credential N", we treat the whole call as
+// KindCircuitOpen so the request_logs row carries the actionable kind
+// instead of being demoted to "unknown". Without this, the
+// circuit-break-cascade case (minimax-m3 2026-06-30 incident) showed
+// up as a flood of `err_kind=unknown` rows that operators could not
+// diagnose from the admin UI.
+//
 // Returns "" when no kind can be determined (caller should omit the
 // header and the field).
 func mapExecuteErrorToKind(err *routing.ExecuteError) string {
@@ -3013,6 +3110,15 @@ func mapExecuteErrorToKind(err *routing.ExecuteError) string {
 	}
 	if err.Tried == 0 {
 		return "no_candidates"
+	}
+	// 2026-07-01: last-resort diagnostic — if every attempt was
+	// "circuit open for credential X" (the only LastErr-style message
+	// the executor emits without setting LastKind), surface it as
+	// KindCircuitOpen so request_logs.err_kind is informative.
+	if len(err.Attempts) > 0 && err.LastErr != nil {
+		if strings.Contains(err.LastErr.Error(), "circuit open for credential") {
+			return string(errorsx.KindCircuitOpen)
+		}
 	}
 	return "unknown"
 }

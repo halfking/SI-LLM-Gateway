@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/kaixuan/llm-gateway-go/admin"
+	"github.com/kaixuan/llm-gateway-go/attachments"
 	"github.com/kaixuan/llm-gateway-go/audit"
 	"github.com/kaixuan/llm-gateway-go/auth"
 	"github.com/kaixuan/llm-gateway-go/autoroute"
@@ -42,6 +43,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/internal/ir"
 	"github.com/kaixuan/llm-gateway-go/internal/modelpolicy"
 	"github.com/kaixuan/llm-gateway-go/internal/observability"
+	"github.com/kaixuan/llm-gateway-go/observability/rotate"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/maas"
 	"github.com/kaixuan/llm-gateway-go/memora"
@@ -94,6 +96,11 @@ func main() {
 	// ── Logging ───────────────────────────────────────────────────────────
 	cfg := config.Load()
 
+	// Stderr handler is always installed as the primary handler
+	// (so docker logs / kubectl logs continues to work). The
+	// optional rotated file handler is added below, after the
+	// YAML config (if any) is loaded so LLM_GATEWAY_LOG_FILE /
+	// log_file overrides take effect.
 	level := slog.LevelInfo
 	switch cfg.LogLevel {
 	case "debug":
@@ -103,9 +110,8 @@ func main() {
 	case "error":
 		level = slog.LevelError
 	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: level,
-	})))
+	stderrHandler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+	slog.SetDefault(slog.New(stderrHandler))
 
 	// ── Optional YAML config file ─────────────────────────────────────────
 	configFile := os.Getenv("LLM_GATEWAY_CONFIG_FILE")
@@ -119,6 +125,45 @@ func main() {
 			slog.Warn("config: failed to load YAML file, using env-only", "path", configFile, "error", err)
 		} else {
 			slog.Info("config: loaded YAML file", "path", configFile)
+		}
+	}
+
+	// ── Optional rotated log file (LLM_GATEWAY_LOG_FILE) ──────────────────
+	// Installed AFTER the YAML config so log_file / log_max_size_mb /
+	// etc. can override the env defaults. Mirrors observability/siem
+	// fail-soft: if the file cannot be opened, the process continues
+	// with stderr-only logging. Defaults (set in config.Load):
+	//   ./logs/gateway.log, 100 MiB, 10 backups, gzip on.
+	//
+	// TODO(rotate-hot-reload): when config.Store.ReloadFile swaps the
+	// config, the slog default handler is not re-created; the file
+	// path / size cap stay pinned to the startup values. Re-wiring
+	// on hot-reload is out of scope for this change.
+	if cfg.Log.File != "" {
+		compress := true
+		if cfg.Log.Compress != nil {
+			compress = *cfg.Log.Compress
+		}
+		rot, err := rotate.New(rotate.Config{
+			File:       cfg.Log.File,
+			MaxSizeMB:  cfg.Log.MaxSizeMB,
+			MaxBackups: cfg.Log.MaxBackups,
+			MaxAgeDays: cfg.Log.MaxAgeDays,
+			Compress:   &compress,
+		})
+		if err != nil {
+			slog.Warn("log: file rotation disabled, using stderr only",
+				"path", cfg.Log.File, "error", err)
+		} else {
+			defer rot.Close()
+			fileHandler := slog.NewJSONHandler(rot.Writer(), &slog.HandlerOptions{Level: level})
+			slog.SetDefault(slog.New(rotate.NewMultiHandler(stderrHandler, fileHandler)))
+			slog.Info("log: file rotation enabled",
+				"path", rot.Path(),
+				"max_size_mb", cfg.Log.MaxSizeMB,
+				"max_backups", cfg.Log.MaxBackups,
+				"max_age_days", cfg.Log.MaxAgeDays,
+				"compress", compress)
 		}
 	}
 
@@ -170,6 +215,47 @@ func main() {
 	modelsHandler := relay.NewModelsHandler()
 	messagesHandler := relay.NewMessagesHandler(chatHandler)
 	responsesHandler := relay.NewResponsesHandler(chatHandler)
+
+	// ── Attachment manager (2026-07-01) ─────────────────────────────────
+	// Extracts and saves base64 images/files before forwarding to upstream.
+	// Reduces request_body size and enables separate attachment management.
+	var attachmentMgr *attachments.Manager
+	if dbConn != nil && dbConn.Enabled() {
+		storagePath := os.Getenv("ATTACHMENT_STORAGE_PATH")
+		if storagePath == "" {
+			// 2026-07-02 fix: the previous default `./data/attachments`
+			// is a RELATIVE path that resolves against the process cwd.
+			// When gateway runs inside the systemd-launched Docker
+			// container (`--entrypoint /opt/llm-gateway-go/llm-gateway-go`
+			// without `--workdir`), the container's cwd is `/`, so the
+			// attachments end up in `/data/attachments` on the alpine
+			// rootfs — invisible to the host and impossible for the
+			// server to read back via /api/admin/attachments/{id}
+			// (HTTP 500, "failed to read attachment"). We now anchor
+			// to the absolute path the systemd unit bind-mounts
+			// into the container (`/opt/llm-gateway-go/data`).
+			storagePath = "/opt/llm-gateway-go/data/attachments"
+		}
+		attachmentEnabled := os.Getenv("ATTACHMENT_ENABLED")
+		enabled := attachmentEnabled == "" || attachmentEnabled == "true" || attachmentEnabled == "1"
+		maxSizeMB := int64(10)
+		if maxSizeStr := os.Getenv("ATTACHMENT_MAX_SIZE_MB"); maxSizeStr != "" {
+			if parsed, err := strconv.ParseInt(maxSizeStr, 10, 64); err == nil && parsed > 0 {
+				maxSizeMB = parsed
+			}
+		}
+		var err error
+		attachmentMgr, err = attachments.NewManager(dbConn.Pool(), storagePath, enabled, maxSizeMB)
+		if err != nil {
+			slog.Warn("attachment manager disabled", "error", err)
+			attachmentMgr = nil
+		} else if attachmentMgr.Enabled() {
+			chatHandler.SetAttachmentManager(attachmentMgr)
+			slog.Info("attachment manager enabled",
+				"storage_path", storagePath,
+				"max_size_mb", maxSizeMB)
+		}
+	}
 
 	// ── Tenant model policy (Round 48, 2026-06-21) ─────────────────
 	// Single Checkerr singleton shared by relay.ChatHandler (hot
@@ -246,6 +332,7 @@ func main() {
 		Enabled:            cfg.EnableCredentialFpSlots,
 		ActiveGateSeconds:  cfg.CredentialFpSlotActiveGateSeconds,
 		ReclaimIdleSeconds: cfg.CredentialFpSlotReclaimIdleSeconds,
+		MaxInflightPerSlot: cfg.CredentialFpSlotMaxInflightPerSlot,
 	}, fpSlotRedis)
 
 	// 2026-06-23: enable background idle-slot reclaim.
@@ -1333,6 +1420,15 @@ func main() {
 		mux.HandleFunc("/api/admin/credential-success-rates", wrapAdmin(admin.HandleCredentialSuccessRates(dbConn.Pool())))
 		mux.HandleFunc("/api/admin/credential-success-rates/reset", wrapAdmin(admin.HandleResetCredentialSuccessRate(dbConn.Pool())))
 		slog.Info("Phase 3.6 credential success rate management enabled (/api/admin/credential-success-rates)")
+
+		// Attachment downloads (2026-07-01). Lets operators inspect images
+		// archived from request bodies. Registered under wrapAdmin so only
+		// authenticated admin users can fetch them.
+		if attachmentMgr != nil && attachmentMgr.Enabled() {
+			attachmentsHandler := admin.NewAttachmentsHandler(attachmentMgr)
+			mux.HandleFunc("/api/admin/attachments/", wrapAdmin(attachmentsHandler.ServeHTTP))
+			slog.Info("attachment download API enabled (/api/admin/attachments/)")
+		}
 	}
 
 	slog.Info("CHECKPOINT: before middleware stack build")

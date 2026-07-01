@@ -747,12 +747,23 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 			}
 		}
 
-		if !e.Circuit.Allow(cand.ProviderID, cand.CredentialID) {
+		if !e.Circuit.Allow(cand.ProviderID, cand.CredentialID, cand.RawModel) {
 			slog.Debug("executor: circuit open, skipping candidate",
 				"credential_id", cand.CredentialID,
 				"provider_id", cand.ProviderID,
+				"raw_model", cand.RawModel,
 			)
 			lastErr = fmt.Errorf("circuit open for credential %d", cand.CredentialID)
+			// 2026-07-01 (V3.1.2): also stamp lastKind so the eventual
+			// ExecuteError carries a meaningful kind instead of "".
+			// Without this, "all 4 candidates failed because every
+			// one of them had its circuit open" bubbles up as
+			// err_kind=unknown in request_logs (the operator's worst
+			// nightmare — a perfectly explainable cascade that
+			// looks like an undefined bug). Setting it here means
+			// LastKind is always populated for the
+			// circuit-skipped-skip-candidate path.
+			lastKind = errorsx.KindCircuitOpen
 			if fpLease != nil {
 				e.FpSlots.Release(params.R.Context(), fpLease)
 			}
@@ -1002,7 +1013,11 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 			}
 			e.recordStickyFailure(params, cand.CredentialID, kind)
 			// V3.1 (2026-06-26): 同步 RouteNodeState 失败计数
-			e.recordRouteNodeFailure(params, cand.CredentialID, cand.RawModel, kind)
+			if justDisabled := e.recordRouteNodeFailure(params, cand.CredentialID, cand.RawModel, kind); justDisabled {
+				// V3.1.1 (2026-07-01): 当节点被禁用时，清除会话偏好
+				// 防止会话继续粘滞到已失效的凭证
+				e.clearSessionPreferenceOnNodeDisable(params, cand.CredentialID, cand.RawModel)
+			}
 
 			if sie.resumable {
 				// Stream is resumable (few chunks sent) - try next candidate.
@@ -1013,11 +1028,11 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 				// because the executor's outer loop now drives the failover
 				// to the next candidate, and we want the DB state to be
 				// authoritative before that next lookup.
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
+				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind)
 				if kind == errorsx.KindConcurrent {
 					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, kind, execErr)
 					e.forceUnpinOnFatalKind(params.R.Context(), holder, cand.CredentialID, kind)
-				} else if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, kind) {
+				} else if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind) {
 					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, kind, execErr)
 					e.forceUnpinOnFatalKind(params.R.Context(), holder, cand.CredentialID, kind)
 				}
@@ -1042,8 +1057,8 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 				// The inner tryCandidate already wrote the credential state
 				// with the correct kind; this branch keeps the circuit counter
 				// consistent and ensures the kind is recorded.
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
-				if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, kind) {
+				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind)
+				if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind) {
 					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, kind, execErr)
 					e.forceUnpinOnFatalKind(params.R.Context(), holder, cand.CredentialID, kind)
 				}
@@ -1155,8 +1170,12 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 		})
 		e.recordStickyFailure(params, cand.CredentialID, kind)
 		// V3.1 (2026-06-26): 同步 RouteNodeState 失败计数
-		e.recordRouteNodeFailure(params, cand.CredentialID, cand.RawModel, kind)
-		e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
+		if justDisabled := e.recordRouteNodeFailure(params, cand.CredentialID, cand.RawModel, kind); justDisabled {
+			// V3.1.1 (2026-07-01): 当节点被禁用时，清除会话偏好
+			// 防止会话继续粘滞到已失效的凭证
+			e.clearSessionPreferenceOnNodeDisable(params, cand.CredentialID, cand.RawModel)
+		}
+		e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind)
 		trace.BlockedCandidates = append(trace.BlockedCandidates, TraceCandidate{
 			ProviderID:   cand.ProviderID,
 			CredentialID: cand.CredentialID,
@@ -1164,7 +1183,7 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 			Tier:         cand.Tier,
 			Reason:       fmt.Sprintf("request_failed:%s", kind),
 		})
-		if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, kind) {
+		if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind) {
 			e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, kind, execErr)
 			e.forceUnpinOnFatalKind(params.R.Context(), holder, cand.CredentialID, kind)
 		}
@@ -1766,8 +1785,8 @@ func (e *Executor) recordStickySuccess(params *ExecParams, credentialID int) {
 }
 
 // recordRouteNodeSuccess (V3.1, 2026-06-26) 在上游成功后更新两处状态：
-//   1. RouteNodeStore: 清掉 Disabled 标记 + 追加成功记录到滑动窗口
-//   2. SessionPrefStore: 标记"该会话偏好此 credential"
+//  1. RouteNodeStore: 清掉 Disabled 标记 + 追加成功记录到滑动窗口
+//  2. SessionPrefStore: 标记"该会话偏好此 credential"
 //
 // 都是 best-effort：失败仅记 warn 日志，不影响响应路径。
 func (e *Executor) recordRouteNodeSuccess(params *ExecParams, credentialID int, model string) {
@@ -1885,6 +1904,38 @@ func isCredentialLevelFailureForRouteNode(kind errorsx.ErrorKind) bool {
 		return false
 	}
 	return true
+}
+
+// clearSessionPreferenceOnNodeDisable (V3.1.1, 2026-07-01) 在节点被禁用时清除会话偏好。
+//
+// 场景：某个 credential 连续失败 3 次后被禁用，如果当前会话的 session_pref
+// 指向该 credential，下次请求仍会优先尝试它（虽然会被 IsUsable() 过滤掉，
+// 但在 lenient mode 下仍可能被选中）。清除 session_pref 让下次请求重新
+// 通过 P2C 选择健康的 credential。
+//
+// 这是 best-effort 操作：失败仅记 warn 日志，不影响当前请求。
+func (e *Executor) clearSessionPreferenceOnNodeDisable(params *ExecParams, credentialID int, model string) {
+	if e == nil || params == nil || params.SessionID == "" {
+		return
+	}
+	if e.Router == nil || e.Router.SessionPrefStore == nil {
+		return
+	}
+	ctx := params.R.Context()
+	if err := e.Router.SessionPrefStore.Clear(ctx, params.SessionID); err != nil {
+		slog.Warn("failed to clear session preference after node disable",
+			"session_id", params.SessionID,
+			"credential_id", credentialID,
+			"model", model,
+			"error", err,
+		)
+	} else {
+		slog.Info("cleared session preference after node disable",
+			"session_id", params.SessionID,
+			"credential_id", credentialID,
+			"model", model,
+		)
+	}
 }
 
 // AsyncPendingError (Track C C4, 2026-06-18) is returned by Execute
@@ -2490,7 +2541,7 @@ func shouldWriteCredentialState(kind errorsx.ErrorKind) bool {
 	}
 }
 
-func (e *Executor) shouldWriteCredentialStateOnConfirmedFailure(providerID, credentialID int, kind errorsx.ErrorKind) bool {
+func (e *Executor) shouldWriteCredentialStateOnConfirmedFailure(providerID, credentialID int, rawModel string, kind errorsx.ErrorKind) bool {
 	if !shouldWriteCredentialState(kind) {
 		return false
 	}
@@ -2504,7 +2555,7 @@ func (e *Executor) shouldWriteCredentialStateOnConfirmedFailure(providerID, cred
 	if e.Circuit == nil {
 		return true
 	}
-	b := e.Circuit.GetOrCreate(providerID, credentialID)
+	b := e.Circuit.GetOrCreate(providerID, credentialID, rawModel)
 	state := b.State()
 	if state == circuit.StateOpen || state == circuit.StateQuarantined {
 		return true

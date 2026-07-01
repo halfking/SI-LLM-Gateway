@@ -48,6 +48,13 @@ const (
 	// trim was applied.
 	KindContextLength ErrorKind = "context_length_exceeded"
 	KindUnsupportedFeature ErrorKind = "unsupported_feature"
+	// KindCircuitOpen (2026-07-01): the executor skipped this candidate
+	// because the per-credential circuit breaker is open. Without this
+	// kind, an "all 4 candidates failed because every one of them had
+	// its circuit open" call would land in request_logs as
+	// err_kind="unknown" (because executor.go:755 only set lastErr, not
+	// lastKind), making the symptom un-actionable from the admin UI.
+	KindCircuitOpen ErrorKind = "circuit_open"
 )
 
 // contextLengthRe matches upstream error bodies that signal "prompt too
@@ -241,6 +248,14 @@ func ClassifyError(err error, resp *http.Response) ErrorKind {
 		if strings.Contains(msg, "connection") || strings.Contains(msg, "refused") ||
 			strings.Contains(msg, "no such host") || strings.Contains(msg, "reset") {
 			return KindNetwork
+		}
+		// 2026-07-01: when the executor stringifies a circuit-open skip
+		// as "circuit open for credential N", classify the error as
+		// KindCircuitOpen so the upstream_status_code / response_body
+		// remain NULL (no upstream call was made) but the kind is
+		// diagnosable in the admin UI.
+		if strings.Contains(msg, "circuit open for credential") {
+			return KindCircuitOpen
 		}
 		if modelNotFoundRe.MatchString(msg) {
 			return KindModelNotFound

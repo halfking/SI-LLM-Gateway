@@ -785,12 +785,12 @@ func (e *Executor) executeAnthropicOnce(
 			resp.StatusCode != 403 && resp.StatusCode != 402 &&
 			errKind != errorsx.KindConcurrent {
 			if !errorsx.IsClientBug(errKind) {
-				e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID)
+				e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
 			}
 		} else if errKind == errorsx.KindRateLimit {
 			e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
 		} else if errKind == errorsx.KindConcurrent {
-			e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, errorsx.KindConcurrent)
+			e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, errorsx.KindConcurrent)
 			e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, errorsx.KindConcurrent,
 				fmt.Errorf("upstream %d concurrent overload: %s", resp.StatusCode, string(body[:min(n, 200)])))
 			e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, errorsx.KindConcurrent)
@@ -830,7 +830,7 @@ func (e *Executor) executeAnthropicOnce(
 		return nil, &retryableError{err: fmt.Errorf("upstream %d", resp.StatusCode)}
 	}
 
-	e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID)
+	e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
 	latencyMs := int(time.Since(tTotal).Milliseconds())
 
 	if params.IsStream {
@@ -844,9 +844,9 @@ func (e *Executor) executeAnthropicOnce(
 			isBenignEOF := outcome.Reason == "eof_without_done" && outcome.ChunkCount > 0
 
 			if !isBenignEOF && isResumable {
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, streamKind)
+				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
 			} else if !isBenignEOF {
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, streamKind)
+				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
 			}
 			return &ExecuteResult{
 				Response:    resp,
