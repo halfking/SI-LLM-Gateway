@@ -246,6 +246,20 @@ if [[ -n "$SSH_TARGET" ]] && [[ "$SKIP_UPLOAD" == "false" ]]; then
   log_info "Uploading $WEB_DIST_VERSION_JSON -> $USER_HOST:$REMOTE_DIR/web/dist/version.json"
   $SCP "$WEB_DIST_VERSION_JSON" "${USER_HOST}:${REMOTE_DIR}/web/dist/version.json"
 
+  # Upload the SPA bundle (assets/*.js, *.css) and index.html. Without this
+  # the deployed binary + version.json update but the browser keeps loading
+  # the stale bundle, so frontend code changes never reach production. The
+  # service container mounts $REMOTE_DIR/web read-only, so updating the host
+  # files is enough — no container restart needed for static assets.
+  if [[ -d web/dist/assets ]]; then
+    log_info "Uploading web/dist/assets -> $USER_HOST:$REMOTE_DIR/web/dist/assets"
+    $SSH "$USER_HOST" "mkdir -p $REMOTE_DIR/web/dist/assets"
+    $SCP web/dist/assets/*.js web/dist/assets/*.css \
+      "${USER_HOST}:${REMOTE_DIR}/web/dist/assets/" 2>/dev/null || true
+    log_info "Uploading web/dist/index.html -> $USER_HOST:$REMOTE_DIR/web/dist/index.html"
+    $SCP web/dist/index.html "${USER_HOST}:${REMOTE_DIR}/web/dist/index.html"
+  fi
+
   log_info "Restarting $SERVICE_NAME on $USER_HOST"
   $SSH "$USER_HOST" bash -s <<REMOTE
 set -e
