@@ -336,7 +336,7 @@ func parseVersionString(raw string) map[string]any {
 	// segment keeps its own embedded dashes (2026-06-26) and the trailing
 	// build_seq number doesn't get concatenated onto build_date.
 	parts := strings.SplitN(raw, "-", 4)
-	version := parts[0]
+	version := raw // Return full version string for frontend display
 	gitSHA := ""
 	buildDate := ""
 	if len(parts) > 1 {
