@@ -492,6 +492,23 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	})
 }
 
+// writeCodedError emits the structured error envelope the frontend already
+// parses: {"error":{"detail":..., "code":..., "context":...}}. The `code`
+// field is a stable machine-readable token (e.g. "key_has_no_ciphertext")
+// that lets the UI branch on cause without parsing the human-readable
+// detail string. The optional `ctx` map carries diagnostic context
+// (key_id, ciphertext_len, ...) that is safe to surface to the caller.
+func writeCodedError(w http.ResponseWriter, status int, code, msg string, context map[string]any) {
+	envelope := map[string]any{
+		"detail": msg,
+		"code":   code,
+	}
+	if context != nil {
+		envelope["context"] = context
+	}
+	writeJSON(w, status, map[string]any{"error": envelope})
+}
+
 func readJSON(r *http.Request, v any) error {
 	if r.Body == nil {
 		return nil

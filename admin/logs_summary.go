@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -233,13 +234,21 @@ func (h *Handler) pickFirstAvailableAPIKey(ctx context.Context, r *http.Request)
 		"ak.enabled = TRUE",
 		"COALESCE(ak.status, 'active') = 'active'",
 		"(ak.expires_at IS NULL OR ak.expires_at > now())",
+		// key_ciphertext is nullable (see api_keys.sql); rows with NULL or
+		// empty ciphertext cannot be revealed, so prune them at the DB layer
+		// instead of picking one and failing later. Mirrors the IS NOT NULL
+		// guard in admin/auth.go:216.
+		"ak.key_ciphertext IS NOT NULL AND ak.key_ciphertext <> ''",
 	}
 	if IsTenantAdmin(r) {
 		where = append(where, fmt.Sprintf("ak.tenant_id = $%d", len(args)+1))
 		args = append(args, GetTenantID(r))
 	}
 
-	var ciphertext string
+	// Scan into sql.NullString defensively: even though the WHERE clause
+	// excludes NULL, a future schema change or view could re-introduce it,
+	// and Scan(&string) on NULL fails with 'cannot scan NULL into *string'.
+	var ciphertext sql.NullString
 	query := `SELECT ak.id, ak.key_ciphertext
 		FROM api_keys ak
 		WHERE ` + strings.Join(where, " AND ") + `
@@ -248,10 +257,14 @@ func (h *Handler) pickFirstAvailableAPIKey(ctx context.Context, r *http.Request)
 	if err := h.db.QueryRow(ctx, query, args...).Scan(&id, &ciphertext); err != nil {
 		return 0, "", fmt.Errorf("当前用户无可用 API Key")
 	}
-	if !isRevealableKeyCiphertext(ciphertext) {
+	ct := ""
+	if ciphertext.Valid {
+		ct = ciphertext.String
+	}
+	if !isRevealableKeyCiphertext(ct) {
 		return 0, "", fmt.Errorf("当前用户无可用 API Key")
 	}
-	apiKey, err = h.decryptCredStr(ciphertext)
+	apiKey, err = h.decryptCredStr(ct)
 	if err != nil || strings.TrimSpace(apiKey) == "" {
 		return 0, "", fmt.Errorf("当前用户无可用 API Key")
 	}

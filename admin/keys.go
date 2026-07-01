@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -712,28 +713,65 @@ func (h *Handler) revealKey(w http.ResponseWriter, r *http.Request, id int) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	var ciphertext string
+	// key_ciphertext is nullable in the schema (see api_keys.sql), so the
+	// column can legitimately come back as SQL NULL for keys that predate
+	// the encrypted-storage migration. Scan into sql.NullString to tolerate
+	// that; we treat NULL as "no ciphertext" further below.
+	var ciphertext sql.NullString
 	err := h.db.QueryRow(ctx, `
 		SELECT key_ciphertext FROM api_keys
 		WHERE id = $1 AND COALESCE(status, 'active') <> 'revoked'
 	`, id).Scan(&ciphertext)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "key not found")
-		return
-	}
-	if ciphertext == "" {
-		writeError(w, http.StatusNotFound, "no ciphertext stored")
-		return
-	}
-	if !isRevealableKeyCiphertext(ciphertext) {
-		writeError(w, http.StatusConflict, "no ciphertext stored")
+		// Distinguish "row missing / revoked" from real DB errors so a
+		// connection failure stops being mis-reported as "key not found".
+		if errors.Is(err, pgx.ErrNoRows) {
+			slog.Info("revealKey: key row missing or revoked", "key_id", id)
+			writeCodedError(w, http.StatusNotFound, "key_not_found_or_revoked",
+				"key not found or has been revoked",
+				map[string]any{"key_id": id})
+			return
+		}
+		slog.Error("revealKey: db lookup failed", "key_id", id, "error", err)
+		writeCodedError(w, http.StatusInternalServerError, "key_lookup_failed",
+			"failed to look up key",
+			map[string]any{"key_id": id})
 		return
 	}
 
-	plaintext, err := h.decryptCredStr(ciphertext)
+	// Collapse NULL to "" so the downstream branches all see one representation.
+	ct := ""
+	if ciphertext.Valid {
+		ct = ciphertext.String
+	}
+
+	if ct == "" {
+		slog.Warn("revealKey: row exists but ciphertext is empty or NULL", "key_id", id)
+		writeCodedError(w, http.StatusNotFound, "key_has_no_ciphertext",
+			"key has no stored ciphertext; please reissue the key",
+			map[string]any{"key_id": id})
+		return
+	}
+	if !isRevealableKeyCiphertext(ct) {
+		slog.Warn("revealKey: stored ciphertext is in an unsupported format",
+			"key_id", id,
+			"ciphertext_len", len(ct),
+		)
+		writeCodedError(w, http.StatusConflict, "key_ciphertext_format_unsupported",
+			"stored ciphertext is not in a supported encryption format; please reissue the key",
+			map[string]any{
+				"key_id":         id,
+				"ciphertext_len": len(ct),
+			})
+		return
+	}
+
+	plaintext, err := h.decryptCredStr(ct)
 	if err != nil {
 		slog.Warn("revealKey: decryption failed", "key_id", id, "error", err)
-		writeError(w, http.StatusConflict, "no ciphertext stored")
+		writeCodedError(w, http.StatusConflict, "key_ciphertext_decryption_failed",
+			"stored ciphertext cannot be decrypted with the current keyring; please reissue the key",
+			map[string]any{"key_id": id})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"key_id": id, "api_key": plaintext})
