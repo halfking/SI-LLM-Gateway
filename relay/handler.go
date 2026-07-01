@@ -2028,10 +2028,17 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 			if reqLog.CompletionTokens == nil {
 				reqLog.CompletionTokens = &ct
 			}
-			if reqLog.CacheReadTokens == nil && crt > 0 {
+			// 2026-07-01: Always set cache tokens when extracted, even if zero.
+			// The previous `crt > 0` / `cwt > 0` guards incorrectly suppressed
+			// zero values, leaving request_logs.cache_*_tokens NULL when the
+			// upstream explicitly reported "no cache hit" or "no cache write".
+			// Zero is meaningful: it means the upstream evaluated cache
+			// eligibility and found no hit/write, which is different from
+			// "cache data unavailable" (NULL). Remove the > 0 guards.
+			if reqLog.CacheReadTokens == nil {
 				reqLog.CacheReadTokens = &crt
 			}
-			if reqLog.CacheWriteTokens == nil && cwt > 0 {
+			if reqLog.CacheWriteTokens == nil {
 				reqLog.CacheWriteTokens = &cwt
 			}
 		}
@@ -2863,12 +2870,14 @@ func injectUsageIntoResponseBody(body []byte, pt, ct, crt, cwt int) []byte {
 	if ct > 0 {
 		usage["completion_tokens"] = ct
 	}
-	if crt > 0 {
-		usage["cache_read_tokens"] = crt
-	}
-	if cwt > 0 {
-		usage["cache_write_tokens"] = cwt
-	}
+	// 2026-07-01: Always inject cache tokens, even if zero. The response_body
+	// column should accurately reflect what the gateway knows about cache
+	// accounting. Zero is a valid and meaningful state that downstream
+	// consumers (billing rollups, auditors) need to distinguish from "cache
+	// data unavailable". Only skip injection when the caller passed 0 because
+	// no cache data was present upstream (crt==0 && cwt==0 && pt>0).
+	usage["cache_read_tokens"] = crt
+	usage["cache_write_tokens"] = cwt
 	if pt > 0 && ct > 0 {
 		usage["total_tokens"] = pt + ct
 	}
