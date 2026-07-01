@@ -10,7 +10,7 @@ export default {
   submitting: 'Signing in…',
   cancel: 'Cancel',
   close: 'Close',
-  guestLogin: 'Sign in',
+  signIn: 'Sign in',
   error: {
     required: 'Please enter username and password',
     failed: 'Sign-in failed',

@@ -10,7 +10,7 @@ export default {
   submitting: '登录中…',
   cancel: '取消',
   close: '关闭',
-  guestLogin: '登录',
+  signIn: '登录',
   error: {
     required: '请输入用户名和密码',
     failed: '登录失败',

@@ -21,9 +21,9 @@ export interface LocaleMeta {
 }
 
 export const SUPPORTED_LOCALES: LocaleMeta[] = [
+  { code: 'en-US', short: 'EN',  nativeName: 'English',   englishName: 'English',              dir: 'ltr', flag: '🇺🇸' },
   { code: 'zh-CN', short: '简中', nativeName: '简体中文',  englishName: 'Chinese (Simplified)', dir: 'ltr', flag: '🇨🇳' },
   { code: 'zh-TW', short: '繁中', nativeName: '繁體中文',  englishName: 'Chinese (Traditional)', dir: 'ltr', flag: '🇹🇼' },
-  { code: 'en-US', short: 'EN',  nativeName: 'English',   englishName: 'English',              dir: 'ltr', flag: '🇺🇸' },
   { code: 'ja-JP', short: '日',  nativeName: '日本語',     englishName: 'Japanese',             dir: 'ltr', flag: '🇯🇵' },
   { code: 'de-DE', short: 'DE',  nativeName: 'Deutsch',   englishName: 'German',               dir: 'ltr', flag: '🇩🇪' },
   { code: 'fr-FR', short: 'FR',  nativeName: 'Français',  englishName: 'French',               dir: 'ltr', flag: '🇫🇷' },
@@ -32,7 +32,7 @@ export const SUPPORTED_LOCALES: LocaleMeta[] = [
 ]
 
 /** Default locale — mirrors the `general.default_locale` Spec default. */
-export const DEFAULT_LOCALE = 'zh-CN'
+export const DEFAULT_LOCALE = 'en-US'
 
 /** Fallback when a key is missing in the active locale. English is always fully populated. */
 export const FALLBACK_LOCALE = 'en-US'

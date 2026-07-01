@@ -3,10 +3,14 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { store, clearAll, isSuperAdmin as checkSuperAdmin, isPlatformOpsView as checkPlatformOps } from './store'
 import LoginModal from './components/LoginModal.vue'
+import LanguageSwitcher from './components/LanguageSwitcher.vue'
 import { useLoginModal } from './composables/useLoginModal'
 import { useSidebar } from './composables/useSidebar'
 import { useNavAccordion } from './composables/useNavAccordion'
 import { NAV_GROUPS, NAV_PRIMARY_ITEMS, visibleNavGroups, visibleNavItems, isNavItemActive } from './config/appNav'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -166,12 +170,12 @@ function logout() {
         <button
           type="button"
           class="sidebar-toggle"
-          :title="collapsed ? '展开侧栏' : '收起侧栏'"
-          :aria-label="collapsed ? '展开侧栏' : '收起侧栏'"
+          :title="collapsed ? t('app.sidebar.expand') : t('app.sidebar.collapse')"
+          :aria-label="collapsed ? t('app.sidebar.expand') : t('app.sidebar.collapse')"
           @click="toggleSidebar"
         >
           <span class="toggle-icon" aria-hidden="true">{{ collapsed ? '»' : '«' }}</span>
-          <span v-show="!collapsed" class="toggle-label">收起菜单</span>
+          <span v-show="!collapsed" class="toggle-label">{{ t('app.sidebar.collapseMenu') }}</span>
         </button>
       </div>
     </aside>
@@ -181,7 +185,7 @@ function logout() {
         <button
           type="button"
           class="header-sidebar-toggle btn btn-ghost btn-sm"
-          :title="collapsed ? '展开侧栏' : '收起侧栏'"
+          :title="collapsed ? t('app.sidebar.expand') : t('app.sidebar.collapse')"
           @click="toggleSidebar"
         >
           {{ collapsed ? '»' : '«' }}
@@ -191,7 +195,7 @@ function logout() {
             <template v-if="store.userInfo">
               <span class="user-name">{{ store.userInfo.display_name || store.userInfo.username }}</span>
               <span class="meta-sep" aria-hidden="true">·</span>
-              <span class="user-role">{{ store.userInfo.role === 'super_admin' ? '超级管理员' : '租户管理员' }}</span>
+              <span class="user-role">{{ t(`app.role.${store.userInfo.role}`) }}</span>
             </template>
             <template v-if="versionInfo.version">
               <span v-if="store.userInfo" class="meta-sep" aria-hidden="true">·</span>
@@ -202,7 +206,8 @@ function logout() {
               </template>
             </template>
           </div>
-          <button class="btn btn-ghost btn-sm" @click="logout">退出</button>
+          <LanguageSwitcher />
+          <button class="btn btn-ghost btn-sm" @click="logout">{{ t('app.logout') }}</button>
         </div>
       </header>
       <section class="main-body">
@@ -227,9 +232,12 @@ function logout() {
             G
           </text>
         </svg>
-        <span>LLM Gateway</span>
+        <span>{{ t('app.brand') }}</span>
       </div>
-      <button type="button" class="btn btn-primary btn-sm guest-login-btn" @click="openLogin">登录</button>
+      <div class="guest-header-right">
+        <LanguageSwitcher />
+        <button type="button" class="btn btn-primary btn-sm guest-login-btn" @click="openLogin">{{ t('login.signIn') }}</button>
+      </div>
     </header>
     <main class="guest-main">
       <RouterView />
@@ -572,6 +580,12 @@ function logout() {
   font-size: 14px;
   font-weight: 700;
   color: var(--text);
+}
+
+.guest-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .guest-login-btn {
