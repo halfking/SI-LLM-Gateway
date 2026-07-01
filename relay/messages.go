@@ -225,6 +225,19 @@ func (h *MessagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ── Attachment archival (2026-07-01) ───────────────────────────────
+	// Same side-channel as the chat handler: archive base64 images so
+	// they show up in request_logs, WITHOUT modifying the body forwarded
+	// upstream. Anthropic `image` blocks are recognised in addition to
+	// OpenAI `image_url` blocks.
+	{
+		tenantID := "default"
+		if keyInfo != nil {
+			tenantID = keyInfo.TenantID
+		}
+		h.chatHandler.ArchiveAttachmentsIfEnabled(r.Context(), bodyBytes, requestID, tenantID)
+	}
+
 	var reqBody messagesRequestBody
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
 		attemptErrCode = "json_parse_error"

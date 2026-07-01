@@ -144,8 +144,10 @@ func convertAnthropicMessageToChat(m any) (map[string]any, bool) {
 		return msg, false
 
 	case []any:
-		// Parse content blocks
-		var textParts []string
+		// Parse content blocks. We preserve the multi-part shape so
+		// images survive the conversion: OpenAI Chat Completions models
+		// `content` as an array of {type:"text"|"image_url"} blocks.
+		var contentParts []map[string]any
 		var toolCalls []map[string]any
 		var toolResult *map[string]any
 
@@ -155,8 +157,11 @@ func convertAnthropicMessageToChat(m any) (map[string]any, bool) {
 
 			switch blockType {
 			case "text":
-				if text, ok := b["text"].(string); ok {
-					textParts = append(textParts, text)
+				if text, ok := b["text"].(string); ok && text != "" {
+					contentParts = append(contentParts, map[string]any{
+						"type": "text",
+						"text": text,
+					})
 				}
 			case "tool_use":
 				toolID, _ := b["id"].(string)
@@ -174,7 +179,7 @@ func convertAnthropicMessageToChat(m any) (map[string]any, bool) {
 			case "tool_result":
 				// Anthropic tool_result → OpenAI tool role message
 				toolUseID, _ := b["tool_use_id"].(string)
-				
+
 				// content can be string or array
 				var resultContent string
 				switch rc := b["content"].(type) {
@@ -194,26 +199,41 @@ func convertAnthropicMessageToChat(m any) (map[string]any, bool) {
 					}
 					resultContent = strings.Join(parts, "\n")
 				}
-				
+
 				toolResult = &map[string]any{
 					"role":         "tool",
 					"tool_call_id": toolUseID,
 					"content":      resultContent,
 				}
 			case "image":
-				// Anthropic image → OpenAI image_url
-				// Simplified: convert to text placeholder
+				// Anthropic image → OpenAI image_url. Preserve the
+				// full base64 payload so the upstream vision model can
+				// actually see the image. (Previously this dropped the
+				// data and emitted a "[Image: base64 data]" placeholder,
+				// which was the root cause of image loss on the
+				// anthropic→openai conversion path.)
 				if source, ok := b["source"].(map[string]any); ok {
 					sourceType, _ := source["type"].(string)
 					switch sourceType {
 					case "url":
-						if url, ok := source["url"].(string); ok {
-							textParts = append(textParts, "[Image: "+url+"]")
+						if url, ok := source["url"].(string); ok && url != "" {
+							contentParts = append(contentParts, map[string]any{
+								"type":      "image_url",
+								"image_url": map[string]any{"url": url},
+							})
 						}
 					case "base64":
-						// For base64 images, we'd need to construct proper multipart content
-						// For now, just note it exists
-						textParts = append(textParts, "[Image: base64 data]")
+						mediaType, _ := source["media_type"].(string)
+						if mediaType == "" {
+							mediaType = "image/png"
+						}
+						if data, ok := source["data"].(string); ok && data != "" {
+							url := fmt.Sprintf("data:%s;base64,%s", mediaType, data)
+							contentParts = append(contentParts, map[string]any{
+								"type":      "image_url",
+								"image_url": map[string]any{"url": url},
+							})
+						}
 					}
 				}
 			}
@@ -224,9 +244,31 @@ func convertAnthropicMessageToChat(m any) (map[string]any, bool) {
 			return *toolResult, true
 		}
 
-		// Otherwise, construct regular message
-		if len(textParts) > 0 {
-			msg["content"] = strings.Join(textParts, "\n")
+		// Build content: array when we have image parts (multi-modal),
+		// otherwise a plain string for text-only messages (keeps the
+		// wire shape identical to legacy non-image requests).
+		if len(contentParts) > 0 {
+			// If every part is text, collapse back to a string.
+			allText := true
+			for _, p := range contentParts {
+				if p["type"] != "text" {
+					allText = false
+					break
+				}
+			}
+			if allText {
+				var texts []string
+				for _, p := range contentParts {
+					texts = append(texts, p["text"].(string))
+				}
+				msg["content"] = strings.Join(texts, "\n")
+			} else {
+				parts := make([]any, len(contentParts))
+				for i, p := range contentParts {
+					parts[i] = p
+				}
+				msg["content"] = parts
+			}
 		} else {
 			msg["content"] = ""
 		}

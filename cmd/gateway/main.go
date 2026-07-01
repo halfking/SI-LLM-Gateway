@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/kaixuan/llm-gateway-go/admin"
+	"github.com/kaixuan/llm-gateway-go/attachments"
 	"github.com/kaixuan/llm-gateway-go/audit"
 	"github.com/kaixuan/llm-gateway-go/auth"
 	"github.com/kaixuan/llm-gateway-go/autoroute"
@@ -214,6 +215,36 @@ func main() {
 	modelsHandler := relay.NewModelsHandler()
 	messagesHandler := relay.NewMessagesHandler(chatHandler)
 	responsesHandler := relay.NewResponsesHandler(chatHandler)
+
+	// ── Attachment manager (2026-07-01) ─────────────────────────────────
+	// Extracts and saves base64 images/files before forwarding to upstream.
+	// Reduces request_body size and enables separate attachment management.
+	var attachmentMgr *attachments.Manager
+	if dbConn != nil && dbConn.Enabled() {
+		storagePath := os.Getenv("ATTACHMENT_STORAGE_PATH")
+		if storagePath == "" {
+			storagePath = "./data/attachments"
+		}
+		attachmentEnabled := os.Getenv("ATTACHMENT_ENABLED")
+		enabled := attachmentEnabled == "" || attachmentEnabled == "true" || attachmentEnabled == "1"
+		maxSizeMB := int64(10)
+		if maxSizeStr := os.Getenv("ATTACHMENT_MAX_SIZE_MB"); maxSizeStr != "" {
+			if parsed, err := strconv.ParseInt(maxSizeStr, 10, 64); err == nil && parsed > 0 {
+				maxSizeMB = parsed
+			}
+		}
+		var err error
+		attachmentMgr, err = attachments.NewManager(dbConn.Pool(), storagePath, enabled, maxSizeMB)
+		if err != nil {
+			slog.Warn("attachment manager disabled", "error", err)
+			attachmentMgr = nil
+		} else if attachmentMgr.Enabled() {
+			chatHandler.SetAttachmentManager(attachmentMgr)
+			slog.Info("attachment manager enabled",
+				"storage_path", storagePath,
+				"max_size_mb", maxSizeMB)
+		}
+	}
 
 	// ── Tenant model policy (Round 48, 2026-06-21) ─────────────────
 	// Single Checkerr singleton shared by relay.ChatHandler (hot
@@ -1377,6 +1408,15 @@ func main() {
 		mux.HandleFunc("/api/admin/credential-success-rates", wrapAdmin(admin.HandleCredentialSuccessRates(dbConn.Pool())))
 		mux.HandleFunc("/api/admin/credential-success-rates/reset", wrapAdmin(admin.HandleResetCredentialSuccessRate(dbConn.Pool())))
 		slog.Info("Phase 3.6 credential success rate management enabled (/api/admin/credential-success-rates)")
+
+		// Attachment downloads (2026-07-01). Lets operators inspect images
+		// archived from request bodies. Registered under wrapAdmin so only
+		// authenticated admin users can fetch them.
+		if attachmentMgr != nil && attachmentMgr.Enabled() {
+			attachmentsHandler := admin.NewAttachmentsHandler(attachmentMgr)
+			mux.HandleFunc("/api/admin/attachments/", wrapAdmin(attachmentsHandler.ServeHTTP))
+			slog.Info("attachment download API enabled (/api/admin/attachments/)")
+		}
 	}
 
 	slog.Info("CHECKPOINT: before middleware stack build")
