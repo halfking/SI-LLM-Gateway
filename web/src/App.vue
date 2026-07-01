@@ -114,7 +114,7 @@ function logout() {
             G
           </text>
         </svg>
-        <span v-show="!collapsed" class="sidebar-logo-text">LLM Gateway</span>
+        <span v-show="!collapsed" class="sidebar-logo-text">{{ t('app.brand') }}</span>
       </div>
 
       <nav class="sidebar-nav">
@@ -128,7 +128,7 @@ function logout() {
             :title="collapsed ? item.label : undefined"
           >
             <span class="nav-icon">{{ item.icon }}</span>
-            <span v-show="!collapsed" class="nav-label">{{ item.label }}</span>
+            <span v-show="!collapsed" class="nav-label">{{ t(item.labelKey) }}</span>
           </RouterLink>
         </div>
 
@@ -144,7 +144,7 @@ function logout() {
             :aria-expanded="isGroupExpanded(group.id)"
             @click="toggleGroup(group.id)"
           >
-            <span class="nav-group-title">{{ group.label }}</span>
+            <span class="nav-group-title">{{ t(group.labelKey) }}</span>
             <span class="nav-group-chevron" aria-hidden="true" />
           </button>
           <div
@@ -153,14 +153,14 @@ function logout() {
           >
             <RouterLink
               v-for="item in group.items"
-              :key="item.path + item.label"
+              :key="item.path + item.labelKey"
               :to="item.path"
               class="nav-item"
               :class="{ active: isNavItemActive(item.path, route.path, item.exact) }"
-              :title="collapsed ? item.label : undefined"
+              :title="collapsed ? t(item.labelKey) : undefined"
             >
               <span class="nav-icon">{{ item.icon }}</span>
-              <span v-show="!collapsed" class="nav-label">{{ item.label }}</span>
+              <span v-show="!collapsed" class="nav-label">{{ t(item.labelKey) }}</span>
             </RouterLink>
           </div>
         </section>

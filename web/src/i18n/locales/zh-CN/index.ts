@@ -8,6 +8,9 @@ import users from './users'
 import keys from './keys'
 import requests from './requests'
 import credentialMonitor from './credentialMonitor'
+import providers from './providers'
+import landing from './landing'
+import dashboard from './dashboard'
 
 export default {
   common,
@@ -19,4 +22,7 @@ export default {
   keys,
   requests,
   credentialMonitor,
+  providers,
+  landing,
+  dashboard,
 }

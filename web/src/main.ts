@@ -2,10 +2,16 @@ import { createApp, nextTick } from 'vue'
 import App from './App.vue'
 import { router } from './router'
 import { enableAuthRedirect } from './api/_core'
+import { i18n } from './i18n'
 import './style.css'
 
 const app = createApp(App)
+// vue-i18n must be installed before any component calls useI18n(); App.vue
+// and the per-view components use t() in <script setup>, so missing this
+// `app.use(i18n)` causes useI18n() to throw "NOT_INSTALLED" → SyntaxError →
+// blank page (root cause of the 2026-07-02 llm.kxpms.cn white screen).
 app.use(router)
+app.use(i18n)
 app.mount('#app')
 
 // Re-enable the api/_core 401 → /login redirect AFTER the very first

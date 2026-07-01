@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import MemoraStatusButton from '../components/MemoraStatusButton.vue'
 import TenantDashboardView from './TenantDashboardView.vue'
 import {
@@ -21,6 +22,10 @@ import {
   type CompressionStats,
 } from '../api'
 import { store, isSuperAdmin, isDefaultTenant, getCurrentTenantId } from '../store'
+import { useLocale } from '../i18n/useLocale'
+
+const { t } = useI18n()
+const { locale } = useLocale() // ensures `t()` re-renders when locale changes
 
 const days    = ref(7)
 const summary = ref<UsageSummary | null>(null)
@@ -42,13 +47,13 @@ const tenantLabel = computed(() => {
   const tenantId = getCurrentTenantId()
   const isAdmin = isSuperAdmin()
   const isDefault = isDefaultTenant()
-  
+
   if (isAdmin && isDefault) {
-    return '整站数据'
+    return t('dashboard.tenantLabel.default')
   } else if (isDefault) {
-    return '默认租户'
+    return t('dashboard.tenantLabel.super')
   } else {
-    return `租户: ${tenantId}`
+    return t('dashboard.tenantLabel.tenant', { tenantId })
   }
 })
 
@@ -61,13 +66,13 @@ const proxyWarning = computed(() => {
   if (p.health_done && p.healthy === false) {
     return {
       proxy: p.proxy,
-      detail: '已自动降级为直连，国外模型（Anthropic / OpenAI / OpenRouter / GitHub Copilot 等）可能失败',
+      detail: t('dashboard.proxyWarning.detail', { proxy: p.proxy }),
     }
   }
   if (!p.health_done) {
     return {
       proxy: p.proxy,
-      detail: '正在做初始连通性检查…',
+      detail: t('dashboard.proxyWarning.detail', { proxy: p.proxy }) + ' (probing…)',
     }
   }
   return null
@@ -89,7 +94,7 @@ async function load() {
     hotKeys.value = h
     void loadCompressionStats()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : t('dashboard.loadError')
   } finally {
     loading.value = false
   }
@@ -118,7 +123,12 @@ function fmtPct(v: number | undefined) {
 
 function fmtDate(v: string | null | undefined) {
   if (!v) return '—'
-  return new Date(v).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
+  // locale-aware short date+time (e.g. "7/1/26, 9:04 PM" for en-US, "2026/7/1 21:04" for zh-CN)
+  try {
+    return new Date(v).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  } catch {
+    return new Date(v).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })
+  }
 }
 
 async function loadDiscoveryStatus() {
@@ -187,7 +197,7 @@ function scheduleProbeFailuresPoll() {
   <div v-else>
     <div class="page-header">
       <div class="page-header-title">
-        <h2>仪表盘</h2>
+        <h2>{{ t('dashboard.title') }}</h2>
         <MemoraStatusButton />
       </div>
       <div class="page-header-actions">
@@ -195,12 +205,12 @@ function scheduleProbeFailuresPoll() {
           {{ tenantLabel }}
         </span>
         <select v-model.number="days" style="width:100px" @change="load">
-          <option :value="1">今日</option>
-          <option :value="7">近 7 天</option>
-          <option :value="30">近 30 天</option>
-          <option :value="90">近 90 天</option>
+          <option :value="1">{{ t('dashboard.range.today') }}</option>
+          <option :value="7">{{ t('dashboard.range.last7d') }}</option>
+          <option :value="30">{{ t('dashboard.range.last30d') }}</option>
+          <option :value="90">{{ t('dashboard.range.last90d') }}</option>
         </select>
-        <button class="btn btn-ghost btn-sm" @click="load" :disabled="loading">刷新</button>
+        <button class="btn btn-ghost btn-sm" @click="load" :disabled="loading">{{ t('dashboard.refresh') }}</button>
       </div>
     </div>
 
@@ -210,29 +220,29 @@ function scheduleProbeFailuresPoll() {
       v-if="proxyWarning"
       class="proxy-warning-banner"
     >
-      <strong>⚠ 出口代理不可达</strong>
-      <span>已配置代理 <code>{{ proxyWarning.proxy }}</code> 探测失败，{{ proxyWarning.detail }}</span>
-      <span class="proxy-warning-hint">代理恢复后系统将自动重新启用</span>
+      <strong>{{ t('dashboard.proxyWarning.title') }}</strong>
+      <span>{{ t('dashboard.proxyWarning.detail', { proxy: proxyWarning.proxy }) }}</span>
+      <span class="proxy-warning-hint">{{ t('dashboard.proxyWarning.hint') }}</span>
     </div>
 
     <div
       v-if="discoveryStatus?.running"
       class="background-tasks-banner background-tasks-banner--active"
     >
-      <strong>后台任务进行中</strong>
-      <span>模型发现（{{ discoveryStatus.running.trigger }}）</span>
-      <span>开始 {{ fmtDate(discoveryStatus.running.started_at) }}</span>
-      <span>心跳 {{ fmtDate(discoveryStatus.running.heartbeat_at) }}</span>
-      <span class="background-tasks-hint">管理页可能变慢</span>
-      <RouterLink to="/models">查看详情</RouterLink>
+      <strong>{{ t('dashboard.backgroundTasks.title') }}</strong>
+      <span>{{ t('dashboard.backgroundTasks.running', { trigger: discoveryStatus.running.trigger }) }}</span>
+      <span>{{ t('dashboard.backgroundTasks.startedAt', { time: fmtDate(discoveryStatus.running.started_at) }) }}</span>
+      <span>{{ t('dashboard.backgroundTasks.heartbeat', { time: fmtDate(discoveryStatus.running.heartbeat_at) }) }}</span>
+      <span class="background-tasks-hint">{{ t('dashboard.backgroundTasks.slow') }}</span>
+      <RouterLink to="/models">{{ t('dashboard.backgroundTasks.detailsLink') }}</RouterLink>
     </div>
     <div
       v-else-if="discoveryStatus?.latest"
       class="background-tasks-banner"
     >
-      <span>最近模型发现：{{ discoveryStatus.latest.status }}</span>
+      <span>{{ t('dashboard.discovery.latest') }}{{ discoveryStatus.latest.status }}</span>
       <span>{{ fmtDate(discoveryStatus.latest.finished_at || discoveryStatus.latest.started_at) }}</span>
-      <RouterLink to="/models">模型页</RouterLink>
+      <RouterLink to="/models">{{ t('nav.item.modelsCatalog') }}</RouterLink>
     </div>
 
     <!-- 模型发现 · 最近测试失败计数（spec 2026-06-18-model-probe-rounds） -->
@@ -240,81 +250,109 @@ function scheduleProbeFailuresPoll() {
       v-if="recentModelFailures.length > 0"
       class="probe-failures-banner"
     >
-      <strong>模型发现 · 最近 6h 测试失败</strong>
+      <strong>{{ t('dashboard.discovery.failuresTitle') }}</strong>
       <span class="probe-failures-count">
-        {{ recentModelFailures.reduce((s, m) => s + m.total_failures, 0) }} 次失败 ·
-        {{ recentModelFailures.length }} 个模型
+        {{ t('dashboard.discovery.failuresTally', {
+          n: recentModelFailures.reduce((s, m) => s + m.total_failures, 0),
+          m: recentModelFailures.length,
+        }) }}
       </span>
       <details class="probe-failures-details">
-        <summary>查看失败列表</summary>
+        <summary>{{ t('dashboard.discovery.summary') }}</summary>
         <ul>
           <li v-for="m in recentModelFailures" :key="m.raw_model_name">
             <code class="mono-sm">{{ m.raw_model_name }}</code>
             <span class="probe-failures-meta">
-              {{ m.total_failures }} 次 · 涉及 {{ m.creds_affected }} 个凭据 ·
-              最近 {{ fmtDate(m.last_failed_at) }} ·
-              错误 <code>{{ m.sample_error_code || '—' }}</code>
+              {{ t('dashboard.discovery.meta', {
+                n: m.total_failures,
+                m: m.creds_affected,
+                date: fmtDate(m.last_failed_at),
+                code: m.sample_error_code || '—',
+              }) }}
             </span>
           </li>
         </ul>
       </details>
-      <RouterLink to="/routing-v2?tab=resolve&row=model">路由全景</RouterLink>
+      <RouterLink to="/routing-v2?tab=resolve&row=model">{{ t('nav.item.routingOverview') }}</RouterLink>
     </div>
 
     <div class="stat-grid" v-if="summary && overview">
       <div class="stat-card">
-        <div class="label">总请求数</div>
+        <div class="label">{{ t('dashboard.stat.totalRequests') }}</div>
         <div class="value">{{ fmt(summary.total_requests) }}</div>
-        <div class="sub">近 {{ days }} 天</div>
+        <div class="sub">{{ t('dashboard.stat.inLastDays', { days }) }}</div>
       </div>
       <div class="stat-card">
-        <div class="label">总 Token 用量</div>
+        <div class="label">{{ t('dashboard.stat.totalTokens') }}</div>
         <div class="value">{{ fmt((summary.total_prompt_tokens ?? 0) + (summary.total_completion_tokens ?? 0)) }}</div>
-        <div class="sub">提示 {{ fmt(summary.total_prompt_tokens) }} · 补全 {{ fmt(summary.total_completion_tokens) }}</div>
+        <div class="sub">
+          {{ t('dashboard.stat.prompt', { n: fmt(summary.total_prompt_tokens) }) }} ·
+          {{ t('dashboard.stat.completion', { n: fmt(summary.total_completion_tokens) }) }}
+        </div>
       </div>
       <div class="stat-card">
-        <div class="label">总费用</div>
+        <div class="label">{{ t('dashboard.stat.totalCost') }}</div>
         <div class="value">{{ fmtCost(summary.total_cost_usd) }}</div>
-        <div class="sub">USD</div>
+        <div class="sub">{{ t('dashboard.stat.costUnit') }}</div>
       </div>
       <div class="stat-card">
-        <div class="label">成功率</div>
+        <div class="label">{{ t('dashboard.stat.successRate') }}</div>
         <div class="value" :style="{ color: (summary.success_rate ?? 1) > 0.95 ? 'var(--success)' : 'var(--warning)' }">
           {{ fmtPct(summary.success_rate) }}
         </div>
         <div class="sub">
-          平均延迟 {{ fmt(summary.avg_latency_ms) }} ms
+          {{ t('dashboard.stat.avgLatency', { n: fmt(summary.avg_latency_ms) }) }}
           <RouterLink
             v-if="(summary.success_rate ?? 1) < 0.95"
             :to="{ path: '/request-logs', query: { success: 'failure', hours: String(days * 24) } }"
             class="dashboard-fail-link"
-          >查看失败请求</RouterLink>
+          >{{ t('dashboard.viewFailedRequests') }}</RouterLink>
         </div>
       </div>
       <div class="stat-card">
-        <div class="label">接入 API Key</div>
+        <div class="label">{{ t('dashboard.stat.apiKeys') }}</div>
         <div class="value">{{ fmt(overview.total_api_keys) }}</div>
-        <div class="sub">启用 {{ fmt(overview.active_api_keys) }} · 活跃 {{ fmt(overview.active_api_keys_in_window) }}</div>
+        <div class="sub">
+          {{ t('dashboard.stat.enabledActive', {
+            enabled: fmt(overview.active_api_keys),
+            active: fmt(overview.active_api_keys_in_window),
+          }) }}
+        </div>
       </div>
       <div class="stat-card">
-        <div class="label">模型数量</div>
+        <div class="label">{{ t('dashboard.stat.models') }}</div>
         <div class="value">{{ fmt(overview.total_models) }}</div>
-        <div class="sub">近 {{ days }} 天活跃 {{ fmt(overview.active_models_in_window) }}</div>
+        <div class="sub">
+          {{ t('dashboard.stat.activeInDays', {
+            days,
+            n: fmt(overview.active_models_in_window),
+          }) }}
+        </div>
       </div>
       <div class="stat-card">
-        <div class="label">供应商 / 凭据</div>
+        <div class="label">{{ t('dashboard.stat.providers') }}</div>
         <div class="value">{{ fmt(overview.total_providers) }}</div>
-        <div class="sub">启用 {{ fmt(overview.active_providers) }} · 凭据 {{ fmt(overview.total_credentials) }}</div>
+        <div class="sub">
+          {{ t('dashboard.stat.enabledCredentials', {
+            enabled: fmt(overview.active_providers),
+            total: fmt(overview.total_credentials),
+          }) }}
+        </div>
       </div>
       <div class="stat-card">
-        <div class="label">下线资源</div>
+        <div class="label">{{ t('dashboard.stat.offline') }}</div>
         <div class="value">{{ fmt((overview.offline_models ?? 0) + (overview.offline_credentials ?? 0)) }}</div>
-        <div class="sub">模型 {{ fmt(overview.offline_models) }} · 凭据 {{ fmt(overview.offline_credentials) }}</div>
+        <div class="sub">
+          {{ t('dashboard.stat.modelsCredentials', {
+            models: fmt(overview.offline_models),
+            creds: fmt(overview.offline_credentials),
+          }) }}
+        </div>
       </div>
       <!-- v3 压缩统计卡 (2026-06-20 P2) -->
       <div class="stat-card" v-if="compStats">
         <div class="label">
-          🤖 会话压缩
+          {{ t('dashboard.compression.title') }}
           <span class="badge" style="font-size:9px;margin-left:4px">24h</span>
         </div>
         <div class="value">
@@ -322,12 +360,12 @@ function scheduleProbeFailuresPoll() {
           <span style="font-size:12px;color:var(--text-secondary,#6b7280)">/ {{ compStats.total_requests }}</span>
         </div>
         <div class="sub">
-          <span v-if="compStats.strategy_distribution['delta_append']">增量 {{ compStats.strategy_distribution['delta_append'] }} ·</span>
+          <span v-if="compStats.strategy_distribution['delta_append']">{{ t('dashboard.compression.delta') }} {{ compStats.strategy_distribution['delta_append'] }} ·</span>
           <span v-if="compStats.strategy_distribution['sliding_window_token'] || compStats.strategy_distribution['sliding_window_count']">
-            滑动 {{ (compStats.strategy_distribution['sliding_window_token']||0)+(compStats.strategy_distribution['sliding_window_count']||0) }} ·
+            {{ t('dashboard.compression.sliding') }} {{ (compStats.strategy_distribution['sliding_window_token']||0)+(compStats.strategy_distribution['sliding_window_count']||0) }} ·
           </span>
           <span v-if="compStats.strategy_distribution['delta_append'] || compStats.strategy_distribution['sliding_window_token']" style="color:var(--success,#22c55e)">
-            ≈{{ compStats.total_outbound_tokens ? fmt(compStats.total_outbound_tokens) : '—' }} 出站 token
+            {{ t('dashboard.compression.outboundTokens', { n: compStats.total_outbound_tokens ? fmt(compStats.total_outbound_tokens) : '—' }) }}
           </span>
         </div>
       </div>
@@ -340,18 +378,18 @@ function scheduleProbeFailuresPoll() {
     </div>
 
     <div class="card" style="margin-top:20px" v-if="hotKeys.length > 0 || loading">
-      <div style="font-size:14px;font-weight:600;margin-bottom:12px">高用量 API Key 排行</div>
-      <div v-if="loading" class="empty">加载中…</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px">{{ t('dashboard.table.hotKeysTitle') }}</div>
+      <div v-if="loading" class="empty">{{ t('dashboard.loading') }}</div>
       <table v-else>
         <thead>
           <tr>
-            <th>Key</th>
-            <th>应用</th>
-            <th>归属用户</th>
-            <th style="text-align:right">请求数</th>
-            <th style="text-align:right">Token 用量</th>
-            <th style="text-align:right">费用 (USD)</th>
-            <th>最后使用</th>
+            <th>{{ t('dashboard.table.colKey') }}</th>
+            <th>{{ t('dashboard.table.colApplication') }}</th>
+            <th>{{ t('dashboard.table.colOwner') }}</th>
+            <th style="text-align:right">{{ t('dashboard.table.colRequests') }}</th>
+            <th style="text-align:right">{{ t('dashboard.table.colTokens') }}</th>
+            <th style="text-align:right">{{ t('dashboard.table.colCost') }}</th>
+            <th>{{ t('dashboard.table.colLastUsed') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -366,20 +404,20 @@ function scheduleProbeFailuresPoll() {
           </tr>
         </tbody>
       </table>
-      <div v-if="!loading && hotKeys.length === 0" class="empty">该时段暂无 API Key 排行数据</div>
+      <div v-if="!loading && hotKeys.length === 0" class="empty">{{ t('dashboard.noData') }}</div>
     </div>
 
     <div class="card" style="margin-top:20px" v-if="models.length > 0 || loading">
-      <div style="font-size:14px;font-weight:600;margin-bottom:12px">按模型统计</div>
-      <div v-if="loading" class="empty">加载中…</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px">{{ t('dashboard.table.byModelTitle') }}</div>
+      <div v-if="loading" class="empty">{{ t('dashboard.loading') }}</div>
       <table v-else>
         <thead>
           <tr>
-            <th>模型</th>
-            <th>提供商</th>
-            <th style="text-align:right">请求数</th>
-            <th style="text-align:right">Token 用量</th>
-            <th style="text-align:right">费用 (USD)</th>
+            <th>{{ t('dashboard.table.colModel') }}</th>
+            <th>{{ t('dashboard.table.colProvider') }}</th>
+            <th style="text-align:right">{{ t('dashboard.table.colRequests') }}</th>
+            <th style="text-align:right">{{ t('dashboard.table.colTokens') }}</th>
+            <th style="text-align:right">{{ t('dashboard.table.colCost') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -392,10 +430,10 @@ function scheduleProbeFailuresPoll() {
           </tr>
         </tbody>
       </table>
-      <div v-if="!loading && models.length === 0" class="empty">该时段暂无数据</div>
+      <div v-if="!loading && models.length === 0" class="empty">{{ t('dashboard.noData') }}</div>
     </div>
     <div v-if="!loading && !error && (!summary || summary.total_requests === 0)" class="empty" style="margin-top:40px">
-      🚀 暂无请求数据。配置好提供商后，通过 <code>/v1/chat/completions</code> 发起调用吧。
+      <span v-html="t('dashboard.empty.firstUse')"></span>
     </div>
   </div>
 </template>

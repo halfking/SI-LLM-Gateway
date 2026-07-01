@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { localeRef } from '../i18n'
 import {
   getProviders, createProvider, updateProvider, toggleProvider,
   addCredential, deleteCredential, getCatalog, getProviderCredentials,
@@ -9,6 +11,10 @@ import {
   type Provider, type CatalogEntry, type ProviderCredential, type CredentialStatus,
   type BackgroundTasksStatus, type CredentialCheckResult, type ProbeURLResult,
 } from '../api'
+
+const { t } = useI18n()
+const pm = (k: string, params?: Record<string, unknown>): string =>
+  t(`providers.${k}` as never, params as never)
 
 const providers = ref<Provider[]>([])
 const catalog   = ref<CatalogEntry[]>([])
@@ -22,25 +28,22 @@ const credentialErrors = ref<Record<number, string>>({})
 
 // ── Filter & sort state ──────────────────────────────────────────────────────
 const filterSearch = ref('')
-// Default to "available" (healthy) on entry — operators mostly care about
-// what is actually usable.  The "全部" tab in the filter bar lets users
-// widen the view on demand.
 const filterHealthStatus = ref('healthy')
 const filterFreeModel = ref<'all' | 'yes' | 'no'>('all')
 let _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
-const healthStatusOptions = [
-  { value: 'all', label: '全部' },
-  { value: 'healthy', label: '可用' },
-  { value: 'warning', label: '警告' },
-  { value: 'unreachable', label: '不可用' },
-]
+const healthStatusOptions = computed(() => [
+  { value: 'all',         label: pm('filter.healthChipAll') },
+  { value: 'healthy',     label: pm('filter.healthChipHealthy') },
+  { value: 'warning',     label: pm('filter.healthChipWarning') },
+  { value: 'unreachable', label: pm('filter.healthChipUnreachable') },
+])
 
-const freeModelOptions = [
-  { value: 'all', label: '全部' },
-  { value: 'yes', label: '含免费' },
-  { value: 'no',  label: '不含免费' },
-]
+const freeModelOptions = computed(() => [
+  { value: 'all', label: pm('filter.freeChipAll') },
+  { value: 'yes', label: pm('filter.freeChipYes') },
+  { value: 'no',  label: pm('filter.freeChipNo') },
+])
 
 const bgStatus = ref<BackgroundTasksStatus | null>(null)
 let _bgPollTimer: ReturnType<typeof setInterval> | null = null
@@ -55,25 +58,25 @@ function fmtElapsed(sec: number | null | undefined): string {
 function fmtTimeAgo(iso: string | null | undefined): string {
   if (!iso) return '—'
   const diff = (Date.now() - new Date(iso).getTime()) / 1000
-  if (diff < 60) return `${Math.round(diff)}秒前`
-  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`
-  return `${Math.floor(diff / 86400)}天前`
+  if (diff < 60)    return `${Math.round(diff)}${pm('time.second')}`
+  if (diff < 3600)  return `${Math.floor(diff / 60)}${pm('time.minute')}`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}${pm('time.hour')}`
+  return `${Math.floor(diff / 86400)}${pm('time.day')}`
 }
 
-const credentialStatuses: Array<{ value: CredentialStatus; label: string }> = [
-  { value: 'active', label: '可用' },
-  { value: 'cooling', label: '冷却' },
-  { value: 'degraded', label: '降级' },
-  { value: 'quarantine', label: '隔离' },
-  { value: 'quota_expired', label: '配额耗尽' },
-  { value: 'disabled', label: '停用' },
-]
+const credentialStatuses = computed<Array<{ value: CredentialStatus; label: string }>>(() => [
+  { value: 'active',        label: pm('credential.status.active') },
+  { value: 'cooling',       label: pm('credential.status.cooling') },
+  { value: 'degraded',      label: pm('credential.status.degraded') },
+  { value: 'quarantine',    label: pm('credential.status.quarantine') },
+  { value: 'quota_expired', label: pm('credential.status.quota_expired') },
+  { value: 'disabled',      label: pm('credential.status.disabled') },
+])
 
 function providerChannelLabel(category: string | null | undefined): { label: string; cls: string } {
-  if (category === 'official') return { label: '原厂', cls: 'badge-blue' }
-  if (!category) return { label: '未知', cls: 'badge-gray' }
-  return { label: '中转', cls: 'badge-orange' }
+  if (category === 'official') return { label: pm('list.channel.official'), cls: 'badge-blue' }
+  if (!category)               return { label: pm('list.channel.unknown'), cls: 'badge-gray' }
+  return { label: pm('list.channel.relay'), cls: 'badge-orange' }
 }
 
 // ── Add provider modal ──────────────────────────────────────────────────────
@@ -117,7 +120,7 @@ function openAdd() {
 
 async function doProbe() {
   const url = isCustom.value ? addBaseUrl.value.trim() : addBaseUrl.value.trim()
-  if (!url) { addErr.value = '请先填写 Base URL'; return }
+  if (!url) { addErr.value = pm('create.errors.baseUrlRequired'); return }
   addProbing.value = true
   addProbeResult.value = null
   addErr.value = ''
@@ -128,7 +131,7 @@ async function doProbe() {
       addProtocol.value = r.protocol
     }
   } catch (e: unknown) {
-    addProbeResult.value = { reachable: false, error: e instanceof Error ? e.message : '探测失败' }
+    addProbeResult.value = { reachable: false, error: e instanceof Error ? e.message : pm('create.errors.probeFailed') }
   } finally {
     addProbing.value = false
   }
@@ -137,9 +140,9 @@ async function doProbe() {
 async function submitAdd() {
   addErr.value = ''
   if (isCustom.value) {
-    if (!addCodeCustom.value.trim()) { addErr.value = '请输入自定义供应商代码'; return }
-    if (!addName.value.trim()) { addErr.value = '请输入自定义供应商名称'; return }
-    if (!addBaseUrl.value.trim()) { addErr.value = '请输入 Base URL'; return }
+    if (!addCodeCustom.value.trim()) { addErr.value = pm('create.errors.customCodeRequired'); return }
+    if (!addName.value.trim()) { addErr.value = pm('create.errors.customNameRequired'); return }
+    if (!addBaseUrl.value.trim()) { addErr.value = pm('create.errors.customBaseUrlRequired'); return }
     addSaving.value = true
     try {
       const r = await createProvider({
@@ -153,13 +156,13 @@ async function submitAdd() {
       await load()
       showAdd.value = false
     } catch (e: unknown) {
-      addErr.value = e instanceof Error ? e.message : '创建失败'
+      addErr.value = e instanceof Error ? e.message : pm('create.errors.createFailed')
     } finally {
       addSaving.value = false
     }
     return
   }
-  if (!addCode.value) { addErr.value = '请选择目录'; return }
+  if (!addCode.value) { addErr.value = pm('create.errors.catalogRequired'); return }
   addSaving.value = true
   try {
     await createProvider({
@@ -171,7 +174,7 @@ async function submitAdd() {
     await load()
     showAdd.value = false
   } catch (e: unknown) {
-    addErr.value = e instanceof Error ? e.message : '创建失败'
+    addErr.value = e instanceof Error ? e.message : pm('create.errors.createFailed')
   } finally {
     addSaving.value = false
   }
@@ -203,7 +206,7 @@ function openEdit(p: Provider) {
 async function doEditProbe() {
   if (!editProvider.value) return
   const url = editBaseUrl.value.trim()
-  if (!url) { editErr.value = '请先填写 Base URL'; return }
+  if (!url) { editErr.value = pm('edit.errors.baseUrlRequired'); return }
   editProbing.value = true
   editProbeResult.value = null
   editErr.value = ''
@@ -211,7 +214,7 @@ async function doEditProbe() {
     const r = await probeProviderURL(editProvider.value.id)
     editProbeResult.value = r
   } catch (e: unknown) {
-    editProbeResult.value = { reachable: false, error: e instanceof Error ? e.message : '探测失败' }
+    editProbeResult.value = { reachable: false, error: e instanceof Error ? e.message : pm('edit.errors.probeFailed') }
   } finally {
     editProbing.value = false
   }
@@ -231,7 +234,7 @@ async function submitEdit() {
     await load()
     showEdit.value = false
   } catch (e: unknown) {
-    editErr.value = e instanceof Error ? e.message : '保存失败'
+    editErr.value = e instanceof Error ? e.message : pm('edit.errors.saveFailed')
   } finally {
     editSaving.value = false
   }
@@ -271,7 +274,7 @@ function openCred(p: Provider) {
 }
 
 async function submitCred() {
-  if (!credKey.value) { credErr.value = '请输入 API Key'; return }
+  if (!credKey.value) { credErr.value = pm('credential.errors.apiKeyRequired'); return }
   if (!credProvider.value) return
   credSaving.value = true
   credErr.value    = ''
@@ -299,14 +302,14 @@ async function submitCred() {
     // Close after a brief delay so the user sees the probe result
     setTimeout(() => { showCred.value = false }, 1500)
   } catch (e: unknown) {
-    credErr.value = e instanceof Error ? e.message : '添加失败'
+    credErr.value = e instanceof Error ? e.message : pm('credential.errors.addFailed')
   } finally {
     credSaving.value = false
   }
 }
 
 async function delCred(p: Provider, credId: number) {
-  if (!confirm('确认停用该凭据？')) return
+  if (!confirm(pm('credential.errors.deleteConfirm'))) return
   try {
     await deleteCredential(p.id, credId)
     await loadCredentials(p.id)
@@ -315,7 +318,7 @@ async function delCred(p: Provider, credId: number) {
     const listed = providers.value.find((row) => row.id === p.id)
     if (listed) listed.active_credential_count = activeCount
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '删除失败'
+    error.value = e instanceof Error ? e.message : pm('credential.errors.deleteFailed')
   }
 }
 
@@ -329,7 +332,7 @@ async function loadCredentials(providerId: number) {
   } catch (e: unknown) {
     credentialErrors.value = {
       ...credentialErrors.value,
-      [providerId]: e instanceof Error ? e.message : '凭据加载失败',
+      [providerId]: e instanceof Error ? e.message : pm('credential.errors.loadFailed'),
     }
   } finally {
     credentialLoading.value = { ...credentialLoading.value, [providerId]: false }
@@ -352,7 +355,7 @@ async function saveCredential(p: Provider, c: ProviderCredential) {
     await loadCredentials(p.id)
     p.active_credential_count = (credentialsByProvider.value[p.id] ?? []).filter((row) => row.status === 'active').length
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '保存凭据失败'
+    error.value = e instanceof Error ? e.message : pm('credential.errors.saveFailed')
   } finally {
     credentialSaving.value = { ...credentialSaving.value, [c.id]: false }
   }
@@ -373,18 +376,18 @@ function healthBadgeClass(status?: string | null): string {
 }
 
 function healthLabel(status?: string | null): string {
-  if (status === 'healthy') return '正常'
-  if (status === 'warning') return '警示'
-  if (status === 'unreachable') return '不可达'
-  return '未探测'
+  if (status === 'healthy')     return pm('list.health.healthy')
+  if (status === 'warning')     return pm('list.health.warning')
+  if (status === 'unreachable') return pm('list.health.unreachable')
+  return pm('list.health.none')
 }
 
 function healthWarningLabel(code?: string | null): string {
-  if (code === 'models_unavailable_but_probe_ok') return '模型列表异常，但调用成功'
-  if (code === 'probe_skipped_no_model') return '模型列表异常，且无模型可实探'
-  if (code === 'probe_failed_authentication_failed') return '模型列表异常，且探测鉴权失败'
-  if (code === 'probe_failed_rate_limited') return '模型列表异常，且探测命中限流'
-  if (code === 'probe_failed_request_failed') return '模型列表异常，且探测请求失败'
+  if (code === 'models_unavailable_but_probe_ok')     return pm('list.health.warningLabel.models_unavailable_but_probe_ok')
+  if (code === 'probe_skipped_no_model')              return pm('list.health.warningLabel.probe_skipped_no_model')
+  if (code === 'probe_failed_authentication_failed') return pm('list.health.warningLabel.probe_failed_authentication_failed')
+  if (code === 'probe_failed_rate_limited')          return pm('list.health.warningLabel.probe_failed_rate_limited')
+  if (code === 'probe_failed_request_failed')         return pm('list.health.warningLabel.probe_failed_request_failed')
   return ''
 }
 
@@ -392,7 +395,7 @@ function timeText(v?: string | null): string {
   if (!v) return '—'
   const d = new Date(v)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false })
+  return d.toLocaleString(localeRef.value, { hour12: false })
 }
 
 function money(v: number | string | null | undefined): string {
@@ -432,7 +435,7 @@ async function toggle(p: Provider) {
     await toggleProvider(p.id)
     p.enabled = !p.enabled
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '操作失败'
+    error.value = e instanceof Error ? e.message : pm('credential.errors.toggleFailed')
   }
 }
 
@@ -445,11 +448,11 @@ async function checkSingleProvider(p: Provider) {
   checkResults.value = { ...checkResults.value, [p.id]: '' }
   try {
     const r = await checkProvider(p.id)
-    checkResults.value = { ...checkResults.value, [p.id]: r.reason === 'started' ? '检测已启动' : '已在检测中' }
+    checkResults.value = { ...checkResults.value, [p.id]: r.reason === 'started' ? pm('check.providerStarted') : pm('check.providerRunning') }
     // Refresh after short delay to pick up health status
     setTimeout(() => load(), 5000)
   } catch (e: unknown) {
-    checkResults.value = { ...checkResults.value, [p.id]: e instanceof Error ? e.message : '检测失败' }
+    checkResults.value = { ...checkResults.value, [p.id]: e instanceof Error ? e.message : pm('check.providerFailed') }
   } finally {
     checkingProvider.value = { ...checkingProvider.value, [p.id]: false }
   }
@@ -466,14 +469,14 @@ async function checkSingleCredential(prov: Provider, cred: { id: number }) {
     const r = await checkCredential(prov.id, cred.id)
     credentialCheckResults.value = {
       ...credentialCheckResults.value,
-      [cred.id]: `状态: ${r.health_status} · ${r.health_source === 'models' ? '模型接口正常' : r.probe_ok ? '探活通过' : '不可用'}`,
+      [cred.id]: `${pm('check.credentialStatusPrefix', { status: r.health_status })}${r.health_source === 'models' ? pm('check.credentialModels') : r.probe_ok ? pm('check.credentialProbeOk') : pm('check.credentialUnreachable')}`,
     }
     // Refresh credentials to pick up new health status
     setTimeout(() => loadCredentials(prov.id), 3000)
   } catch (e: unknown) {
     credentialCheckResults.value = {
       ...credentialCheckResults.value,
-      [cred.id]: e instanceof Error ? e.message : '检测失败',
+      [cred.id]: e instanceof Error ? e.message : pm('check.credentialFailed'),
     }
   } finally {
     checkingCredential.value = { ...checkingCredential.value, [cred.id]: false }
@@ -497,7 +500,7 @@ async function openDiagnose(prov: Provider) {
     const r = await diagnoseProvider(prov.id, { force: true })
     diagnoseResult.value = r as never
   } catch (e: unknown) {
-    diagnoseError.value = e instanceof Error ? e.message : '诊断失败'
+    diagnoseError.value = e instanceof Error ? e.message : pm('check.diagnoseFailed')
   } finally {
     diagnoseLoading.value = false
   }
@@ -522,11 +525,11 @@ function sourceBadgeClass(source: string | null | undefined): string {
 
 function sourceLabel(source: string | null | undefined): string {
   switch (source) {
-    case 'api':           return 'API 绿'
-    case 'manifest':      return 'Manifest 黄'
-    case 'manifest_only': return '仅 Manifest'
-    case 'none':          return '未验证'
-    default:              return source || '未验证'
+    case 'api':           return pm('list.source.api')
+    case 'manifest':      return pm('list.source.manifest')
+    case 'manifest_only': return pm('list.source.manifest_only')
+    case 'none':          return pm('list.source.none')
+    default:              return source || pm('list.source.none')
   }
 }
 
@@ -558,7 +561,7 @@ async function load() {
     providers.value = p
     catalog.value   = c
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : pm('error.loadFailed')
   } finally {
     loading.value = false
   }
@@ -599,47 +602,47 @@ onUnmounted(() => {
 <template>
   <div>
     <div class="page-header">
-      <h2>提供商管理</h2>
-      <button class="btn btn-primary" @click="openAdd">+ 添加提供商</button>
+      <h2>{{ pm('page.title') }}</h2>
+      <button class="btn btn-primary" @click="openAdd">{{ pm('page.addBtn') }}</button>
     </div>
 
     <div class="bg-status-bar" v-if="bgStatus">
       <div class="bg-status-item">
         <span class="bg-dot" :class="bgStatus.discovery.alive ? 'dot-green' : 'dot-red'"></span>
-        <span class="bg-label">模型发现</span>
+        <span class="bg-label">{{ pm('bgStatus.task.discovery') }}</span>
         <template v-if="bgStatus.discovery.running">
-          <span class="badge badge-blue">检测中 {{ fmtElapsed(bgStatus.discovery.elapsed_seconds) }}</span>
+          <span class="badge badge-blue">{{ pm('bgStatus.task.discoveryRunning', { elapsed: fmtElapsed(bgStatus.discovery.elapsed_seconds) }) }}</span>
         </template>
         <template v-else-if="bgStatus.discovery.alive">
-          <span class="badge badge-green">正常</span>
-          <span class="bg-muted">上次: {{ fmtTimeAgo(bgStatus.discovery.finished_at) }}</span>
+          <span class="badge badge-green">{{ pm('bgStatus.task.discoveryHealthy') }}</span>
+          <span class="bg-muted">{{ pm('bgStatus.task.discoveryLast', { ago: fmtTimeAgo(bgStatus.discovery.finished_at) }) }}</span>
         </template>
         <template v-else>
-          <span class="badge badge-red">已停止</span>
+          <span class="badge badge-red">{{ pm('bgStatus.task.discoveryStopped') }}</span>
         </template>
-        <span class="bg-muted" v-if="bgStatus.discovery.error">错误: {{ bgStatus.discovery.error.slice(0, 60) }}</span>
+        <span class="bg-muted" v-if="bgStatus.discovery.error">{{ pm('bgStatus.task.discoveryError') }}{{ bgStatus.discovery.error.slice(0, 60) }}</span>
       </div>
       <div class="bg-status-item">
         <span class="bg-dot" :class="bgStatus.probe_loop.alive ? 'dot-green' : 'dot-red'"></span>
-        <span class="bg-label">快速探测</span>
-        <span class="badge" :class="bgStatus.probe_loop.alive ? 'badge-green' : 'badge-red'">{{ bgStatus.probe_loop.alive ? '运行' : '停止' }}</span>
-        <span class="bg-muted" v-if="bgStatus.probe_loop.checks_last_10m != null">10m内 {{ bgStatus.probe_loop.checks_last_10m }} 次</span>
+        <span class="bg-label">{{ pm('bgStatus.task.fastProbe') }}</span>
+        <span class="badge" :class="bgStatus.probe_loop.alive ? 'badge-green' : 'badge-red'">{{ bgStatus.probe_loop.alive ? pm('bgStatus.task.fastProbeRunning') : pm('bgStatus.task.fastProbeStopped') }}</span>
+        <span class="bg-muted" v-if="bgStatus.probe_loop.checks_last_10m != null">{{ pm('bgStatus.task.fastProbeCount', { n: bgStatus.probe_loop.checks_last_10m }) }}</span>
       </div>
       <div class="bg-status-item">
         <span class="bg-dot" :class="bgStatus.cycler.alive ? 'dot-green' : 'dot-red'"></span>
-        <span class="bg-label">凭据巡检</span>
-        <span class="badge" :class="bgStatus.cycler.alive ? 'badge-green' : 'badge-red'">{{ bgStatus.cycler.alive ? '运行' : '停止' }}</span>
-        <span class="bg-muted" v-if="bgStatus.cycler.last_check_at">上次: {{ fmtTimeAgo(bgStatus.cycler.last_check_at) }}</span>
+        <span class="bg-label">{{ pm('bgStatus.task.cycler') }}</span>
+        <span class="badge" :class="bgStatus.cycler.alive ? 'badge-green' : 'badge-red'">{{ bgStatus.cycler.alive ? pm('bgStatus.task.cyclerRunning') : pm('bgStatus.task.cyclerStopped') }}</span>
+        <span class="bg-muted" v-if="bgStatus.cycler.last_check_at">{{ pm('bgStatus.task.cyclerLast', { ago: fmtTimeAgo(bgStatus.cycler.last_check_at) }) }}</span>
       </div>
       <div class="bg-status-item">
         <span class="bg-dot" :class="bgStatus.recovery.alive ? 'dot-green' : 'dot-red'"></span>
-        <span class="bg-label">自动恢复</span>
-        <span class="badge" :class="bgStatus.recovery.alive ? 'badge-green' : 'badge-red'">{{ bgStatus.recovery.alive ? '运行' : '停止' }}</span>
+        <span class="bg-label">{{ pm('bgStatus.task.recovery') }}</span>
+        <span class="badge" :class="bgStatus.recovery.alive ? 'badge-green' : 'badge-red'">{{ bgStatus.recovery.alive ? pm('bgStatus.task.recoveryRunning') : pm('bgStatus.task.recoveryStopped') }}</span>
       </div>
     </div>
 
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
-    <div v-if="loading" class="empty">加载中…</div>
+    <div v-if="loading" class="empty">{{ pm('page.loading') }}</div>
 
     <!-- ── Filter Bar ────────────────────────────────────────────────────── -->
     <div class="filter-bar" v-if="!loading">
@@ -647,7 +650,7 @@ onUnmounted(() => {
         <input
           v-model="filterSearch"
           @input="onSearchInput"
-          placeholder="搜索显示名…"
+          :placeholder="pm('filter.searchPlaceholder')"
           class="filter-input"
         />
         <span class="filter-search-icon">🔍</span>
@@ -663,7 +666,7 @@ onUnmounted(() => {
       </div>
       <div class="filter-divider" aria-hidden="true"></div>
       <div class="filter-tabs">
-        <span class="filter-tab-label">免费模型</span>
+        <span class="filter-tab-label">{{ pm('filter.freeModelGroup') }}</span>
         <button
           v-for="opt in freeModelOptions"
           :key="opt.value"
@@ -678,17 +681,17 @@ onUnmounted(() => {
       <table>
         <thead>
           <tr>
-            <th>显示名</th>
-            <th>渠道</th>
-            <th>目录代码</th>
-            <th>Header Profile</th>
-            <th>Base URL</th>
-            <th>凭据数</th>
-            <th>可用模型</th>
-            <th>免费模型</th>
-            <th>24h 错误率</th>
-            <th>系统健康</th>
-            <th>状态</th>
+            <th>{{ pm('list.table.displayName') }}</th>
+            <th>{{ pm('list.table.channel') }}</th>
+            <th>{{ pm('list.table.catalogCode') }}</th>
+            <th>{{ pm('list.table.headerProfile') }}</th>
+            <th>{{ pm('list.table.baseUrl') }}</th>
+            <th>{{ pm('list.table.credentials') }}</th>
+            <th>{{ pm('list.table.availableModels') }}</th>
+            <th>{{ pm('list.table.freeModels') }}</th>
+            <th>{{ pm('list.table.errorRate24h') }}</th>
+            <th>{{ pm('list.table.health') }}</th>
+            <th>{{ pm('list.table.status') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -728,7 +731,7 @@ onUnmounted(() => {
               <span
                 class="badge"
                 :class="(p.free_model_count ?? 0) > 0 ? 'badge-green' : 'badge-gray'"
-                :title="(p.free_model_count ?? 0) > 0 ? '该供应商存在免费 (billing_mode=free) 的模型' : '该供应商没有免费模型'"
+                :title="(p.free_model_count ?? 0) > 0 ? pm('filter.freeBadgeTooltipYes') : pm('filter.freeBadgeTooltipNo')"
               >{{ p.free_model_count ?? 0 }}</span>
             </td>
             <td>
@@ -738,36 +741,36 @@ onUnmounted(() => {
               <span class="badge" :class="healthBadgeClass(p.health_status)">
                 {{ healthLabel(p.health_status) }}
               </span>
-              <div class="muted">检查 {{ timeText(p.health_checked_at) }}</div>
-              <div class="muted" v-if="(p.warning_credential_count ?? 0) > 0">警示 {{ p.warning_credential_count }}</div>
+              <div class="muted">{{ pm('list.checkedAtPrefix') }} {{ timeText(p.health_checked_at) }}</div>
+              <div class="muted" v-if="(p.warning_credential_count ?? 0) > 0">{{ pm('list.warningsPrefix') }} {{ p.warning_credential_count }}</div>
             </td>
             <td>
               <span class="badge" :class="p.enabled ? 'badge-green' : 'badge-gray'">
-                {{ p.enabled ? '已启用' : '已禁用' }}
+                {{ p.enabled ? pm('list.enabledBadge') : pm('list.disabledBadge') }}
               </span>
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="!loading && providers.length === 0" class="empty">尚未配置任何提供商</div>
+      <div v-if="!loading && providers.length === 0" class="empty">{{ pm('list.empty') }}</div>
     </div>
 
     <!-- ── Add Provider Modal ─────────────────────────────────────────────── -->
     <div class="modal-overlay" v-if="showAdd" @click.self="showAdd = false">
       <div class="modal" style="max-width:500px" @click.stop>
-        <h3>添加提供商</h3>
+        <h3>{{ pm('create.title') }}</h3>
         <div v-if="addErr" class="alert alert-danger">{{ addErr }}</div>
 
         <!-- Toggle custom mode -->
         <div class="form-group" style="display:flex;align-items:center;gap:10px">
           <input id="customToggle" type="checkbox" v-model="isCustom" style="width:auto" />
-          <label for="customToggle" style="margin:0;cursor:pointer">自定义供应商（不在目录中）</label>
+          <label for="customToggle" style="margin:0;cursor:pointer">{{ pm('create.customToggle') }}</label>
         </div>
 
         <!-- Catalog mode -->
         <template v-if="!isCustom">
           <div class="form-group">
-            <label>选择目录</label>
+            <label>{{ pm('create.selectCatalog') }}</label>
             <select v-model="addCode" @change="onCatalogChange">
               <option v-for="c in catalog" :key="c.code" :value="c.code">
                 {{ c.display_name }} ({{ c.code }})
@@ -775,40 +778,40 @@ onUnmounted(() => {
             </select>
           </div>
           <div class="form-group">
-            <label>显示名（可选，留空使用目录默认名）</label>
-            <input v-model="addName" placeholder="例: 我的 OpenAI" />
+            <label>{{ pm('create.displayNameLabel') }}</label>
+            <input v-model="addName" :placeholder="pm('create.displayNamePlaceholder')" />
           </div>
         </template>
 
         <!-- Custom mode -->
         <template v-else>
           <div class="form-group">
-            <label>供应商代码 <span style="color:var(--danger)">*</span></label>
-            <input v-model="addCodeCustom" placeholder="例: my-custom-ollama (唯一标识符)" />
+            <label>{{ pm('create.providerCodeLabel') }} <span style="color:var(--danger)">*</span></label>
+            <input v-model="addCodeCustom" :placeholder="pm('create.providerCodePlaceholder')" />
           </div>
           <div class="form-group">
-            <label>供应商名称 <span style="color:var(--danger)">*</span></label>
-            <input v-model="addName" placeholder="例: 私有 Ollama 集群" />
+            <label>{{ pm('create.providerNameLabel') }} <span style="color:var(--danger)">*</span></label>
+            <input v-model="addName" :placeholder="pm('create.providerNamePlaceholder')" />
           </div>
           <div class="form-group">
-            <label>协议</label>
+            <label>{{ pm('create.protocolLabel') }}</label>
             <select v-model="addProtocol">
-              <option value="openai-completions">OpenAI 兼容 (openai-completions)</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="ollama">Ollama</option>
-              <option value="cohere">Cohere</option>
-              <option value="gemini">Gemini</option>
+              <option value="openai-completions">{{ pm('create.protocols.openai-completions') }}</option>
+              <option value="anthropic">{{ pm('create.protocols.anthropic') }}</option>
+              <option value="ollama">{{ pm('create.protocols.ollama') }}</option>
+              <option value="cohere">{{ pm('create.protocols.cohere') }}</option>
+              <option value="gemini">{{ pm('create.protocols.gemini') }}</option>
             </select>
           </div>
         </template>
 
         <!-- Base URL (always shown) -->
         <div class="form-group">
-          <label>Base URL{{ isCustom ? ' *' : '（可选，覆盖目录默认值）' }}</label>
+          <label>Base URL{{ isCustom ? pm('create.baseUrlRequired') : pm('create.baseUrlOptional') }}</label>
           <div style="display:flex;gap:8px">
             <input
               v-model="addBaseUrl"
-              :placeholder="isCustom ? 'https://your-api.example.com/v1' : (selectedCat?.base_url_template || 'https://api.example.com/v1')"
+              :placeholder="isCustom ? pm('create.baseUrlPlaceholder') : (selectedCat?.base_url_template || pm('create.baseUrlPlaceholderFallback'))"
               style="flex:1"
             />
             <button
@@ -816,41 +819,41 @@ onUnmounted(() => {
               :class="addProbeResult?.reachable ? 'btn-green' : 'btn-ghost'"
               @click="doProbe"
               :disabled="addProbing || !addBaseUrl.trim()"
-              :title="'探测此 URL 是否可达并自动识别协议'"
-            >{{ addProbing ? '探测中…' : '探测' }}</button>
+              :title="pm('create.probeTooltip')"
+            >{{ addProbing ? pm('create.probeBtnProbing') : pm('create.probeBtn') }}</button>
           </div>
           <div v-if="isCustom && selectedCat" style="font-size:11px;color:var(--muted);margin-top:4px">
-            目录默认: {{ selectedCat.base_url_template }}
+            {{ pm('create.probeHintCatalogMatch') }}{{ selectedCat.base_url_template }}
           </div>
           <div v-if="addProbeResult" style="margin-top:6px;font-size:12px">
             <template v-if="addProbeResult.reachable">
-              <span style="color:var(--success)">✅ 可达</span>
+              <span style="color:var(--success)">{{ pm('create.probeOk') }}</span>
               <span v-if="addProbeResult.protocol" style="margin-left:8px;color:var(--muted)">
-                协议: {{ addProbeResult.protocol }}
+                {{ pm('create.probeOkProtocol') }}{{ addProbeResult.protocol }}
               </span>
               <span v-if="addProbeResult.models_count != null" style="margin-left:8px;color:var(--muted)">
-                模型: {{ addProbeResult.models_count }}
+                {{ pm('create.probeOkModels') }}{{ addProbeResult.models_count }}
               </span>
               <span v-if="addProbeResult.auth_ok === false" style="margin-left:8px;color:var(--warning)">
-                ⚠️ 需 API Key
+                {{ pm('create.probeWarn') }}
               </span>
             </template>
             <template v-else>
-              <span style="color:var(--danger)">❌ 不可达</span>
+              <span style="color:var(--danger)">{{ pm('create.probeFail') }}</span>
               <span v-if="addProbeResult.error" style="margin-left:8px;color:var(--muted)">{{ addProbeResult.error }}</span>
             </template>
           </div>
         </div>
 
         <div class="form-group">
-          <label>备注（可选）</label>
-          <input v-model="addNotes" placeholder="内部说明" />
+          <label>{{ pm('create.remarkLabel') }}</label>
+          <input v-model="addNotes" :placeholder="pm('create.remarkPlaceholder')" />
         </div>
 
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn btn-ghost" @click="showAdd = false">取消</button>
+          <button class="btn btn-ghost" @click="showAdd = false">{{ pm('common.button.cancel') }}</button>
           <button class="btn btn-primary" @click="submitAdd" :disabled="addSaving">
-            {{ addSaving ? '保存中…' : '确认添加' }}
+            {{ addSaving ? pm('create.submitting') : pm('create.submit') }}
           </button>
         </div>
       </div>
@@ -859,72 +862,72 @@ onUnmounted(() => {
     <!-- ── Edit Provider Modal ───────────────────────────────────────────── -->
     <div class="modal-overlay" v-if="showEdit" @click.self="showEdit = false">
       <div class="modal" style="max-width:500px" @click.stop>
-        <h3>编辑提供商 — {{ editProvider?.display_name }}</h3>
+        <h3>{{ pm('edit.title', { name: editProvider?.display_name }) }}</h3>
         <div v-if="editErr" class="alert alert-danger">{{ editErr }}</div>
         <div class="form-group">
-          <label>目录代码</label>
+          <label>{{ pm('edit.catalogCode') }}</label>
           <input :value="editProvider?.catalog_code || '—'" disabled class="muted" />
         </div>
         <div class="form-group">
-          <label>供应商</label>
+          <label>{{ pm('edit.vendor') }}</label>
           <input :value="editProvider?.vendor_name || '—'" disabled class="muted" />
         </div>
         <div class="form-group">
-          <label>Header Profile</label>
+          <label>{{ pm('edit.headerProfile') }}</label>
           <input :value="editProvider?.header_profile_code || '—'" disabled class="muted" />
         </div>
         <div class="form-group">
-          <label>显示名</label>
-          <input v-model="editName" placeholder="供应商显示名称" />
+          <label>{{ pm('edit.displayName') }}</label>
+          <input v-model="editName" :placeholder="pm('edit.displayNamePlaceholder')" />
         </div>
         <div class="form-group">
-          <label>Protocol</label>
+          <label>{{ pm('edit.protocol') }}</label>
           <select v-model="editProtocol">
-            <option value="openai-completions">OpenAI Completions</option>
-            <option value="openai-responses">OpenAI Responses</option>
-            <option value="anthropic-messages">Anthropic Messages</option>
-            <option value="gemini-generate">Gemini Generate</option>
+            <option value="openai-completions">{{ pm('edit.protocols.openai-completions') }}</option>
+            <option value="openai-responses">{{ pm('edit.protocols.openai-responses') }}</option>
+            <option value="anthropic-messages">{{ pm('edit.protocols.anthropic-messages') }}</option>
+            <option value="gemini-generate">{{ pm('edit.protocols.gemini-generate') }}</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Base URL</label>
+          <label>{{ pm('edit.baseUrl') }}</label>
           <div style="display:flex;gap:8px">
-            <input v-model="editBaseUrl" placeholder="https://api.example.com/v1" style="flex:1" />
+            <input v-model="editBaseUrl" :placeholder="pm('edit.baseUrlPlaceholder')" style="flex:1" />
             <button
               class="btn btn-sm"
               :class="editProbeResult?.reachable ? 'btn-green' : 'btn-ghost'"
               @click="doEditProbe"
               :disabled="editProbing || !editBaseUrl.trim()"
-              :title="'使用现有凭据探测此 URL'"
-            >{{ editProbing ? '探测中…' : '探测' }}</button>
+              :title="pm('edit.probeTooltip')"
+            >{{ editProbing ? pm('edit.probeBtnProbing') : pm('edit.probeBtn') }}</button>
           </div>
           <div v-if="editProbeResult" style="margin-top:6px;font-size:12px">
             <template v-if="editProbeResult.reachable">
-              <span style="color:var(--success)">✅ 可达</span>
+              <span style="color:var(--success)">{{ pm('edit.probeOk') }}</span>
               <span v-if="editProbeResult.protocol" style="margin-left:8px;color:var(--muted)">
-                协议: {{ editProbeResult.protocol }}
+                {{ pm('edit.probeOkProtocol') }}{{ editProbeResult.protocol }}
               </span>
               <span v-if="editProbeResult.models_count != null" style="margin-left:8px;color:var(--muted)">
-                模型: {{ editProbeResult.models_count }} 个
+                {{ pm('edit.probeOkModels', { n: editProbeResult.models_count }) }}
               </span>
               <span v-if="editProbeResult.auth_ok === false" style="margin-left:8px;color:var(--warning)">
-                ⚠️ API Key 无效
+                {{ pm('edit.probeWarn') }}
               </span>
             </template>
             <template v-else>
-              <span style="color:var(--danger)">❌ 不可达</span>
+              <span style="color:var(--danger)">{{ pm('edit.probeFail') }}</span>
               <span v-if="editProbeResult.error" style="margin-left:8px;color:var(--muted)">{{ editProbeResult.error }}</span>
             </template>
           </div>
         </div>
         <div class="form-group">
-          <label>备注</label>
-          <input v-model="editNotes" placeholder="内部说明" />
+          <label>{{ pm('edit.remark') }}</label>
+          <input v-model="editNotes" :placeholder="pm('edit.remarkPlaceholder')" />
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn btn-ghost" @click="showEdit = false">取消</button>
+          <button class="btn btn-ghost" @click="showEdit = false">{{ pm('common.button.cancel') }}</button>
           <button class="btn btn-primary" @click="submitEdit" :disabled="editSaving">
-            {{ editSaving ? '保存中…' : '保存' }}
+            {{ editSaving ? pm('keys.common.loading') : pm('common.button.save') }}
           </button>
         </div>
       </div>
@@ -935,7 +938,7 @@ onUnmounted(() => {
       <div class="drawer-panel card drawer-panel-wide" @click.stop>
         <div class="credential-toolbar">
           <div>
-            <h3 style="margin:0">管理凭据 — {{ manageProvider.display_name }}</h3>
+            <h3 style="margin:0">{{ pm('credential.drawerTitle', { name: manageProvider.display_name }) }}</h3>
             <div class="muted" style="margin-top:4px">
               {{ manageProvider.catalog_code }} · {{ manageProvider.base_url || '—' }}
             </div>
@@ -945,13 +948,13 @@ onUnmounted(() => {
               class="btn btn-ghost btn-sm"
               @click="loadCredentials(manageProvider.id)"
               :disabled="credentialLoading[manageProvider.id]"
-            >刷新</button>
-            <button class="btn btn-primary btn-sm" @click="openCred(manageProvider)">+ 凭据</button>
-            <button class="btn btn-ghost btn-sm" @click="closeManageCred">关闭</button>
+            >{{ pm('credential.refresh') }}</button>
+            <button class="btn btn-primary btn-sm" @click="openCred(manageProvider)">{{ pm('credential.addBtn') }}</button>
+            <button class="btn btn-ghost btn-sm" @click="closeManageCred">{{ pm('keys.common.close') }}</button>
           </div>
         </div>
         <div v-if="credentialErrors[manageProvider.id]" class="alert alert-danger">{{ credentialErrors[manageProvider.id] }}</div>
-        <div v-if="credentialLoading[manageProvider.id]" class="empty">凭据加载中…</div>
+        <div v-if="credentialLoading[manageProvider.id]" class="empty">{{ pm('keys.common.loading') }}</div>
         <div v-else class="credential-scroll">
           <table class="credential-table">
             <thead>

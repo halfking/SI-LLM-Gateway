@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { login, getAuthMe } from '../api'
 import { setApiKey, setJwtToken, setUserInfo } from '../store'
 import { useLoginModal } from '../composables/useLoginModal'
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const { closeLogin } = useLoginModal()
+const { t } = useI18n()
 
 const username = ref('admin')
 const password = ref('')
@@ -39,7 +41,7 @@ function close() {
 async function handleLogin() {
   error.value = ''
   if (!username.value || !password.value) {
-    error.value = '请输入用户名和密码'
+    error.value = t('login.error.required')
     return
   }
   loading.value = true
@@ -67,7 +69,7 @@ async function handleLogin() {
       await router.replace(target)
     }
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '登录失败'
+    error.value = e instanceof Error ? e.message : t('login.error.failed')
   } finally {
     loading.value = false
   }
@@ -104,11 +106,11 @@ async function handleLogin() {
               >G</text>
             </svg>
             <div>
-              <h2 id="login-modal-title">登录控制面</h2>
-              <p class="login-modal__subtitle">开轩 MaaS 管理后台</p>
+              <h2 id="login-modal-title">{{ t('login.title') }}</h2>
+              <p class="login-modal__subtitle">{{ t('login.subtitle') }}</p>
             </div>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm login-modal__close" aria-label="关闭" @click="close">
+          <button type="button" class="btn btn-ghost btn-sm login-modal__close" :aria-label="t('login.close')" @click="close">
             ✕
           </button>
         </div>
@@ -117,29 +119,29 @@ async function handleLogin() {
 
         <form @submit.prevent="handleLogin">
           <div class="form-group">
-            <label for="login-username">用户名</label>
+            <label for="login-username">{{ t('login.username') }}</label>
             <input
               id="login-username"
               v-model="username"
               type="text"
-              placeholder="admin"
+              :placeholder="t('login.usernamePlaceholder')"
               autocomplete="username"
             />
           </div>
           <div class="form-group">
-            <label for="login-password">密码</label>
+            <label for="login-password">{{ t('login.password') }}</label>
             <input
               id="login-password"
               v-model="password"
               type="password"
-              placeholder="••••••••"
+              :placeholder="t('login.passwordPlaceholder')"
               autocomplete="current-password"
             />
           </div>
           <div class="login-modal__actions">
-            <button type="button" class="btn btn-ghost" @click="close">取消</button>
+            <button type="button" class="btn btn-ghost" @click="close">{{ t('login.cancel') }}</button>
             <button class="btn btn-primary" type="submit" :disabled="loading">
-              {{ loading ? '登录中…' : '登录' }}
+              {{ loading ? t('login.submitting') : t('login.submit') }}
             </button>
           </div>
         </form>

@@ -16,10 +16,19 @@ export interface UserInfo {
   enabled: boolean
 }
 
+function parseUserInfo(): UserInfo | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
 export const store = reactive({
   apiKey: localStorage.getItem(KEY) ?? '',
   jwtToken: localStorage.getItem(JWT_KEY) ?? '',
-  userInfo: JSON.parse(localStorage.getItem(USER_KEY) ?? 'null') as UserInfo | null,
+  userInfo: parseUserInfo(),
 })
 
 export function setApiKey(k: string) {
