@@ -959,22 +959,22 @@ onUnmounted(() => {
           <table class="credential-table">
             <thead>
               <tr>
-                <th>凭据</th>
-                <th>状态</th>
-                <th>系统探活</th>
-                <th>模型清单</th>
-                <th>并发</th>
-                <th>有效期</th>
-                <th>用量 / 余额</th>
-                <th>标签 / 备注</th>
-                <th>操作</th>
+                <th>{{ pm('credential.table.id') }}</th>
+                <th>{{ pm('credential.table.status') }}</th>
+                <th>{{ pm('credential.table.probe') }}</th>
+                <th>{{ pm('credential.table.models') }}</th>
+                <th>{{ pm('credential.table.concurrency') }}</th>
+                <th>{{ pm('credential.table.expires') }}</th>
+                <th>{{ pm('credential.table.usage') }}</th>
+                <th>{{ pm('credential.table.tags') }}</th>
+                <th>{{ pm('common.table.actions') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="c in credentialsByProvider[manageProvider.id] || []" :key="c.id">
                 <td>
                   <input v-model="c.label" class="compact-input" />
-                  <div class="muted">#{{ c.id }} · {{ c.trust_level }}</div>
+                  <div class="muted">{{ pm('credential.row.idTrustLine', { id: c.id, trust: c.trust_level }) }}</div>
                 </td>
                 <td>
                   <select v-model="c.status" class="compact-input">
@@ -984,9 +984,9 @@ onUnmounted(() => {
                 </td>
                 <td>
                   <div><span class="badge" :class="healthBadgeClass(c.health_status)">{{ healthLabel(c.health_status) }}</span></div>
-                  <div class="muted">检查 {{ timeText(c.health_checked_at) }}</div>
+                  <div class="muted">{{ pm('list.checkedAtPrefix') }} {{ timeText(c.health_checked_at) }}</div>
                   <div class="muted" v-if="c.health_warning_code">{{ healthWarningLabel(c.health_warning_code) }}</div>
-                  <div class="muted" v-if="c.health_probe_model">Probe {{ c.health_probe_model }}</div>
+                  <div class="muted" v-if="c.health_probe_model">{{ pm('credential.row.healthProbeModel', { model: c.health_probe_model }) }}</div>
                   <div class="muted health-error" v-if="c.health_error">{{ c.health_error }}</div>
                 </td>
                 <td>
@@ -994,46 +994,46 @@ onUnmounted(() => {
                     <span
                       class="badge"
                       :class="c.api_models_ok === true ? 'badge badge-green' : c.api_models_ok === false ? 'badge badge-red' : 'badge'"
-                      :title="c.api_models_ok === true ? '模型清单 API 验证通过' : c.api_models_ok === false ? 'API 验证失败: ' + (c.api_models_error || '') : '尚未验证'"
-                    >{{ c.api_models_ok === true ? 'API 绿' : c.api_models_ok === false ? 'API 红' : '未验证' }}</span>
+                      :title="c.api_models_ok === true ? pm('credential.row.apiOkTitle') : c.api_models_ok === false ? pm('credential.row.apiFailTitlePrefix') + (c.api_models_error || '') : pm('credential.row.apiUnknownTitle')"
+                    >{{ c.api_models_ok === true ? pm('credential.row.apiOk') : c.api_models_ok === false ? pm('credential.row.apiFail') : pm('credential.row.apiUnknown') }}</span>
                   </div>
-                  <div class="muted" v-if="c.api_models_last_checked_at">检查 {{ timeText(c.api_models_last_checked_at) }}</div>
+                  <div class="muted" v-if="c.api_models_last_checked_at">{{ pm('list.checkedAtPrefix') }} {{ timeText(c.api_models_last_checked_at) }}</div>
                   <div class="muted health-error" v-if="c.api_models_error">{{ c.api_models_error }}</div>
                 </td>
                 <td>
-                  <input v-model.number="c.concurrency_limit" type="number" min="0" class="compact-input number" placeholder="默认5" />
+                  <input v-model.number="c.concurrency_limit" type="number" min="0" class="compact-input number" :placeholder="pm('credential.row.concurrencyPlaceholder')" />
                   <div v-if="c.fp_slot_limit != null" class="muted" style="font-size:11px;margin-top:4px">
-                    槽 {{ c.fp_slots_used ?? 0 }}/{{ c.fp_slot_limit }}
-                    <span v-if="(c.fp_slots_free ?? 0) === 0" style="color:var(--danger)">已满</span>
-                    <span v-else>余 {{ c.fp_slots_free }}</span>
+                    {{ pm('credential.row.slotUsage', { used: c.fp_slots_used ?? 0, limit: c.fp_slot_limit }) }}
+                    <span v-if="(c.fp_slots_free ?? 0) === 0" style="color:var(--danger)">{{ pm('credential.row.slotFull') }}</span>
+                    <span v-else>{{ pm('credential.row.slotFree', { free: c.fp_slots_free }) }}</span>
                   </div>
-                  <div v-else class="muted" style="font-size:11px;margin-top:4px">无限（0=不限）</div>
+                  <div v-else class="muted" style="font-size:11px;margin-top:4px">{{ pm('credential.row.slotUnlimited') }}</div>
                 </td>
                 <td>
                   <input :value="asDateInput(c.effective_at)" type="datetime-local" class="compact-input" @input="setDateInputFromEvent(c, 'effective_at', $event)" />
                   <input :value="asDateInput(c.expires_at)" type="datetime-local" class="compact-input" @input="setDateInputFromEvent(c, 'expires_at', $event)" />
                 </td>
                 <td>
-                  <div>{{ c.total_requests }} 次 · {{ money(c.total_cost_usd) }}</div>
-                  <div class="muted">余额 <input v-model.number="c.balance_usd" type="number" min="0" step="100" class="compact-input number" style="width:80px;display:inline-block" placeholder="—" /></div>
-                  <div v-if="c.quota_summary?.any_exhausted" class="badge badge-red">配额耗尽</div>
+                  <div>{{ c.total_requests }}{{ pm('credential.row.usageSeparator') }}{{ money(c.total_cost_usd) }}</div>
+                  <div class="muted">{{ pm('credential.row.balanceLabel') }} <input v-model.number="c.balance_usd" type="number" min="0" step="100" class="compact-input number" style="width:80px;display:inline-block" placeholder="—" /></div>
+                  <div v-if="c.quota_summary?.any_exhausted" class="badge badge-red">{{ pm('credential.row.quotaExhausted') }}</div>
                 </td>
                 <td>
-                  <input :value="tagsText(c)" class="compact-input" placeholder="tag1, tag2" @input="setTagsTextFromEvent(c, $event)" />
-                  <input v-model="c.notes" class="compact-input" placeholder="备注" />
+                  <input :value="tagsText(c)" class="compact-input" :placeholder="pm('credential.row.tagsPlaceholder')" @input="setTagsTextFromEvent(c, $event)" />
+                  <input v-model="c.notes" class="compact-input" :placeholder="pm('credential.row.notesPlaceholder')" />
                 </td>
                 <td>
                   <button class="btn btn-primary btn-sm" @click="saveCredential(manageProvider, c)" :disabled="credentialSaving[c.id]">
-                    {{ credentialSaving[c.id] ? '保存中' : '保存' }}
+                    {{ credentialSaving[c.id] ? pm('keys.common.loading') : pm('common.button.save') }}
                   </button>
                   <button
                     class="btn btn-ghost btn-sm"
                     @click="checkSingleCredential(manageProvider, c)"
                     :disabled="checkingCredential[c.id]"
-                    title="对此凭据执行一次健康检测"
-                  >{{ checkingCredential[c.id] ? '检测中' : '检测' }}</button>
-                  <button class="btn btn-ghost btn-sm" @click="openDiagnose(manageProvider)">诊断</button>
-                  <button class="btn btn-ghost btn-sm" @click="delCred(manageProvider, c.id)">停用</button>
+                    :title="pm('credential.row.checkTooltip')"
+                  >{{ checkingCredential[c.id] ? pm('credential.row.checkingBtn') : pm('credential.row.checkBtn') }}</button>
+                  <button class="btn btn-ghost btn-sm" @click="openDiagnose(manageProvider)">{{ pm('credential.row.diagnose') }}</button>
+                  <button class="btn btn-ghost btn-sm" @click="delCred(manageProvider, c.id)">{{ pm('credential.row.disable') }}</button>
                   <div v-if="credentialCheckResults[c.id]" style="font-size:11px;color:var(--muted);margin-top:4px">
                     {{ credentialCheckResults[c.id] }}
                   </div>
@@ -1041,7 +1041,7 @@ onUnmounted(() => {
               </tr>
             </tbody>
           </table>
-          <div v-if="!(credentialsByProvider[manageProvider.id] || []).length" class="empty">暂无凭据，点击「+ 凭据」添加</div>
+          <div v-if="!(credentialsByProvider[manageProvider.id] || []).length" class="empty">{{ pm('credential.empty') }}</div>
         </div>
       </div>
     </div>
@@ -1049,23 +1049,23 @@ onUnmounted(() => {
     <!-- ── Diagnose Modal ───────────────────────────────────────────────── -->
     <div class="drawer-backdrop" style="z-index:110" v-if="diagnoseProviderId !== null" @click="closeDiagnose">
       <div class="drawer-panel card drawer-panel-wide" @click.stop>
-        <h3>供应商诊断 — 实际请求/响应抓包 <span class="muted" style="font-size:12px">(凭据已脱敏)</span></h3>
-        <div v-if="diagnoseLoading" class="muted">诊断中…</div>
+        <h3>{{ pm('diagnose.title') }} <span class="muted" style="font-size:12px">{{ pm('diagnose.subtitle') }}</span></h3>
+        <div v-if="diagnoseLoading" class="muted">{{ pm('diagnose.loading') }}</div>
         <div v-else-if="diagnoseError" class="alert alert-danger">{{ diagnoseError }}</div>
         <div v-else-if="diagnoseResult">
           <div class="muted" style="margin-bottom:12px">
-            共 {{ diagnoseResult.credential_count }} 个凭据，点击行展开详细请求/响应抓包
+            {{ pm('diagnose.summary', { n: diagnoseResult.credential_count }) }}
           </div>
           <table class="data-table">
             <thead>
               <tr>
-                <th>凭据</th>
-                <th>模型源</th>
-                <th>系统健康</th>
-                <th>状态码</th>
-                <th>延迟</th>
-                <th>Endpoint 模板</th>
-                <th>操作</th>
+                <th>{{ pm('diagnose.table.credential') }}</th>
+                <th>{{ pm('diagnose.table.modelSource') }}</th>
+                <th>{{ pm('diagnose.table.health') }}</th>
+                <th>{{ pm('diagnose.table.statusCode') }}</th>
+                <th>{{ pm('diagnose.table.latency') }}</th>
+                <th>{{ pm('diagnose.table.endpoint') }}</th>
+                <th>{{ pm('diagnose.table.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -1073,7 +1073,7 @@ onUnmounted(() => {
                 <tr>
                   <td>
                     <div>#{{ r.credential_id }}</div>
-                    <div class="muted" v-if="r.effective_source === 'manifest_only'">manifest-only supplier</div>
+                    <div class="muted" v-if="r.effective_source === 'manifest_only'">{{ pm('diagnose.manifestOnly') }}</div>
                   </td>
                   <td>
                     <span class="badge" :class="sourceBadgeClass(r.effective_source)">
@@ -1091,56 +1091,56 @@ onUnmounted(() => {
                       {{ r.response_status }}
                     </span>
                     <span v-else class="muted">—</span>
-                    <div class="muted" v-if="r.attempt_index > 0">第 {{ r.attempt_index + 1 }} 次（probe fallback）</div>
+                    <div class="muted" v-if="r.attempt_index > 0">{{ pm('diagnose.attemptFooter', { n: r.attempt_index + 1 }) }}</div>
                   </td>
                   <td>
-                    <span v-if="r.health_latency_ms !== null">{{ r.health_latency_ms }} ms</span>
+                    <span v-if="r.health_latency_ms !== null">{{ r.health_latency_ms }} {{ pm('diagnose.msUnit') }}</span>
                     <span v-else class="muted">—</span>
                   </td>
                   <td>
-                    <code style="font-size:11px">{{ r.models_endpoint_template || '(auto)' }}</code>
+                    <code style="font-size:11px">{{ r.models_endpoint_template || pm('diagnose.autoEndpoint') }}</code>
                     <div class="muted" v-if="r.models_endpoint_resolved">
                       → <code style="font-size:11px">{{ r.models_endpoint_resolved }}</code>
                     </div>
                   </td>
                   <td>
                     <button class="btn btn-ghost btn-sm" @click="toggleCredDetail(r.credential_id)">
-                      {{ expandedCredId === r.credential_id ? '收起' : '展开' }}
+                      {{ expandedCredId === r.credential_id ? pm('diagnose.collapse') : pm('diagnose.expand') }}
                     </button>
                   </td>
                 </tr>
                 <tr v-if="expandedCredId === r.credential_id">
                   <td colspan="7" style="background:rgba(0,0,0,0.2);padding:12px">
                     <div class="diag-section">
-                      <h4>📤 请求</h4>
-                      <div><strong>URL:</strong> <code style="font-size:12px">{{ r.request_url || '(未发出)' }}</code></div>
-                      <div><strong>Method:</strong> <code>{{ r.request_method }}</code></div>
-                      <div><strong>Headers (脱敏):</strong>
+                      <h4>{{ pm('diagnose.reqHeader') }}</h4>
+                      <div><strong>{{ pm('diagnose.reqUrlLabel') }}</strong> <code style="font-size:12px">{{ r.request_url || pm('diagnose.reqNotSent') }}</code></div>
+                      <div><strong>{{ pm('diagnose.reqMethodLabel') }}</strong> <code>{{ r.request_method }}</code></div>
+                      <div><strong>{{ pm('diagnose.reqHeadersLabel') }}</strong>
                         <pre style="margin:4px 0;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;font-size:11px;overflow-x:auto">{{ asJson(r.request_headers_sanitized) }}</pre>
                       </div>
-                      <div v-if="r.request_body_preview"><strong>Body:</strong>
+                      <div v-if="r.request_body_preview"><strong>{{ pm('diagnose.reqBodyLabel') }}</strong>
                         <pre style="margin:4px 0;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;font-size:11px;overflow-x:auto">{{ r.request_body_preview }}</pre>
                       </div>
                     </div>
                     <div class="diag-section" style="margin-top:12px">
-                      <h4>📥 响应</h4>
-                      <div><strong>Status:</strong> <code>{{ r.response_status || '(no response)' }}</code></div>
-                      <div v-if="r.response_headers && Object.keys(r.response_headers).length"><strong>Headers:</strong>
+                      <h4>{{ pm('diagnose.respHeader') }}</h4>
+                      <div><strong>{{ pm('diagnose.respStatusLabel') }}</strong> <code>{{ r.response_status || pm('diagnose.respNoResponse') }}</code></div>
+                      <div v-if="r.response_headers && Object.keys(r.response_headers).length"><strong>{{ pm('diagnose.respHeadersLabel') }}</strong>
                         <pre style="margin:4px 0;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;font-size:11px;overflow-x:auto">{{ asJson(r.response_headers) }}</pre>
                       </div>
-                      <div v-if="r.response_body_preview"><strong>Body (2KB):</strong>
+                      <div v-if="r.response_body_preview"><strong>{{ pm('diagnose.respBodyLabel') }}</strong>
                         <pre style="margin:4px 0;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;font-size:11px;overflow-x:auto;max-height:200px">{{ r.response_body_preview }}</pre>
                       </div>
                     </div>
                     <div v-if="r.health_error" class="diag-section" style="margin-top:12px">
-                      <h4>⚠️ 错误</h4>
+                      <h4>{{ pm('diagnose.errHeader') }}</h4>
                       <pre style="margin:4px 0;padding:8px;background:rgba(180,40,40,0.2);border-radius:4px;font-size:11px;overflow-x:auto">{{ r.health_error }}</pre>
                     </div>
                     <div v-if="r.returned_models && r.returned_models.length" class="diag-section" style="margin-top:12px">
-                      <h4>✅ 解析到的模型 ({{ r.returned_models.length }})</h4>
+                      <h4>{{ pm('diagnose.modelsHeader', { n: r.returned_models.length }) }}</h4>
                       <div style="font-size:11px;line-height:1.6">
                         <code v-for="m in r.returned_models.slice(0, 30)" :key="m" style="margin-right:6px;display:inline-block;padding:2px 6px;background:rgba(0,255,128,0.1);border-radius:3px">{{ m }}</code>
-                        <span v-if="r.returned_models.length > 30" class="muted">… 共 {{ r.returned_models.length }} 个</span>
+                        <span v-if="r.returned_models.length > 30" class="muted">{{ pm('diagnose.modelsTruncated', { n: r.returned_models.length }) }}</span>
                       </div>
                     </div>
                   </td>
@@ -1150,7 +1150,7 @@ onUnmounted(() => {
           </table>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn btn-primary" @click="closeDiagnose">关闭</button>
+          <button class="btn btn-primary" @click="closeDiagnose">{{ pm('keys.common.close') }}</button>
         </div>
       </div>
     </div>
@@ -1158,10 +1158,31 @@ onUnmounted(() => {
     <!-- ── Add Credential Modal ──────────────────────────────────────────── -->
     <div class="modal-overlay" style="z-index:110" v-if="showCred" @click.self="showCred = false">
       <div class="modal" @click.stop>
-        <h3>添加凭据 — {{ credProvider?.display_name }}</h3>
+        <h3>{{ pm('credential.addDialog.title', { name: credProvider?.display_name }) }}</h3>
         <div v-if="credErr" class="alert alert-danger">{{ credErr }}</div>
         <div class="form-group">
-          <label>API Key</label>
+          <label>{{ pm('credential.addDialog.apiKeyLabel') }}</label>
+          <input v-model="credKey" :placeholder="pm('credential.addDialog.apiKeyPlaceholder')" />
+        </div>
+        <div class="form-group">
+          <label>{{ pm('credential.addDialog.tagsLabel') }}</label>
+          <input v-model="credLabel" :placeholder="pm('credential.addDialog.tagsPlaceholder')" />
+        </div>
+        <div v-if="credProbeStatus" class="alert" :class="credProbeStatus === 'done' ? 'alert-success' : credProbeStatus === 'failed' ? 'alert-warning' : 'alert-info'">
+          <template v-if="credProbeStatus === 'probing'">{{ pm('credential.addDialog.probeStatusProbing') }}</template>
+          <template v-else-if="credProbeStatus === 'done'">{{ pm('credential.addDialog.probeStatusDone') }}</template>
+          <template v-else-if="credProbeStatus === 'failed'">{{ pm('credential.addDialog.probeStatusFailed') }}</template>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+          <button class="btn btn-ghost" @click="showCred = false">{{ pm('common.button.cancel') }}</button>
+          <button class="btn btn-primary" @click="submitCred" :disabled="credSaving">
+            {{ credSaving ? pm('credential.addDialog.submitting') : (credProbeStatus === 'probing' ? pm('credential.addDialog.probeBtn') : pm('credential.addDialog.submit')) }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
           <input v-model="credKey" type="password" placeholder="sk-…" autocomplete="off" :disabled="credSaving" />
         </div>
         <div class="form-group">
