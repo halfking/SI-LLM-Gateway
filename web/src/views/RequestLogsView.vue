@@ -7,12 +7,15 @@ import {
   getSessionSummary,
   sessionSummaryToMemora,
   getKeys,
+  getAttachments,
+  getAttachmentUrl,
   type RequestLogRow,
   type RequestLogDetail,
   type ApiKey,
   type RequestLogsResponse,
   type SessionSummaryResponse,
   type SessionSummaryToMemoraResponse,
+  type Attachment,
 } from '../api'
 import ModelPicker from '../components/ModelPicker.vue'
 import { isSuperAdmin, isDefaultTenant, getCurrentTenantId } from '../store'
@@ -92,7 +95,11 @@ const compressionStats = computed(() => {
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detail = ref<RequestLogDetail | null>(null)
-const detailTab = ref<'request' | 'outbound' | 'response'>('request')
+const detailTab = ref<'request' | 'outbound' | 'response' | 'attachments'>('request')
+
+// Attachments
+const attachments = ref<Attachment[]>([])
+const attachmentsLoading = ref(false)
 
 // Tenant info for display
 const tenantLabel = computed(() => {
@@ -650,8 +657,13 @@ async function showDetail(requestId: string) {
   detailLoading.value = true
   detail.value = null
   detailTab.value = 'request'
+  attachments.value = []
   try {
     detail.value = await getRequestLogDetail(requestId)
+    // Load attachments if present
+    if (detail.value.has_attachments) {
+      loadAttachments(requestId)
+    }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -659,9 +671,21 @@ async function showDetail(requestId: string) {
   }
 }
 
+async function loadAttachments(requestId: string) {
+  attachmentsLoading.value = true
+  try {
+    attachments.value = await getAttachments(requestId)
+  } catch (e: unknown) {
+    console.error('Failed to load attachments:', e)
+  } finally {
+    attachmentsLoading.value = false
+  }
+}
+
 function closeDetail() {
   detailVisible.value = false
   detail.value = null
+  attachments.value = []
 }
 
 function formatJson(obj: any): string {
@@ -671,6 +695,14 @@ function formatJson(obj: any): string {
   } catch {
     return String(obj)
   }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 function extractMessagesFromBody(body: any): any[] {
@@ -1082,11 +1114,12 @@ onMounted(async () => {
             <th class="col-lat">延迟</th>
             <th class="col-compress">压缩</th>
             <th class="col-status">状态</th>
+            <th class="col-attachments" title="附件">📎</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading"><td :colspan="traceMode ? (isDefaultTenant() ? 9 : 10) : (isDefaultTenant() ? 8 : 9)">加载中…</td></tr>
-          <tr v-else-if="!rows.length"><td :colspan="traceMode ? (isDefaultTenant() ? 9 : 10) : (isDefaultTenant() ? 8 : 9)">无记录</td></tr>
+          <tr v-if="loading"><td :colspan="traceMode ? (isDefaultTenant() ? 10 : 11) : (isDefaultTenant() ? 9 : 10)">加载中…</td></tr>
+          <tr v-else-if="!rows.length"><td :colspan="traceMode ? (isDefaultTenant() ? 10 : 11) : (isDefaultTenant() ? 9 : 10)">无记录</td></tr>
           <tr
             v-for="r in rows"
             :key="r.request_id + r.ts"
@@ -1169,6 +1202,16 @@ onMounted(async () => {
             <td class="col-status" :style="{ color: statusColor(r) }" :title="statusTitle(r)">
               <div class="cell-line1">{{ statusLabel(r) }}</div>
               <div v-if="r.error_kind && r.request_status === 'failure'" class="cell-line2">{{ r.error_kind }}</div>
+            </td>
+            <td class="col-attachments" style="text-align:center">
+              <span 
+                v-if="r.has_attachments && r.attachment_count && r.attachment_count > 0" 
+                class="attachment-badge"
+                :title="`${r.attachment_count} 个附件`"
+              >
+                📎 {{ r.attachment_count }}
+              </span>
+              <span v-else style="color:var(--muted)">—</span>
             </td>
           </tr>
         </tbody>
@@ -1271,6 +1314,14 @@ onMounted(async () => {
                 </span>
               </button>
               <button class="btn btn-sm" :class="{ 'btn-primary': detailTab === 'response' }" @click="detailTab = 'response'">响应内容</button>
+              <button 
+                v-if="detail.has_attachments && detail.attachment_count && detail.attachment_count > 0" 
+                class="btn btn-sm" 
+                :class="{ 'btn-primary': detailTab === 'attachments' }" 
+                @click="detailTab = 'attachments'"
+              >
+                📎 附件 ({{ detail.attachment_count }})
+              </button>
             </div>
           </div>
 
@@ -1315,6 +1366,50 @@ onMounted(async () => {
                 </div>
               </template>
               <div v-else style="color:var(--muted)">(该请求未触发 v3 会话压缩：转发体 == 客户端请求体)</div>
+            </template>
+
+            <template v-else-if="detailTab === 'attachments'">
+              <div v-if="attachmentsLoading" style="text-align:center;padding:20px;color:var(--muted)">加载附件中…</div>
+              <div v-else-if="attachments.length === 0" style="text-align:center;padding:20px;color:var(--muted)">无附件</div>
+              <div v-else style="display:flex;flex-direction:column;gap:12px">
+                <div 
+                  v-for="attachment in attachments" 
+                  :key="attachment.id" 
+                  class="attachment-item"
+                >
+                  <div style="display:flex;align-items:center;gap:12px">
+                    <div v-if="attachment.media_type.startsWith('image/')" style="flex-shrink:0">
+                      <img 
+                        :src="getAttachmentUrl(attachment.id)" 
+                        :alt="attachment.id"
+                        style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border,#333)"
+                        @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
+                      />
+                    </div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-weight:600;margin-bottom:4px;word-break:break-all">{{ attachment.id }}</div>
+                      <div style="font-size:11px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap">
+                        <span>类型: {{ attachment.media_type }}</span>
+                        <span>大小: {{ formatBytes(attachment.file_size) }}</span>
+                        <span>哈希: {{ attachment.content_hash.substring(0, 12) }}...</span>
+                      </div>
+                      <div style="font-size:10px;color:var(--muted);margin-top:2px">
+                        创建时间: {{ fmtTs(attachment.created_at) }}
+                      </div>
+                    </div>
+                    <div style="flex-shrink:0">
+                      <a 
+                        :href="getAttachmentUrl(attachment.id)" 
+                        target="_blank" 
+                        class="btn btn-sm"
+                        :download="attachment.id"
+                      >
+                        下载
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </template>
 
             <template v-else>
@@ -1404,6 +1499,23 @@ onMounted(async () => {
 .col-status {
   min-width: 4.5rem;
   max-width: 7rem;
+}
+.col-attachments {
+  width: 3.5rem;
+  text-align: center;
+  white-space: nowrap;
+}
+.attachment-badge {
+  font-size: 11px;
+  color: var(--accent, #3b82f6);
+  cursor: pointer;
+  display: inline-block;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: rgba(59, 130, 246, 0.1);
+}
+.attachment-badge:hover {
+  background: rgba(59, 130, 246, 0.2);
 }
 .cell-line1 {
   font-size: 12px;
@@ -1636,6 +1748,17 @@ onMounted(async () => {
   padding: 1px 4px;
   border-radius: 3px;
   background: var(--surface-primary, #16213e);
+}
+
+/* Attachment styles */
+.attachment-item {
+  padding: 12px;
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  background: var(--surface-primary, #16213e);
+}
+.attachment-item:hover {
+  background: var(--surface-secondary, #1a1a2e);
 }
 </style>
 
