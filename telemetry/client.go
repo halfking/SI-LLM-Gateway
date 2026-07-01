@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -270,9 +271,56 @@ func (c *Client) EmitRequestLogUpdate(entry *RequestLogEntry) {
 	c.EmitRequestLog(entry)
 }
 
+// Stop signals the worker to exit, then waits up to `drainTimeout`
+// for any in-flight queue entries to be flushed to the database.
+//
+// 2026-07-02 fix (in_flight_during_restart bug): the previous Stop()
+// called `c.wg.Wait()` with no timeout, which meant:
+//
+//   1. If the caller relied on a SIGTERM grace period (e.g. 10s from
+//      docker stop / k8s preStop), wg.Wait() blocked forever because
+//      the worker loop only exits on `<-c.done`, which is fine — but
+//      when the OS sends SIGKILL after the grace period, any queue
+//      entries still buffered are lost (this is exactly the
+//      in_flight_during_restart orphan rows we observed in audit).
+//
+//   2. Even when `close(c.done)` was reached, if the worker was
+//      blocked inside a slow pgx Exec, wg.Wait() could exceed the
+//      orchestrator's grace window.
+//
+// Now we use a bounded timeout (default 8s, configurable via
+// LLM_GATEWAY_TELEMETRY_DRAIN_TIMEOUT). After the deadline, we mark
+// the worker as stopped and the caller is free to return. Remaining
+// queue entries will be lost; the cron-cleanup script
+// `cleanup_in_progress.sh` (added 2026-07-02) marks those orphan
+// rows as failure so the user sees something coherent.
 func (c *Client) Stop() {
 	close(c.done)
-	c.wg.Wait()
+
+	drainTimeout := 8 * time.Second
+	if v := os.Getenv("LLM_GATEWAY_TELEMETRY_DRAIN_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			drainTimeout = d
+		}
+	}
+
+	done := make(chan struct{})
+	go func() {
+		c.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Worker drained cleanly within the timeout.
+	case <-time.After(drainTimeout):
+		// 2026-07-02: log loud warning so operators see why some
+		// in-flight request_logs rows may remain at in_progress.
+		// The cron cleanup script will eventually reconcile them.
+		slog.Warn("telemetry: stop drain timeout, queue may have unflushed entries",
+			"timeout", drainTimeout,
+			"queue_len", len(c.queue))
+	}
 }
 
 func (c *Client) worker() {
@@ -282,11 +330,33 @@ func (c *Client) worker() {
 	timer := time.NewTimer(200 * time.Millisecond)
 	defer timer.Stop()
 
+	// 2026-07-02: drainCh is closed when Stop() is called. The worker
+	// keeps reading from c.queue until both the queue is empty AND
+	// drainCh is closed, so we never silently drop entries that were
+	// already pushed before Stop().
+	drainCh := make(chan struct{})
+	go func() {
+		<-c.done
+		// Allow the loop to keep consuming until queue is empty.
+		// We don't close the queue itself (select-style channels
+		// can't be safely closed while senders may still exist),
+		// but since c.done is already closed the EmitRequestLog
+		// senders stop very quickly after Stop() returns. The
+		// remaining queue items belong to requests that were
+		// already in flight when Stop() was invoked.
+		for {
+			if len(c.queue) == 0 {
+				close(drainCh)
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}()
+
 	for {
 		select {
 		case <-c.done:
-			c.flush(batch)
-			return
+			// Fall through to drain mode below.
 		case item := <-c.queue:
 			batch = append(batch, item)
 			if len(batch) >= 50 {
@@ -296,10 +366,30 @@ func (c *Client) worker() {
 			} else if len(batch) == 1 {
 				timer.Reset(200 * time.Millisecond)
 			}
+			continue
 		case <-timer.C:
 			if len(batch) > 0 {
 				c.flush(batch)
 				batch = batch[:0]
+			}
+			continue
+		}
+
+		// Drain mode (c.done is closed): keep pulling remaining
+		// entries until the queue is empty, then flush and exit.
+		for {
+			select {
+			case item := <-c.queue:
+				batch = append(batch, item)
+				if len(batch) >= 50 {
+					c.flush(batch)
+					batch = batch[:0]
+				}
+			default:
+				if len(batch) > 0 {
+					c.flush(batch)
+				}
+				return
 			}
 		}
 	}

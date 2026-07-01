@@ -1697,6 +1697,27 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 		return
 	}
 
+	// 2026-07-02 fix: mark logCtx as logged IMMEDIATELY upon entering the
+	// success-path telemetry emission, so the deferred safety net in
+	// ChatHandler.ServeHTTP (relay/handler.go:437-487) cannot re-fire
+	// EmitFailure() and overwrite a perfectly good success row with a
+	// spurious failure (the exact symptom we saw for the
+	// `content_cache_hit` fast path on 2026-07-01: the cache hit set
+	// logCtx.ErrCode="content_cache_hit", the deferred safety net saw
+	// `ErrCode != "" && !IsLogged()` because content_cache_hit only
+	// called logCtx.MarkLogged() and not the surrounding closure
+	// markLogged(), and EmitFailure wrote a row that clobbered the
+	// in-flight success entry).
+	//
+	// Setting the flag here is safe because every code path that
+	// reaches emitTelemetry has produced a response body for the
+	// client; the deferred safety net's purpose is solely to catch
+	// paths that *bypass* emitTelemetry, not to re-process successful
+	// ones.
+	if logCtx != nil {
+		logCtx.MarkLogged()
+	}
+
 	var apiKeyID *int
 	var tenantID string = "default"
 	var applicationID *int
