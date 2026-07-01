@@ -9,14 +9,43 @@
 | 1 | `VERSION` | 后端版本文件 | `<major>.<minor>.<patch>-<git_sha>-<YYYYMMDD>-<seq>` |
 | 2 | `version.json` | 后端版本JSON | 完整JSON格式（见模板） |
 | 3 | `web/public/version.json` | 前端版本JSON | 与后端version.json一致 |
+| 4 | `web/dist/version.json` | 前端构建产物中的版本JSON | 与 3 一致 |
+| 5 | `.deploy_seq` | 单文件 build_seq（被 `/api/system/version` 直接读取） | 单个整数 |
+| 6 | Go 二进制 ldflags | 注入 `main.Version` / `main.BuildNumber` / `main.GitCommit` / `main.BuildTime` | `-ldflags "-X 'main.X=Y' ..."` |
+
+> **2026-07-02 注**: `/api/system/version` 的 `build_seq` 字段**不**从 VERSION 文件解析，而是从 `.deploy_seq` 单文件读取（`admin/misc.go loadDeploySeq`）。只更新 VERSION 而忘记 `.deploy_seq` 会导致前端 build_seq 卡在旧值。
+
+### ⚡ 推荐方式：`scripts/bump-version.sh` 一键同步
+
+```bash
+# 跳号到指定值（如 721）+ 部署到 71
+SSHPASS='Kaixuan2026&#*9527' ./scripts/bump-version.sh --seq 721 --ssh root@14.103.174.71
+
+# 自动递增（默认 +1）
+SSHPASS='Kaixuan2026&#*9527' ./scripts/bump-version.sh --ssh root@14.103.174.71
+
+# 仅修改文件，不构建不上传
+./scripts/bump-version.sh --seq 722 --no-build --no-upload
+
+# 完整一行式部署（默认 +1 + 跳过前端构建）
+SSHPASS='Kaixuan2026&#*9527' ./scripts/deploy-71.sh
+```
+
+`bump-version.sh` 自动：
+1. 从 `version.json` 读取当前 `build_seq`（single source of truth）
+2. 更新 5 个文件 + ldflags 注入 + cross-compile linux/amd64
+3. Stop 服务（释放 binary mmap 锁）→ scp 4 个文件到 71 → Start 服务
+4. 重新加载 systemd
 
 ### ❌ 常见错误
 
 - ❌ **只更新后端版本，忘记前端**
-- ❌ **只更新 version.json，忘记 VERSION 文件**
-- ❌ **编译时未使用 -ldflags 注入版本信息**
+- ❌ **只更新 `version.json`，忘记 `VERSION` 文件**
+- ❌ **只更新 `VERSION`，忘记 `.deploy_seq`**（前端 build_seq 卡旧值）
+- ❌ **编译时未使用 `-ldflags` 注入版本信息**
 - ❌ **容器挂载的文件路径搞错**
 - ❌ **没有重新构建前端**
+- ❌ **跨主机架构 scp**：开发机是 darwin/arm64，必须 `GOOS=linux GOARCH=amd64` 交叉编译，否则 docker exec 报 `exec format error`
 
 ---
 
@@ -576,6 +605,6 @@ docker logs llm-gateway-go | grep attachment
 
 ---
 
-**最后更新**: 2026-07-01  
+**最后更新**: 2026-07-02  
 **维护者**: Kiro AI  
-**版本**: 1.0
+**版本**: 1.1 (2026-07-02: 增加 `bump-version.sh` 一键脚本说明 + `.deploy_seq` 同步要求)
