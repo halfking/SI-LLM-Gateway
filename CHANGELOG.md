@@ -2,6 +2,70 @@
 
 > 简明变更历史。仅记录高阶业务/架构级变更，不含文件路径、内部提交哈希、命令、密钥或事件细节。
 
+## V2.3.3 — 附件归档与部署自动化
+
+### 部署自动化
+- `bump-version.sh`: 5 文件原子同步机制 (VERSION / version.json / web/public / web/dist / .deploy_seq)
+- `deploy-71.sh`: 一键部署脚本 (自动 stop → 编译 → 上传 → restart)
+- `.deploy_seq` 文件作为 build_seq 单一数据源，修复前端编译次数显示不同步问题
+- 交叉编译 linux/amd64 自动化 + systemd 服务重启
+
+### 附件功能
+- 内联 base64 图片自动归档到本地存储
+- 附件缩略图点击全屏预览 (Vue Teleport + 模态框 + ESC 关闭)
+- 修复 3 个静默失败: nil pool 返回、dedupe 不回写 request_id、null 序列化白屏
+- `storage_path` 锚定到绝对路径，修复容器挂载路径不一致问题
+- 附件元数据显示 (media_type / file_size / hash)
+
+### 电路熔断器
+- 瞬时故障阈值提升 3→10，冷却期缩短 (V3.2.0)
+- 按模型变体隔离电路状态，避免单模型故障导致全局熔断 (V3.2.1)
+- circuit-open 级联正确分类为 `KindCircuitOpen` 而非 unknown
+
+### 诊断与修复工具
+- `credentials_pkey` 序列失序诊断和自动修复脚本
+- `request_logs.in_progress` 卡死修复 (3 个根因: 未设 status / 流中断未标记 / INSERT 失败静默)
+- 凭据创建故障排查 SQL + 自动建议修复步骤
+- 部署验证脚本套件 (attachments / version display / circuit fix)
+
+### 性能优化
+- `request_logs` 列表/详情分离投影 (避免全字段扫描)
+- `provider_model` 反规范化到 `request_logs` (migration 057，消除 LATERAL JOIN)
+- `request_status` 物化字段，移除读路径 COALESCE
+- GIN trgm 索引支持 `?q=` 全文搜索
+- listing-path 索引优化 (migration 056)
+
+### 凭据与密钥管理
+- NULL `key_ciphertext` 容错处理 (避免解密崩溃)
+- `/api/keys/{id}/reveal` 结构化错误码
+- 凭据+模型状态统一模块 (`credentialstate`)
+
+### 版本显示
+- `/api/system/version` 返回完整版本字符串 + build_seq
+- 前端顶部栏简化显示为 `vX.X.X · #build_seq`
+- 修复 VERSION 文件与 .deploy_seq 不同步导致的编译次数错误
+
+### 日志与可观测性
+- 大小限定的旋转日志文件 (`observability/rotate`)
+- `UpstreamStatusCode` 字段补充到 `RequestLogEntry`
+- 详细的 schema 迁移错误日志
+
+### 路由与会话
+- 凭据 disable 时清除会话偏好，避免 sticky session 卡住 (V3.1.1)
+- 凭据+模型双重验证防抖动 (anti-flap)
+- session preference 一致性修复
+
+### Bug 修复
+- Unicode 特殊字符 (§ 等) 导致的 SQL 语法错误
+- PostgreSQL 兼容性: `ADD CONSTRAINT IF NOT EXISTS` → DO 块
+- `model_aliases` 主键重复检查
+- SQL schema 缩进和 WHERE 子句错误
+
+### 文档
+- 标准部署流程文档 (`DEPLOYMENT_STANDARD.md`)
+- 20+ 部署报告、审计报告、验证脚本
+- 各功能完整实施报告 (attachments / circuit / version display)
+
 ## V2.3 — 性能与会话管理
 
 ### 性能
