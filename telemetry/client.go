@@ -108,6 +108,13 @@ type RequestLogEntry struct {
 	StreamChunkCount   *int    `json:"stream_chunk_count,omitempty"`
 	StreamDoneReceived *bool   `json:"stream_done_received,omitempty"`
 	StreamInterrupted  *bool   `json:"stream_interrupted,omitempty"`
+	// UpstreamStatusCode is the HTTP status code returned by the
+	// upstream provider for a failed request. Nil when the
+	// request failed before reaching upstream (network error,
+	// client error, etc.). Added 2026-07-01 to fix a missing
+	// field on RequestLogEntry that relay/request_log_pipeline.go
+	// was already populating since 2026-06-30.
+	UpstreamStatusCode *int    `json:"upstream_status_code,omitempty"`
 	ResponseChecksum   *string `json:"response_checksum,omitempty"`
 	FailureDetailCode  *string `json:"failure_detail_code,omitempty"`
 	FailureStage       *string `json:"failure_stage,omitempty"`
