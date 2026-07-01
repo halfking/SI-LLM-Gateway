@@ -2543,6 +2543,14 @@ func (h *ChatHandler) recordInitialRequestLog(
 		reqLog.StreamChunkCount = &zero
 	}
 	applyAutoRouteFields(reqLog, autoCtx)
+	// 2026-07-02: attachment tracking. Without this, INSERT writes
+	// has_attachments=NULL even when attachments have been archived,
+	// because updateRequestLog's UPDATE SQL (telemetry/client.go:865)
+	// does not include has_attachments / attachment_count. Setting
+	// them at INSERT time is the only place that survives the rest of
+	// the request lifecycle (the COALESCE in updateRequestLog's
+	// INSERT-conflict branch keeps the original NULL).
+	applyAttachmentFields(reqLog, autoCtx)
 	if h.requestLogHook != nil {
 		h.requestLogHook(reqLog)
 	}

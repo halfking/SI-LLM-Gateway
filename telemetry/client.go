@@ -936,12 +936,22 @@ func (c *Client) updateRequestLog(entry *RequestLogEntry) error {
 	   -- (db/migrations/018_upstream_finish_reason.sql). The new column is
 	   -- the SOLE home for the upstream finish_reason.
 	   upstream_finish_reason = COALESCE($62, upstream_finish_reason),
-	   -- 2026-06-23: structured tool_calls (042_tool_calls_column.sql).
-	   tool_calls = COALESCE(CAST($63 AS jsonb), tool_calls),
-	   -- 2026-06-26: client-supplied X-Request-Id (debug only).
-	   -- COALESCE so a late success UPDATE does not blank a value set on INSERT.
-	   client_request_id = COALESCE($64, client_request_id)
-	 WHERE request_id = $1
+-- 2026-06-23: structured tool_calls (042_tool_calls_column.sql).
+		   tool_calls = COALESCE(CAST($63 AS jsonb), tool_calls),
+		   -- 2026-06-26: client-supplied X-Request-Id (debug only).
+		   -- COALESCE so a late success UPDATE does not blank a value set on INSERT.
+		   client_request_id = COALESCE($64, client_request_id),
+		   -- 2026-07-02: attachment tracking. The INSERT path
+		   -- (recordInitialRequestLog in relay/handler.go) sets these
+		   -- at INSERT time, but if for any reason the initial INSERT
+		   -- lost them (e.g. an earlier retry storm that pre-dated
+		   -- the applyAttachmentFields fix) we still want the success
+		   -- UPDATE to surface them. COALESCE preserves the INSERT-time
+		   -- value when this UPDATE does not carry a non-NIL value,
+		   -- matching the pattern used by client_request_id above.
+		   has_attachments  = COALESCE($65, has_attachments),
+		   attachment_count = COALESCE($66, attachment_count)
+		 WHERE request_id = $1
 `,
 		entry.RequestID,
 		entry.ClientModel,
@@ -1017,6 +1027,9 @@ func (c *Client) updateRequestLog(entry *RequestLogEntry) error {
 		entry.ToolCalls,
 		// 2026-06-26: client-supplied X-Request-Id (debug only).
 		entry.ClientRequestID,
+		// 2026-07-02: attachment tracking. See SET clause comment above.
+		entry.HasAttachments,
+		entry.AttachmentCount,
 	)
 	if err != nil {
 		return err
@@ -1153,9 +1166,11 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 			is_auto_request, task_type, auto_profile, auto_decision, auto_confidence,
 			work_type, credits_charged,
 			upstream_finish_reason,
-			-- 2026-06-26: client-supplied X-Request-Id (debug only).
-			client_request_id
-		) VALUES (
+-- 2026-06-26: client-supplied X-Request-Id (debug only).
+				client_request_id,
+				-- 2026-07-02: attachment tracking (mirrors insertRequestLog).
+				has_attachments, attachment_count
+			) VALUES (
 			$1, now(), $2,
 			COALESCE($3, ''), COALESCE($4, ''),
 			$5, $6, $7,
@@ -1178,7 +1193,11 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 			CAST(NULLIF($46, '') AS jsonb), $47,
 			COALESCE(NULLIF($48, ''), NULL), $49,
 			COALESCE(NULLIF($50, ''), NULL),
-			$51
+			$51,
+			-- 2026-07-02: attachment tracking. INSERT-time values are
+			-- authoritative; the ON CONFLICT branch preserves them via
+			-- COALESCE on the column instead of the new value.
+			$52, $53
 		)
 		-- 2026-06-27 REVERT: ON CONFLICT back to (request_id, ts) for partitioned table compatibility
 		ON CONFLICT (request_id, ts) DO UPDATE SET
@@ -1218,7 +1237,14 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 			failure_detail_code = COALESCE(NULLIF(request_logs.failure_detail_code, ''), EXCLUDED.failure_detail_code),
 			response_preview = COALESCE(NULLIF(request_logs.response_preview, ''), EXCLUDED.response_preview),
 			response_body = COALESCE(request_logs.response_body, EXCLUDED.response_body),
-			identity_hash = COALESCE(NULLIF(request_logs.identity_hash, ''), EXCLUDED.identity_hash)
+			identity_hash = COALESCE(NULLIF(request_logs.identity_hash, ''), EXCLUDED.identity_hash),
+			-- 2026-07-02: attachment tracking. The original INSERT from
+			-- recordInitialRequestLog already populated these via
+			-- applyAttachmentFields; preserve them by COALESCE'ing on
+			-- the existing row, NOT on EXCLUDED, so a late fallback
+			-- that arrives with NIL doesn't blank the original value.
+			has_attachments  = COALESCE(request_logs.has_attachments,  EXCLUDED.has_attachments),
+			attachment_count = COALESCE(request_logs.attachment_count, EXCLUDED.attachment_count)
 		-- NOTE: do NOT update client_model, request_body, gw_session_id, gw_task_id,
 		-- api_key_*, application_code, is_auto_request, task_type, auto_*,
 		-- work_type, credits_charged, request_preview, transform_summary,
@@ -1278,6 +1304,9 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 		entry.CreditsCharged,                    // $49
 		strPtrValue(entry.UpstreamFinishReason), // $50
 		entry.ClientRequestID,                   // $51
+		// 2026-07-02: attachment tracking. See SET clause comment.
+		entry.HasAttachments,                    // $52
+		entry.AttachmentCount,                   // $53
 	)
 	return err
 }
