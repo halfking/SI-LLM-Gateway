@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { getKeyDetail, updateKeyLimits, type ApiKey, type UpdateKeyLimitsRequest } from '../api'
 import {
   getKeyUsage,
@@ -10,6 +11,10 @@ import {
   type ModelUsageForKey,
   type TrendEntry,
 } from '../api'
+import { useFormat } from '../i18n/useFormat'
+
+const { t } = useI18n()
+const { fmtDateTime, fmtDateShort, fmtNumber } = useFormat()
 
 // ── Route params ──────────────────────────────────────────────────────────
 const route = useRoute()
@@ -78,15 +83,15 @@ function modeToValue(mode: LimitMode, current: number | null | undefined): numbe
 function validateLimitsForm(): string | null {
   if (rpmMode.value === 'custom') {
     const v = limitsForm.value.rate_limit_rpm
-    if (v == null || v < 1) return 'RPM 自定义值必须 ≥ 1'
+    if (v == null || v < 1) return t('keys.detail.validation.rpmMin')
   }
   if (concurrentMode.value === 'custom') {
     const v = limitsForm.value.rate_limit_concurrent
-    if (v == null || v < 1) return '并发自定义值必须 ≥ 1'
+    if (v == null || v < 1) return t('keys.detail.validation.concurrentMin')
   }
   if (tpmMode.value === 'custom') {
     const v = limitsForm.value.rate_limit_tpm
-    if (v == null || v < 1) return 'TPM 自定义值必须 ≥ 1'
+    if (v == null || v < 1) return t('keys.detail.validation.tpmMin')
   }
   return null
 }
@@ -107,11 +112,11 @@ async function saveLimits() {
       rate_limit_tpm: modeToValue(tpmMode.value, limitsForm.value.rate_limit_tpm),
     }
     await updateKeyLimits(keyId.value, data)
-    limitsSuccess.value = '限制已保存'
+    limitsSuccess.value = t('keys.detail.limitsSaved')
     showLimitsEditor.value = false
     await loadKey()
   } catch (e: unknown) {
-    limitsErr.value = e instanceof Error ? e.message : '保存失败'
+    limitsErr.value = e instanceof Error ? e.message : t('keys.common.saveFailed')
   } finally {
     limitsSaving.value = false
   }
@@ -119,17 +124,17 @@ async function saveLimits() {
 
 // Time range (summary cards)
 type PeriodType = 'minute' | 'hour' | 'day' | 'week' | 'month'
-const periodOptions: { label: string; days: number }[] = [
-  { label: '最近 1 天', days: 1 },
-  { label: '最近 3 天', days: 3 },
-  { label: '最近 7 天', days: 7 },
-  { label: '最近 30 天', days: 30 },
-  { label: '最近 90 天', days: 90 },
-]
+const periodOptions = computed<{ label: string; days: number }[]>(() => [
+  { label: t('keys.detail.period.d1'), days: 1 },
+  { label: t('keys.detail.period.d3'), days: 3 },
+  { label: t('keys.detail.period.d7'), days: 7 },
+  { label: t('keys.detail.period.d30'), days: 30 },
+  { label: t('keys.detail.period.d90'), days: 90 },
+])
 const selectedPeriodDays = ref(7)
 
 function periodLabelForDays(days: number): string {
-  return periodOptions.find(o => o.days === days)?.label ?? `最近 ${days} 天`
+  return periodOptions.value.find(o => o.days === days)?.label ?? t('keys.detail.period.custom', { days })
 }
 
 // Trend chart controls
@@ -141,13 +146,13 @@ const hoveredTrendIndex = ref<number | null>(null)
 const CHART_W = 640
 const CHART_H = 160
 const CHART_PAD = { l: 44, r: 10, t: 8, b: 22 }
-const trendPeriodOptions: { label: string; value: PeriodType }[] = [
-  { label: '按分钟', value: 'minute' },
-  { label: '按小时', value: 'hour' },
-  { label: '按天', value: 'day' },
-  { label: '按周', value: 'week' },
-  { label: '按月', value: 'month' },
-]
+const trendPeriodOptions = computed<{ label: string; value: PeriodType }[]>(() => [
+  { label: t('keys.detail.granularity.minute'), value: 'minute' },
+  { label: t('keys.detail.granularity.hour'), value: 'hour' },
+  { label: t('keys.detail.granularity.day'), value: 'day' },
+  { label: t('keys.detail.granularity.week'), value: 'week' },
+  { label: t('keys.detail.granularity.month'), value: 'month' },
+])
 
 const TREND_WINDOW_LIMITS: Record<'minute' | 'hour', number> = {
   minute: 3,
@@ -179,7 +184,7 @@ const trendHasActivity = computed(() =>
 )
 
 const trendSummaryLabel = computed(() => {
-  const periodLabel = trendPeriodOptions.find(o => o.value === trendPeriod.value)?.label ?? '按小时'
+  const periodLabel = trendPeriodOptions.value.find(o => o.value === trendPeriod.value)?.label ?? t('keys.detail.granularity.hour')
   if (useCustomRange.value && customStart.value && customEnd.value) {
     return `${periodLabel} · ${customStart.value} ~ ${customEnd.value}`
   }
@@ -188,10 +193,10 @@ const trendSummaryLabel = computed(() => {
 
 const trendGranularityHint = computed(() => {
   if (trendPeriod.value === 'minute') {
-    return '按分钟最多 3 天窗口，便于观察日内峰谷'
+    return t('keys.detail.granularity.minuteHint')
   }
   if (trendPeriod.value === 'hour') {
-    return '按小时最多 31 天窗口，便于对比每日时段规律'
+    return t('keys.detail.granularity.hourHint')
   }
   return ''
 })
@@ -312,12 +317,14 @@ function compactTrendLabel(s: string, period: PeriodType, total: number): string
   if (period === 'minute' || period === 'hour') {
     const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(s)
     if (m) {
+      const daySuffix = t('keys.detail.trend.daySuffix') || ''
+      const hourSuffix = t('keys.detail.trend.hourSuffix') || ''
       if (period === 'minute') {
         if (total > 200) return `${m[4]}:${m[5]}`
-        if (total > 48) return `${parseInt(m[3], 10)}日${m[4]}:${m[5]}`
+        if (total > 48) return `${parseInt(m[3], 10)}${daySuffix} ${m[4]}:${m[5]}`
         return `${m[2]}/${m[3]} ${m[4]}:${m[5]}`
       }
-      if (total > 72) return `${parseInt(m[3], 10)}日${m[4]}时`
+      if (total > 72) return `${parseInt(m[3], 10)}${daySuffix} ${m[4]}${hourSuffix}`
       return `${m[2]}/${m[3]} ${m[4]}:00`
     }
     return s
@@ -372,15 +379,9 @@ const trendLineColor = computed(() =>
 )
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function fmtDate(s: string | null | undefined) {
-  if (!s) return '—'
-  return new Date(s).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
-}
-
-function fmtDateShort(s: string | null | undefined) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
-}
+// fmtDate / fmtDateShort / fmtNum come from useFormat (locale-aware).
+// The trend-period helpers below remain here because they format backend
+// period keys (e.g. "IYYY-IW") that need custom logic, not a raw timestamp.
 
 // Format a trend period label based on the selected trend period.
 // The backend emits "YYYY-MM-DD" for day, "IYYY-IW" for week, "YYYY-MM"
@@ -398,36 +399,36 @@ function fmtTrendPeriod(s: string, period: PeriodType) {
   }
   if (period === 'week') {
     const m = /^(\d{4})-(\d{1,2})$/.exec(s)
-    if (m) return `${m[1].slice(2)}-${m[2]}周`
+    if (m) return `${m[1].slice(2)}-${m[2]}${t('keys.detail.trend.weekSuffix') || '周'}`
     return s
   }
   if (period === 'month') {
     const m = /^(\d{4})-(\d{1,2})$/.exec(s)
-    if (m) return `${m[1].slice(2)}年${parseInt(m[2], 10)}月`
+    if (m) return `${m[1].slice(2)}${t('keys.detail.trend.yearSuffix') || '年'}${parseInt(m[2], 10)}${t('keys.detail.trend.monthSuffix') || '月'}`
     return s
   }
-  return new Date(s).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+  return fmtDateShort(s)
 }
 
 function fmtNum(n: number | string | null | undefined, decimals = 0): string {
   if (n == null) return '0'
-  return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+  return fmtNumber(n, decimals)
 }
 
 function formatRpmLimit(v: number | null | undefined): string {
-  if (v == null) return '默认'
-  if (v === 0) return '无限制'
+  if (v == null) return t('keys.common.defaultLabel')
+  if (v === 0) return t('keys.common.unlimited')
   return `${v} RPM`
 }
 
 function formatConcurrentLimit(v: number | null | undefined): string {
-  if (v == null) return '默认'
-  if (v === 0) return '无限制'
+  if (v == null) return t('keys.common.defaultLabel')
+  if (v === 0) return t('keys.common.unlimited')
   return String(v)
 }
 
 function formatTpmLimit(v: number | null | undefined): string {
-  if (v == null || v === 0) return '不限制'
+  if (v == null || v === 0) return t('keys.common.noLimit')
   return `${fmtNum(v)} TPM`
 }
 
@@ -476,7 +477,7 @@ async function loadKey() {
   try {
     keyInfo.value = await getKeyDetail(keyId.value)
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : t('keys.detail.error.loadKeyFailed')
   } finally {
     loading.value = false
   }
@@ -512,7 +513,7 @@ async function loadDetail() {
     keyModels.value = models
     keyTrend.value = trend
   } catch (e: unknown) {
-    detailError.value = e instanceof Error ? e.message : '加载详情失败'
+    detailError.value = e instanceof Error ? e.message : t('keys.detail.error.loadDetailFailed')
   } finally {
     detailLoading.value = false
   }

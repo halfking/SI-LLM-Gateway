@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   listKeyApplications,
   approveKeyApplication,
@@ -8,6 +9,10 @@ import {
   type KeyApplication,
   type ApproveApplicationResponse,
 } from '../api'
+import { useFormat } from '../i18n/useFormat'
+
+const { t } = useI18n()
+const { fmtDateTime } = useFormat()
 
 const applications = ref<KeyApplication[]>([])
 const loading = ref(false)
@@ -24,6 +29,13 @@ const reviewError = ref<string | null>(null)
 // Approved key reveal
 const revealedKeys = ref<Record<string, string>>({})
 const revealLoading = ref<string | null>(null)
+
+const filterTabs = computed(() => [
+  { value: 'pending', label: t('keys.applications.tab.pending') },
+  { value: 'approved', label: t('keys.applications.tab.approved') },
+  { value: 'rejected', label: t('keys.applications.tab.rejected') },
+  { value: '', label: t('keys.applications.tab.all') },
+])
 
 const filtered = computed(() => {
   if (!filterStatus.value) return applications.value
@@ -109,7 +121,7 @@ async function handleReveal(app: KeyApplication) {
 
 function fmtTs(ts: string | null) {
   if (!ts) return '—'
-  return new Date(ts).toLocaleString('zh-CN', { hour12: false })
+  return fmtDateTime(ts)
 }
 
 function statusBadge(status: string) {
@@ -120,11 +132,8 @@ function statusBadge(status: string) {
 }
 
 function statusLabel(status: string) {
-  if (status === 'pending') return '待审核'
-  if (status === 'approved') return '已通过'
-  if (status === 'rejected') return '已拒绝'
-  if (status === 'expired') return '已过期'
-  return status
+  const tr = t(`keys.applications.status.${status}`)
+  return tr && !tr.startsWith('keys.') ? tr : status
 }
 
 onMounted(load)
@@ -137,12 +146,12 @@ onMounted(load)
       style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"
     >
       <h2 style="margin:0">
-        密钥申请
+        {{ t('keys.applications.title') }}
         <span v-if="pendingCount" class="badge badge-yellow" style="margin-left:8px;font-size:13px">
-          {{ pendingCount }} 待审
+          {{ pendingCount }}{{ t('keys.applications.pendingBadge') }}
         </span>
       </h2>
-      <button class="btn btn-primary btn-sm" :disabled="loading" @click="load">刷新</button>
+      <button class="btn btn-primary btn-sm" :disabled="loading" @click="load">{{ t('keys.applications.refresh') }}</button>
     </div>
 
     <p v-if="error" style="color:var(--danger);margin-bottom:12px">{{ error }}</p>
@@ -150,12 +159,7 @@ onMounted(load)
     <!-- Filter tabs -->
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <button
-        v-for="tab in [
-          { value: 'pending', label: '待审核' },
-          { value: 'approved', label: '已通过' },
-          { value: 'rejected', label: '已拒绝' },
-          { value: '', label: '全部' },
-        ]"
+        v-for="tab in filterTabs"
         :key="tab.value"
         class="btn btn-sm"
         :class="filterStatus === tab.value ? 'btn-primary' : 'btn-ghost'"
@@ -169,28 +173,28 @@ onMounted(load)
       <table class="data-table" style="width:100%;font-size:13px">
         <thead>
           <tr>
-            <th>申请时间</th>
-            <th>联系方式</th>
-            <th>用途</th>
-            <th>来源 IP</th>
-            <th>状态</th>
-            <th>审核备注</th>
-            <th>操作</th>
+            <th>{{ t('keys.applications.table.appliedAt') }}</th>
+            <th>{{ t('keys.applications.table.contact') }}</th>
+            <th>{{ t('keys.applications.table.purpose') }}</th>
+            <th>{{ t('keys.applications.table.sourceIp') }}</th>
+            <th>{{ t('keys.applications.table.status') || t('common.table.status') }}</th>
+            <th>{{ t('keys.applications.table.reviewRemark') }}</th>
+            <th>{{ t('keys.applications.table.actions') || t('common.table.actions') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="7" style="text-align:center;padding:24px">加载中…</td>
+            <td colspan="7" style="text-align:center;padding:24px">{{ t('keys.applications.loading') }}</td>
           </tr>
           <tr v-else-if="!filtered.length">
-            <td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">无记录</td>
+            <td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">{{ t('keys.applications.noRecord') }}</td>
           </tr>
           <tr v-for="app in filtered" :key="app.id">
             <td style="white-space:nowrap">{{ fmtTs(app.created_at) }}</td>
             <td>
               <div style="font-weight:500">{{ app.contact }}</div>
               <div v-if="app.expires_at && app.status === 'pending'" style="font-size:11px;color:var(--muted)">
-                过期 {{ fmtTs(app.expires_at) }}
+                {{ t('keys.applications.expiredCell', { ts: fmtTs(app.expires_at) }) }}
               </div>
             </td>
             <td style="max-width:240px;word-break:break-word">{{ app.purpose || '—' }}</td>
@@ -208,11 +212,11 @@ onMounted(load)
                   class="btn btn-sm btn-primary"
                   style="margin-right:6px"
                   @click="openReview(app, 'approve')"
-                >通过</button>
+                >{{ t('keys.applications.action.approve') }}</button>
                 <button
                   class="btn btn-sm btn-danger"
                   @click="openReview(app, 'reject')"
-                >拒绝</button>
+                >{{ t('keys.applications.action.reject') }}</button>
               </template>
               <!-- Approved: show key prefix + reveal button -->
               <template v-else-if="app.status === 'approved' && app.issued_key_id">
@@ -226,7 +230,7 @@ onMounted(load)
                   :disabled="revealLoading === app.id"
                   @click="handleReveal(app)"
                 >
-                  {{ revealLoading === app.id ? '加载…' : '查看完整密钥' }}
+                  {{ revealLoading === app.id ? t('keys.applications.action.revealing') : t('keys.applications.action.reveal') }}
                 </button>
               </template>
               <span v-else style="color:var(--muted)">—</span>
@@ -244,35 +248,35 @@ onMounted(load)
     >
       <div class="card" style="width:480px;padding:24px" @click.stop>
         <h3 style="margin:0 0 16px">
-          {{ reviewAction === 'approve' ? '✅ 通过申请' : '❌ 拒绝申请' }}
+          {{ reviewAction === 'approve' ? t('keys.applications.modal.approveTitle') : t('keys.applications.modal.rejectTitle') }}
         </h3>
         <div style="margin-bottom:12px">
-          <div style="font-size:13px;color:var(--muted)">联系方式</div>
+          <div style="font-size:13px;color:var(--muted)">{{ t('keys.applications.modal.contact') }}</div>
           <div style="font-weight:500">{{ reviewing.contact }}</div>
         </div>
         <div v-if="reviewing.purpose" style="margin-bottom:12px">
-          <div style="font-size:13px;color:var(--muted)">申请用途</div>
+          <div style="font-size:13px;color:var(--muted)">{{ t('keys.applications.modal.purpose') }}</div>
           <div>{{ reviewing.purpose }}</div>
         </div>
         <div style="margin-bottom:16px">
-          <label style="font-size:13px;display:block;margin-bottom:4px">备注（可选）</label>
+          <label style="font-size:13px;display:block;margin-bottom:4px">{{ t('keys.applications.modal.remark') }}</label>
           <textarea
             v-model="reviewNotes"
             rows="3"
-            placeholder="管理员备注…"
+            :placeholder="t('keys.applications.modal.remarkPlaceholder')"
             style="width:100%;box-sizing:border-box"
           />
         </div>
         <p v-if="reviewError" style="color:var(--danger);margin-bottom:12px">{{ reviewError }}</p>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-ghost btn-sm" @click="closeReview">取消</button>
+          <button class="btn btn-ghost btn-sm" @click="closeReview">{{ t('keys.applications.modal.cancel') }}</button>
           <button
             class="btn btn-sm"
             :class="reviewAction === 'approve' ? 'btn-primary' : 'btn-danger'"
             :disabled="reviewSaving"
             @click="submitReview"
           >
-            {{ reviewSaving ? '处理中…' : (reviewAction === 'approve' ? '确认通过' : '确认拒绝') }}
+            {{ reviewSaving ? t('keys.applications.modal.processing') : (reviewAction === 'approve' ? t('keys.applications.modal.confirmApprove') : t('keys.applications.modal.confirmReject')) }}
           </button>
         </div>
       </div>

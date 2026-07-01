@@ -4,6 +4,7 @@ const KEY = 'llmgw_api_key'
 const JWT_KEY = 'llmgw_jwt_token'
 const USER_KEY = 'llmgw_user_info'
 const PREFERRED_CHAT_KEY_PREFIX = 'llmgw_preferred_key_id:'
+const LANG_KEY = 'llmgw_lang'
 
 export interface UserInfo {
   id: number
@@ -50,6 +51,26 @@ export function setPreferredChatKeyId(id: number) {
 
 export function clearPreferredChatKeyId() {
   localStorage.removeItem(preferredChatKeyStorageKey())
+}
+
+// ── Locale preference (UI language) ──────────────────────────────────────
+// Stored client-side and read as the initial locale on app boot (see
+// i18n/index.ts detectInitialLocale). The backend `general.default_locale`
+// Spec is the platform-wide fallback for users who have not picked one.
+// Returning '' means "no explicit choice" — i18n then falls back to browser
+// language, then DEFAULT_LOCALE. Not cleared on logout: the language is a
+// device-level UI preference, so the post-logout login page keeps it.
+export function getLang(): string {
+  return localStorage.getItem(LANG_KEY) ?? ''
+}
+
+export function setLang(code: string) {
+  if (code) localStorage.setItem(LANG_KEY, code)
+  else localStorage.removeItem(LANG_KEY)
+}
+
+export function clearLang() {
+  localStorage.removeItem(LANG_KEY)
 }
 
 export function setJwtToken(token: string) {

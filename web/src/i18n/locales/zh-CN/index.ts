@@ -5,6 +5,7 @@ import login from './login'
 import app from './app'
 import errors from './errors'
 import users from './users'
+import keys from './keys'
 
 export default {
   common,
@@ -13,4 +14,5 @@ export default {
   app,
   errors,
   users,
+  keys,
 }
