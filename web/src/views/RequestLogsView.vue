@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount, watch, Teleport } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   getRequestLogs,
   getRequestLogDetail,
@@ -18,6 +19,11 @@ import {
 } from '../api'
 import ModelPicker from '../components/ModelPicker.vue'
 import { isSuperAdmin, isDefaultTenant, getCurrentTenantId } from '../store'
+import { useFormat } from '../i18n/useFormat'
+import { localeRef } from '../i18n'
+
+const { t } = useI18n()
+const { fmtDateTime } = useFormat()
 
 const rows = ref<RequestLogRow[]>([])
 const keys = ref<ApiKey[]>([])
@@ -130,13 +136,13 @@ const tenantLabel = computed(() => {
   const tenantId = getCurrentTenantId()
   const isAdmin = isSuperAdmin()
   const isDefault = isDefaultTenant()
-  
+
   if (isAdmin && isDefault) {
-    return '整站数据'
+    return t('requests.defaultTenantOptions.whole')
   } else if (isDefault) {
-    return '默认租户'
+    return t('requests.defaultTenantOptions.defaultTenant')
   } else {
-    return `租户: ${tenantId}`
+    return t('requests.defaultTenantOptions.tenantPrefix', { id: tenantId })
   }
 })
 
@@ -169,28 +175,31 @@ function onModelFilterChange(name: string | string[]) {
   modelFilter.value = typeof name === 'string' ? name.trim() : ''
 }
 
+// Kind label maps — populated from i18n so the Chinese UI doesn't need
+// hand-maintained Records. Falls back to the raw kind string for unknown
+// codes (the backend can add new ones before the locale is updated).
 const ERROR_KIND_LABELS: Record<string, string> = {
-  model_not_found: '模型未找到',
-  provider_error: '供应商错误',
-  auth_error: '认证失败',
-  missing_key: '无Key',
-  invalid_key: 'Key无效',
-  auth_unavailable: '鉴权不可用',
-  body_read_error: 'Body读取失败',
-  body_too_large: 'Body过大',
-  json_parse_error: 'JSON无效',
-  rate_limit: '供应商限流',
-  rate_limit_exceeded: '网关RPM限流',
-  key_throttled: '密钥节流',
-  budget_exhausted: '预算耗尽',
-  insufficient_credits: '积分不足',
-  timeout: '超时',
-  canceled: '已取消',
-  upstream_error: '上游错误',
-  stream_error: '流中断',
-  no_candidate: '无可用路由',
-  session_forbidden: '会话无权',
-  executor_unavailable: '执行器不可用',
+  model_not_found: t('requests.errorKind.model_not_found'),
+  provider_error: t('requests.errorKind.provider_error'),
+  auth_error: t('requests.errorKind.auth_error'),
+  missing_key: t('requests.errorKind.missing_key'),
+  invalid_key: t('requests.errorKind.invalid_key'),
+  auth_unavailable: t('requests.errorKind.auth_unavailable'),
+  body_read_error: t('requests.errorKind.body_read_error'),
+  body_too_large: t('requests.errorKind.body_too_large'),
+  json_parse_error: t('requests.errorKind.json_parse_error'),
+  rate_limit: t('requests.errorKind.rate_limit'),
+  rate_limit_exceeded: t('requests.errorKind.rate_limit_exceeded'),
+  key_throttled: t('requests.errorKind.key_throttled'),
+  budget_exhausted: t('requests.errorKind.budget_exhausted'),
+  insufficient_credits: t('requests.errorKind.insufficient_credits'),
+  timeout: t('requests.errorKind.timeout'),
+  canceled: t('requests.errorKind.canceled'),
+  upstream_error: t('requests.errorKind.upstream_error'),
+  stream_error: t('requests.errorKind.stream_error'),
+  no_candidate: t('requests.errorKind.no_candidate'),
+  session_forbidden: t('requests.errorKind.session_forbidden'),
+  executor_unavailable: t('requests.errorKind.executor_unavailable'),
 }
 
 // 2026-06-19 T-NEW-7: labels for actual gateway failure codes (the only
@@ -199,29 +208,29 @@ const ERROR_KIND_LABELS: Record<string, string> = {
 // client_cancel are kept as "successful with caveat" in the status
 // column; only the "真" gateway errors get a Chinese label here.
 const FAILURE_DETAIL_LABELS: Record<string, string> = {
-  gw_rpm_exceeded: '网关RPM限流',
-  gw_concurrent_exceeded: '网关并发限流',
-  gw_tpm_exceeded: '网关TPM限流',
-  gw_key_throttled: '密钥节流',
-  gw_budget_exhausted: '预算耗尽',
-  gw_no_candidate: '无可用路由',
-  gw_session_forbidden: '会话无权',
-  eof_without_done: '上游EOF无[DONE]',
-  stream_timeout: '流超时',
-  client_cancel: '客户端取消',
-  client_disconnected: '客户端断连',
-  no_deltas: '无内容块',
-  invalid_first_chunk: '首块无效',
-  invalid_json: 'JSON无效',
-  upstream_5xx: '上游5xx',
-  upstream_4xx: '上游4xx',
-  unexpected_status: '状态异常',
-  connection_reset: '连接重置',
-  write_failed: '写入失败',
-  hangup: '远端挂断',
-  body_too_large: 'Body过大',
-  eof_mid_tool_call: '工具调用中断',
-  first_byte_timeout: '首字节超时',
+  gw_rpm_exceeded: t('requests.gwErrorKind.gw_rpm_exceeded'),
+  gw_concurrent_exceeded: t('requests.gwErrorKind.gw_concurrent_exceeded'),
+  gw_tpm_exceeded: t('requests.gwErrorKind.gw_tpm_exceeded'),
+  gw_key_throttled: t('requests.gwErrorKind.gw_key_throttled'),
+  gw_budget_exhausted: t('requests.gwErrorKind.gw_budget_exhausted'),
+  gw_no_candidate: t('requests.gwErrorKind.gw_no_candidate'),
+  gw_session_forbidden: t('requests.gwErrorKind.gw_session_forbidden'),
+  eof_without_done: t('requests.gwErrorKind.eof_without_done'),
+  stream_timeout: t('requests.gwErrorKind.stream_timeout'),
+  client_cancel: t('requests.gwErrorKind.client_cancel'),
+  client_disconnected: t('requests.gwErrorKind.client_disconnected'),
+  no_deltas: t('requests.gwErrorKind.no_deltas'),
+  invalid_first_chunk: t('requests.gwErrorKind.invalid_first_chunk'),
+  invalid_json: t('requests.gwErrorKind.invalid_json'),
+  upstream_5xx: t('requests.gwErrorKind.upstream_5xx'),
+  upstream_4xx: t('requests.gwErrorKind.upstream_4xx'),
+  unexpected_status: t('requests.gwErrorKind.unexpected_status'),
+  connection_reset: t('requests.gwErrorKind.connection_reset'),
+  write_failed: t('requests.gwErrorKind.write_failed'),
+  hangup: t('requests.gwErrorKind.hangup'),
+  body_too_large: t('requests.gwErrorKind.body_too_large'),
+  eof_mid_tool_call: t('requests.gwErrorKind.eof_mid_tool_call'),
+  first_byte_timeout: t('requests.gwErrorKind.first_byte_timeout'),
 }
 
 // 2026-06-19 T-NEW-7: labels for the SOLE home of the upstream
@@ -229,12 +238,12 @@ const FAILURE_DETAIL_LABELS: Record<string, string> = {
 // failures; the UI surfaces them as informational metadata in the
 // request detail panel, not as a "失败详情" pill.
 const UPSTREAM_FINISH_REASON_LABELS: Record<string, string> = {
-  stop: '正常完成',
-  tool_calls: '工具调用',
-  function_call: '函数调用',
-  length: '达到长度上限',
-  end_turn: '轮次结束',
-  max_tokens: '达到 max_tokens',
+  stop: t('requests.finish.stop'),
+  tool_calls: t('requests.finish.tool_calls'),
+  function_call: t('requests.finish.function_call'),
+  length: t('requests.finish.length'),
+  end_turn: t('requests.finish.end_turn'),
+  max_tokens: t('requests.finish.max_tokens'),
 }
 
 function upstreamFinishReasonLabel(v: string | null | undefined): string {
@@ -243,8 +252,8 @@ function upstreamFinishReasonLabel(v: string | null | undefined): string {
 }
 
 function statusLabel(row: RequestLogRow): string {
-  if (row.request_status === 'in_progress') return '请求中'
-  if (row.request_status === 'success' || row.success) return '成功'
+  if (row.request_status === 'in_progress') return t('requests.status.in_progress')
+  if (row.request_status === 'success' || row.success) return t('requests.status.success')
   // 2026-06-19 T-NEW-7: failure_detail_code now contains ONLY real failure
   // codes. upstream_finish_reason is informational and should never be
   // read as a failure label.
@@ -252,8 +261,8 @@ function statusLabel(row: RequestLogRow): string {
   if (FAILURE_DETAIL_LABELS[detail]) return FAILURE_DETAIL_LABELS[detail]
   const kind = row.error_kind || ''
   if (ERROR_KIND_LABELS[kind]) return ERROR_KIND_LABELS[kind]
-  if (detail.startsWith('gw_')) return `网关:${detail.slice(3)}`
-  return kind || detail || '失败'
+  if (detail.startsWith('gw_')) return `${t('requests.errorKind.gw_prefix')}${detail.slice(3)}`
+  return kind || detail || t('requests.status.failure')
 }
 
 function statusTitle(row: RequestLogRow): string {
@@ -304,23 +313,23 @@ function compressionLabel(row: RequestLogRow): { reason: string; strategy: strin
   // compression_strategy means something fired.
   if (!row.compression_reason && !row.compression_strategy) return null
   const reasonMap: Record<string, string> = {
-    'mode_1_auto_threshold': '自动阈值',
-    'mode_2_on_4xx': '4xx 重试',
-    'sliding_window_token': '滑动窗口·token',
-    'sliding_window_count': '滑动窗口·消息数',
-    'sliding_window_idle': '滑动窗口·空闲',
-    'sliding_window_mechanical_trim': '滑动窗口·机械',
+    'mode_1_auto_threshold': t('requests.compression.mode_1_auto_threshold'),
+    'mode_2_on_4xx': t('requests.compression.mode_2_on_4xx'),
+    'sliding_window_token': t('requests.compression.sliding_window_token'),
+    'sliding_window_count': t('requests.compression.sliding_window_count'),
+    'sliding_window_idle': t('requests.compression.sliding_window_idle'),
+    'sliding_window_mechanical_trim': t('requests.compression.sliding_window_mechanical_trim'),
   }
   const strategyMap: Record<string, string> = {
-    'mechanical_trim': '机械裁剪',
-    'memora_l1_inject': 'Memora 注入',
-    'llm_summary': 'LLM 摘要',
-    'noop': '未压缩',
+    'mechanical_trim': t('requests.compression.mechanical_trim'),
+    'memora_l1_inject': t('requests.compression.memora_l1_inject'),
+    'llm_summary': t('requests.compression.llm_summary'),
+    'noop': t('requests.compression.noop'),
     // v3 (2026-06-19) session-level strategies
-    'delta_append': '增量拼接',
-    'sliding_window_token': '滑动·token',
-    'sliding_window_count': '滑动·消息数',
-    'sliding_window_idle': '滑动·空闲',
+    'delta_append': t('requests.compression.short.delta_append'),
+    'sliding_window_token': t('requests.compression.short.sliding_window_token'),
+    'sliding_window_count': t('requests.compression.short.sliding_window_count'),
+    'sliding_window_idle': t('requests.compression.short.sliding_window_idle'),
   }
   // For v3 sliding-window triggered entries, the "reason" label is the
   // window trigger (stored in compression_strategy) and the v7 reason
@@ -330,10 +339,10 @@ function compressionLabel(row: RequestLogRow): { reason: string; strategy: strin
   // Special case: v3 delta_append has compression_reason empty + strategy = 'delta_append'.
   // Treat as '增量拼接' strategy with reason '同会话增量'.
   if (row.compression_strategy === 'delta_append' && !row.compression_reason) {
-    reason = '同会话增量'
+    reason = t('requests.compression.reason.same_session_delta')
   }
   // Build a tooltip with byte/token deltas from compression_meta when present.
-  let tip = `原因: ${reason}\n策略: ${strategy}`
+  let tip = `${t('requests.detail_extra.tipReason', { r: reason })}\n${t('requests.detail_extra.tipStrategy', { s: strategy })}`
   const meta = row.compression_meta as Record<string, any> | null
   if (meta) {
     if (meta.tokens_before && meta.tokens_after) {
@@ -346,25 +355,25 @@ function compressionLabel(row: RequestLogRow): { reason: string; strategy: strin
       tip += `\nBytes: ${kbBefore}KB → ${kbAfter}KB`
     }
     if (meta.latency_ms) {
-      tip += `\n延迟: ${meta.latency_ms}ms`
+      tip += `\n${t('requests.detail_extra.tipLatency', { n: meta.latency_ms })}`
     }
     // v3 fields: window_triggered + summary_marker
     if (meta.window_triggered) {
-      tip += `\n触发: ${meta.window_triggered}`
+      tip += `\n${t('requests.detail_extra.tipTrigger', { v: meta.window_triggered })}`
     }
     if (meta.summary_marker) {
-      tip += `\n摘要标记: ${String(meta.summary_marker).slice(0, 24)}…`
+      tip += `\n${t('requests.detail_extra.tipSummaryMarker', { v: String(meta.summary_marker).slice(0, 24) })}`
     }
   }
   // v3 outbound counts (always when outbound body was set, regardless of meta)
   if (typeof row.outbound_msg_count === 'number') {
-    tip += `\n转发消息数: ${row.outbound_msg_count}`
+    tip += `\n${t('requests.detail_extra.tipOutboundMsgCount', { n: row.outbound_msg_count })}`
     if (typeof row.outbound_token_est === 'number') {
       tip += ` (≈${row.outbound_token_est} tokens)`
     }
   }
   if (row.parent_request_id) {
-    tip += `\n父请求: ${row.parent_request_id}`
+    tip += `\n${t('requests.detail_extra.tipParentRequest', { id: row.parent_request_id })}`
   }
   return { reason, strategy, tip }
 }
@@ -450,18 +459,18 @@ async function generateSessionSummary() {
 
 function summaryExportContent(data: SessionSummaryResponse): string {
   const lines: string[] = []
-  lines.push('# 会话总结')
+  lines.push(t('requests.list.summary.title'))
   lines.push('')
   lines.push(`- Session ID: ${data.meta.session_id}`)
-  lines.push(`- 时间范围: ${fmtTs(data.meta.data_from)} ~ ${fmtTs(data.meta.data_to)}`)
-  lines.push(`- 日志条数: ${data.meta.log_count}`)
-  lines.push(`- 生成时间: ${fmtTs(data.meta.generated_at)}`)
+  lines.push(t('requests.list.summary.range', { from: fmtTs(data.meta.data_from), to: fmtTs(data.meta.data_to) }))
+  lines.push(t('requests.list.summary.logCount', { n: data.meta.log_count }))
+  lines.push(t('requests.list.summary.generatedAt', { ts: fmtTs(data.meta.generated_at) }))
   lines.push('')
-  lines.push('## 摘要')
+  lines.push(t('requests.list.summary.summaryHeading'))
   lines.push(data.summary)
   if (data.key_points && data.key_points.length) {
     lines.push('')
-    lines.push('## 关键要点')
+    lines.push(t('requests.list.summary.keyPointsHeading'))
     for (const p of data.key_points) lines.push(`- ${p}`)
   }
   return lines.join('\n')
@@ -522,9 +531,9 @@ function routeModelTitle(r: RequestLogRow): string {
   const requestModel = r.canonical_name || r.client_model || '—'
   const providerModel = (r.provider_model || r.outbound_model || '').trim()
   if (!providerModel || providerModel.toLowerCase() === requestModel.toLowerCase()) {
-    return `请求模型: ${requestModel}`
+    return `${t('requests.detail_extra.requestedModelPrefix')}${requestModel}`
   }
-  return `请求模型: ${requestModel} → 供应商模型: ${providerModel}`
+  return t('requests.detail_extra.requestedToProviderModelPrefix', { a: requestModel, b: providerModel })
 }
 
 function outboundModelDisplay(r: Pick<RequestLogRow, 'provider_model' | 'outbound_model'> | null | undefined): string {
@@ -538,9 +547,9 @@ function outboundModelTitle(r: Pick<RequestLogRow, 'provider_model' | 'outbound_
   const shown = outboundModelDisplay(r)
   const recorded = (r.outbound_model || '').trim()
   if (r.provider_model && recorded && r.provider_model !== recorded) {
-    return `出站模型: ${shown}（记录值: ${recorded}）`
+    return t('requests.detail_extra.outboundModelRecordedPrefix', { shown, recorded })
   }
-  return `出站模型: ${shown}`
+  return `${t('requests.detail_extra.outboundModelPrefix')}${shown}`
 }
 
 function ellipsize(value: string | null | undefined, max = 28): string {
@@ -559,14 +568,14 @@ function callerUserLine(r: RequestLogRow): string {
 
 function callerUserTitle(r: RequestLogRow): string {
   const parts: string[] = []
-  if (r.api_key_owner_user) parts.push(`用户: ${r.api_key_owner_user}`)
-  if (r.end_user_id) parts.push(`终端用户: ${r.end_user_id}`)
-  if (r.application_code) parts.push(`应用: ${r.application_code}`)
+  if (r.api_key_owner_user) parts.push(`${t('requests.detail_extra.userPrefix')}${r.api_key_owner_user}`)
+  if (r.end_user_id) parts.push(`${t('requests.detail_extra.endUserPrefix')}${r.end_user_id}`)
+  if (r.application_code) parts.push(`${t('requests.detail_extra.applicationPrefix')}${r.application_code}`)
   return parts.join(' · ') || '—'
 }
 
 function callerKeyLine(r: RequestLogRow): string {
-  const key = r.api_key_prefix ?? (r.api_key_id != null ? `key#${r.api_key_id}` : '无key')
+  const key = r.api_key_prefix ?? (r.api_key_id != null ? `key#${r.api_key_id}` : t('requests.detail_extra.noKeyPrefix'))
   if (r.application_code && r.api_key_owner_user) return `${key} · ${r.application_code}`
   if (r.application_code) return `${key} · ${r.application_code}`
   return key
@@ -574,19 +583,19 @@ function callerKeyLine(r: RequestLogRow): string {
 
 function callerKeyTitle(r: RequestLogRow): string {
   const parts: string[] = []
-  if (r.api_key_prefix) parts.push(`Key: ${r.api_key_prefix}`)
-  else if (r.api_key_id != null) parts.push(`Key ID: ${r.api_key_id}`)
-  else parts.push('Key: 无')
-  if (r.application_code) parts.push(`应用: ${r.application_code}`)
+  if (r.api_key_prefix) parts.push(`${t('requests.detail_extra.apiKeyPrefix')}: ${r.api_key_prefix}`)
+  else if (r.api_key_id != null) parts.push(`${t('requests.detail_extra.apiKeyPrefix')} ID: ${r.api_key_id}`)
+  else parts.push(t('requests.detail_extra.noKeyDetail'))
+  if (r.application_code) parts.push(`${t('requests.detail_extra.applicationPrefix')}${r.application_code}`)
   return parts.join(' · ')
 }
 
 function traceSessionTitle(id: string) {
-  return `会话 ID（点击筛选同脉络）\n${id}`
+  return `${t('requests.detail_extra.sessionIdTitle')}\n${id}`
 }
 
 function traceTaskTitle(id: string) {
-  return `任务 ID（点击仅筛此任务）\n${id}`
+  return `${t('requests.detail_extra.taskIdTitle')}\n${id}`
 }
 
 async function load() {
@@ -632,15 +641,16 @@ function resetPageAndLoad() {
 }
 
 function fmtTs(ts: string) {
-  return new Date(ts).toLocaleString('zh-CN', { hour12: false })
+  return fmtDateTime(ts)
 }
 
 function fmtDate(ts: string) {
-  return new Date(ts).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+  // Local short MM/DD; useFormat.fmtDate returns locale-aware short date.
+  return new Date(ts).toLocaleDateString(localeRef.value, { month: '2-digit', day: '2-digit' })
 }
 
 function fmtTime(ts: string) {
-  return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  return new Date(ts).toLocaleTimeString(localeRef.value, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 function token(v: number | null | undefined, usageSource?: 'llm' | 'estimated' | null) {
@@ -656,13 +666,13 @@ function token(v: number | null | undefined, usageSource?: 'llm' | 'estimated' |
 }
 
 function tokenTitle(usageSource?: 'llm' | 'estimated' | null): string {
-  if (usageSource === 'estimated') return '估算值（上游未返回 usage，本地按字符/单词启发式估算）'
-  if (usageSource === 'llm') return 'LLM 返回值'
+  if (usageSource === 'estimated') return t('requests.detail_extra.estimatedNote')
+  if (usageSource === 'llm') return t('requests.detail_extra.llmReported')
   return ''
 }
 
 function costDisplay(v: number | string | null | undefined, currency: string | null | undefined) {
-  if (v == null) return currency ? `待定价(${currency})` : '待定价'
+  if (v == null) return currency ? t('requests.detail_extra.pendingPricing', { currency }) : t('requests.detail_extra.pendingPricingNoCurrency')
   const amount = Number(v).toFixed(6)
   return currency ? `${amount} ${currency}` : amount
 }
@@ -721,7 +731,7 @@ function closeDetail() {
 }
 
 function formatJson(obj: any): string {
-  if (obj == null) return '(无数据)'
+  if (obj == null) return t('requests.common.noData')
   try {
     return JSON.stringify(obj, null, 2)
   } catch {
@@ -853,25 +863,31 @@ function compressExplainText(row: any): string {
   const meta = row.compression_meta as Record<string, any> | null
   switch (strat) {
     case 'delta_append':
-      return '该请求处于已有会话中，网关只转发了新增的消息（已压缩的历史保留在缓存中），无需重新发送完整历史。'
+      return t('requests.list.session.same_session_no_retransmit')
     case 'sliding_window_token':
     case 'sliding_window_count':
-    case 'sliding_window_idle':
-      return [
-        `会话消息过多，触发了${strat === 'sliding_window_token' ? 'Token 阈值' : strat === 'sliding_window_idle' ? '空闲超时' : '消息数阈值'}`,
-        meta?.summary_marker ? '，已由 LLM 生成无损摘要保留关键信息。' : '，已触发滑动窗口压缩。',
-      ].join('')
+    case 'sliding_window_idle': {
+      const strategyName = strat === 'sliding_window_token'
+        ? t('requests.list.session.strategy_token')
+        : strat === 'sliding_window_idle'
+          ? t('requests.list.session.strategy_idle')
+          : t('requests.list.session.strategy_count')
+      const suffix = meta?.summary_marker
+        ? t('requests.list.session.with_llm_summary')
+        : t('requests.list.session.with_sliding_compress')
+      return t('requests.list.session.too_many_messages', { strategy: strategyName }) + suffix
+    }
     case 'mechanical_trim':
-      if (reason === 'mode_2_on_4xx') return '上游供应商返回 context_length 错误（上下文超限），网关对历史消息进行了机械裁剪以适配上游窗口限制。'
-      return 'LLM 摘要压缩失败后降级，采用机械裁剪方式保留 system + 首条 user + 最近 N 对消息。'
+      if (reason === 'mode_2_on_4xx') return t('requests.list.session.mechanical_4xx')
+      return t('requests.list.session.mechanical_fallback')
     case 'memora_l1_inject':
-      return '上下文超出窗口，网关从 Memora 检索了该用户的 L1 事实作为"动态上下文"注入到请求中。'
+      return t('requests.list.session.memora_inject')
     case 'llm_summary':
-      return '上下文超出窗口，已由 LLM 生成结构化摘要（User Intent / Completed Work / …），压缩后替换了旧消息。'
+      return t('requests.list.session.llm_summary_done')
     case 'noop':
-      return '压缩被跳过（模式配置为 off，或 warmup 阶段事实不足）。'
+      return t('requests.list.session.skipped')
     default:
-      return strat ? `压缩策略: ${strat}` : ''
+      return strat ? t('requests.list.session.strategyLabel', { strat }) : ''
   }
 }
 
@@ -910,21 +926,21 @@ onMounted(async () => {
 <template>
   <div>
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h2 style="margin:0">请求日志</h2>
+      <h2 style="margin:0">{{ t('requests.list.title') }}</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <span class="tenant-badge" :class="{ 'tenant-badge--admin': isSuperAdmin(), 'tenant-badge--default': isDefaultTenant() }">
           {{ tenantLabel }}
         </span>
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;user-select:none">
           <input type="checkbox" v-model="autoRefresh" style="cursor:pointer" />
-          <span>自动刷新</span>
+          <span>{{ t('requests.list.autoRefresh') }}</span>
         </label>
-        <button class="btn btn-primary btn-sm" :disabled="loading" @click="load">刷新</button>
+        <button class="btn btn-primary btn-sm" :disabled="loading" @click="load">{{ t('requests.list.refresh') }}</button>
       </div>
     </div>
 
     <div v-if="!isDefaultTenant()" class="tenant-notice" style="margin-bottom:12px;padding:8px 12px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:6px;font-size:12px;color:#3b82f6">
-      非 default 租户只能查看最近 3 天的请求日志
+      {{ t('requests.list.tenantNonDefaultHint') }}
     </div>
 
     <!-- v3 压缩说明卡片 (2026-06-20) -->
@@ -934,45 +950,43 @@ onMounted(async () => {
         @click="showCompressionGuide = !showCompressionGuide"
       >
         <span style="font-weight:600;display:flex;align-items:center;gap:6px">
-          <span>🤖 压缩与会话缓存说明</span>
+          <span>{{ t('requests.list.compress.guideTitle') }}</span>
           <span v-if="compressionStats.totalCompressed > 0" class="badge" style="font-size:10px;padding:2px 6px">
-            本页 {{ compressionStats.totalCompressed }} 条已压缩
-            <template v-if="compressionStats.deltaCount"> · 增量拼接 {{ compressionStats.deltaCount }}</template>
-            <template v-if="compressionStats.slidingCount"> · 滑动窗口 {{ compressionStats.slidingCount }}</template>
+            {{ t('requests.list.compress.summaryTemplate', { total: compressionStats.totalCompressed }) }}
+            <template v-if="compressionStats.deltaCount">{{ t('requests.list.compress.deltaSuffix', { n: compressionStats.deltaCount }) }}</template>
+            <template v-if="compressionStats.slidingCount">{{ t('requests.list.compress.slidingSuffix', { n: compressionStats.slidingCount }) }}</template>
           </span>
         </span>
-        <span style="color:var(--text-secondary,#6b7280);font-size:11px">{{ showCompressionGuide ? '收起 ▲' : '展开 ▼' }}</span>
+        <span style="color:var(--text-secondary,#6b7280);font-size:11px">{{ showCompressionGuide ? t('requests.common.collapse') : t('requests.common.expand') }}</span>
       </div>
       <div v-if="showCompressionGuide" style="padding:8px 12px 12px;border-top:1px solid var(--border,#333);line-height:1.7">
-        <p style="margin:0 0 6px"><strong>会话缓存机制</strong>：网关按 <code>X-Gw-Session-Id</code> 维度缓存会话历史。
-        同一会话的多轮请求不再重复发送完整历史，只发送新增部分。缓存分三级：
-        L1 进程内存 / L2 Redis / L3 数据库兜底。</p>
-        <p style="margin:0 0 6px"><strong>压缩策略说明</strong>：</p>
+        <p style="margin:0 0 6px"><strong>{{ t('requests.list.compress.cacheTitle') }}</strong>：{{ t('requests.list.compress.cacheBody') }}</p>
+        <p style="margin:0 0 6px"><strong>{{ t('requests.list.compress.strategyTitle') }}</strong>：</p>
         <table style="width:100%;border-collapse:collapse;font-size:11px">
           <tr>
-            <th style="text-align:left;padding:3px 6px;border:1px solid var(--border,#444);background:var(--surface-primary,#16213e);white-space:nowrap">策略</th>
-            <th style="text-align:left;padding:3px 6px;border:1px solid var(--border,#444);background:var(--surface-primary,#16213e)">触发条件</th>
-            <th style="text-align:left;padding:3px 6px;border:1px solid var(--border,#444);background:var(--surface-primary,#16213e)">效果</th>
+            <th style="text-align:left;padding:3px 6px;border:1px solid var(--border,#444);background:var(--surface-primary,#16213e);white-space:nowrap">{{ t('requests.list.compress.tableHeaderStrategy') }}</th>
+            <th style="text-align:left;padding:3px 6px;border:1px solid var(--border,#444);background:var(--surface-primary,#16213e)">{{ t('requests.list.compress.tableHeaderTrigger') }}</th>
+            <th style="text-align:left;padding:3px 6px;border:1px solid var(--border,#444);background:var(--surface-primary,#16213e)">{{ t('requests.list.compress.tableHeaderEffect') }}</th>
           </tr>
           <tr>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444);white-space:nowrap;color:var(--success,#22c55e)">增量拼接 (delta_append)</td>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444)">同会话有新增消息</td>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444)">只转发新增的消息（已压缩历史保留在缓存中）</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444);white-space:nowrap;color:var(--success,#22c55e)">{{ t('requests.list.compress.strategies.delta_append') }}</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444)">{{ t('requests.list.compress.strategies.delta_trigger') }}</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444)">{{ t('requests.list.compress.strategies.delta_effect') }}</td>
           </tr>
           <tr>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444);white-space:nowrap;color:var(--warning,#f59e0b)">滑动窗口 (sliding_window)</td>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444)">消息数 ≥ 50 / Token超阈值 / 空闲 ≥ 5 分钟</td>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444)">触发 LLM 无损摘要（保留关键事实、路径、ID、错误等）→ 摘要失败时降级为机械裁剪</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444);white-space:nowrap;color:var(--warning,#f59e0b)">{{ t('requests.list.compress.strategies.sliding_window') }}</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444)">{{ t('requests.list.compress.strategies.sliding_trigger') }}</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444)">{{ t('requests.list.compress.strategies.sliding_effect') }}</td>
           </tr>
           <tr>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444);white-space:nowrap;color:#b45309">机械裁剪 (mechanical_trim)</td>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444)">上游 4xx context_length / 滑动窗口摘要失败</td>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444)">从最早消息开始逐对裁剪，保留 system + 首条 user + 最近 N 对</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444);white-space:nowrap;color:#b45309">{{ t('requests.list.compress.strategies.mechanical_trim') }}</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444)">{{ t('requests.list.compress.strategies.mechanical_trigger') }}</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444)">{{ t('requests.list.compress.strategies.mechanical_effect') }}</td>
           </tr>
           <tr>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444);white-space:nowrap;color:#6d28d9">Memora 注入</td>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444)">上下文超限时检索 Memora L1 事实</td>
-            <td style="padding:3px 6px;border:1px solid var(--border,#444)">将历史事实作为"动态上下文"注入请求</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444);white-space:nowrap;color:#6d28d9">{{ t('requests.list.compress.strategies.memora_l1_inject') }}</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444)">{{ t('requests.list.compress.strategies.memora_trigger') }}</td>
+            <td style="padding:3px 6px;border:1px solid var(--border,#444)">{{ t('requests.list.compress.strategies.memora_effect') }}</td>
           </tr>
         </table>
       </div>
@@ -980,84 +994,79 @@ onMounted(async () => {
 
     <div class="compact-filter-bar compact-filter-bar--stacked">
       <div class="cf-row">
-        <select v-model="apiKeyId" class="cf-select cf-cred" title="API Key">
-          <option value="">全部 Key</option>
+        <select v-model="apiKeyId" class="cf-select cf-cred" :title="'API Key'">
+          <option value="">{{ t('requests.list.filter.keyAll') }}</option>
           <option v-for="k in keys" :key="k.id" :value="k.id">{{ k.key_prefix }} ({{ k.application_code }})</option>
         </select>
-        <select v-model="hours" class="cf-select cf-hours" title="时间范围" @change="validateHours">
-          <option :value="1">1小时</option>
-          <option :value="6">6小时</option>
-          <option :value="24">24小时</option>
-          <option :value="72">3天</option>
-          <option :value="168" :disabled="!isDefaultTenant()">7天</option>
+        <select v-model="hours" class="cf-select cf-hours" :title="t('requests.list.filter.timeTitle')" @change="validateHours">
+          <option :value="1">{{ t('requests.list.filter.timeOptions.h1') }}</option>
+          <option :value="6">{{ t('requests.list.filter.timeOptions.h6') }}</option>
+          <option :value="24">{{ t('requests.list.filter.timeOptions.h24') }}</option>
+          <option :value="72">{{ t('requests.list.filter.timeOptions.d3') }}</option>
+          <option :value="168" :disabled="!isDefaultTenant()">{{ t('requests.list.filter.timeOptions.d7') }}</option>
         </select>
-        <select v-model="successFilter" class="cf-select cf-status" title="结果">
-          <option value="">全部</option>
-          <option value="in_progress">请求中</option>
-          <option value="success">成功</option>
-          <option value="failure">失败</option>
+        <select v-model="successFilter" class="cf-select cf-status" :title="t('requests.list.filter.resultTitle')">
+          <option value="">{{ t('requests.list.filter.resultAll') }}</option>
+          <option value="in_progress">{{ t('requests.list.filter.resultInProgress') }}</option>
+          <option value="success">{{ t('requests.list.filter.resultSuccess') }}</option>
+          <option value="failure">{{ t('requests.list.filter.resultFailure') }}</option>
         </select>
-        <select v-model="errorKindFilter" class="cf-select cf-error" title="错误类型">
-          <option value="">全部错误</option>
-          <option value="model_not_found">模型未找到</option>
-          <option value="provider_error">供应商错误</option>
-          <option value="timeout">超时</option>
-          <option value="rate_limit">供应商限流</option>
-          <option value="rate_limit_exceeded">网关RPM限流</option>
-          <option value="key_throttled">密钥节流</option>
+        <select v-model="errorKindFilter" class="cf-select cf-error" :title="t('requests.list.filter.errorTitle')">
+          <option value="">{{ t('requests.list.filter.errorAll') }}</option>
+          <option v-for="kind in Object.keys(ERROR_KIND_LABELS)" :key="kind" :value="kind">{{ ERROR_KIND_LABELS[kind] }}</option>
         </select>
         <select
           v-model="usageSourceFilter"
           class="cf-select cf-source"
-          title="estimated = 本地估算（上游未返回 usage）"
+          :title="t('requests.list.filter.tokenSourceTitle')"
         >
-          <option value="">Token来源</option>
-          <option value="llm">LLM返回</option>
-          <option value="estimated">本地估算</option>
+          <option value="">{{ t('requests.list.filter.tokenSourceAll') }}</option>
+          <option value="llm">{{ t('requests.list.filter.tokenSourceLlm') }}</option>
+          <option value="estimated">{{ t('requests.list.filter.tokenSourceEstimated') }}</option>
         </select>
-        <span class="cf-meta">共 {{ total }} 条</span>
+        <span class="cf-meta">{{ t('requests.list.filter.totalMeta', { n: total }) }}</span>
       </div>
       <div class="cf-row cf-row--secondary">
         <div class="cf-field cf-field--model">
-          <span class="cf-label">模型（可选）</span>
+          <span class="cf-label">{{ t('requests.list.filter.modelLabel') }}</span>
           <ModelPicker
             v-model="modelFilter"
-            placeholder="选择模型…"
-            title="筛选请求日志模型"
+            :placeholder="t('requests.list.filter.modelPlaceholder')"
+            :title="t('requests.list.filter.modelTitle')"
             @update:model-value="onModelFilterChange"
           />
         </div>
         <div class="cf-field cf-field--grow">
-          <span class="cf-label">消息片段</span>
+          <span class="cf-label">{{ t('requests.list.filter.messageLabel') }}</span>
           <input
             v-model="keyword"
             type="text"
             class="cf-input"
-            placeholder="搜索请求消息内容…"
+            :placeholder="t('requests.list.filter.messagePlaceholder')"
             @keyup.enter="resetPageAndLoad"
           />
         </div>
         <div class="cf-field cf-field--grow">
-          <span class="cf-label">会话 ID</span>
+          <span class="cf-label">{{ t('requests.list.filter.sessionLabel') }}</span>
           <input
             v-model="gwSessionFilter"
             type="text"
             class="cf-input"
-            placeholder="X-Gw-Session-Id…"
+            :placeholder="t('requests.list.filter.sessionPlaceholder')"
             @keyup.enter="resetPageAndLoad"
           />
         </div>
         <div class="cf-field cf-field--grow">
-          <span class="cf-label">任务 ID</span>
+          <span class="cf-label">{{ t('requests.list.filter.taskLabel') }}</span>
           <input
             v-model="gwTaskFilter"
             type="text"
             class="cf-input"
-            placeholder="X-Gw-Task-Id…"
+            :placeholder="t('requests.list.filter.taskPlaceholder')"
             @keyup.enter="resetPageAndLoad"
           />
         </div>
-        <button class="btn btn-primary btn-sm" @click="resetPageAndLoad">查询</button>
+        <button class="btn btn-primary btn-sm" @click="resetPageAndLoad">{{ t('requests.list.query') }}</button>
       </div>
     </div>
 
@@ -1068,47 +1077,47 @@ onMounted(async () => {
       class="card trace-summary"
       style="margin-bottom:12px;padding:10px 14px;font-size:12px;display:flex;gap:16px;align-items:center;flex-wrap:wrap"
     >
-      <span style="font-weight:600">任务脉络</span>
-      <span>共 {{ total }} 步（本页 {{ taskSummary.total }}）</span>
-      <span style="color:var(--success)">成功 {{ taskSummary.ok }}</span>
-      <span style="color:var(--danger)">失败 {{ taskSummary.fail }}</span>
-      <span v-if="taskSummary.pending" style="color:var(--warning, #f59e0b)">进行中 {{ taskSummary.pending }}</span>
-      <span v-if="gwTaskFilter" style="color:var(--muted)">任务: {{ gwTaskFilter }}</span>
-      <span v-if="gwSessionFilter" style="color:var(--muted)">会话: {{ shortHash(gwSessionFilter) }}</span>
-      <button class="btn btn-ghost btn-sm" style="margin-left:auto" @click="clearTraceFilter">清除脉络筛选</button>
+      <span style="font-weight:600">{{ t('requests.list.trace.title') }}</span>
+      <span>{{ t('requests.list.trace.summaryTemplate', { total: total, n: taskSummary.total }) }}</span>
+      <span style="color:var(--success)">{{ t('requests.list.trace.successLabel', { n: taskSummary.ok }) }}</span>
+      <span style="color:var(--danger)">{{ t('requests.list.trace.failLabel', { n: taskSummary.fail }) }}</span>
+      <span v-if="taskSummary.pending" style="color:var(--warning, #f59e0b)">{{ t('requests.list.trace.pendingLabel', { n: taskSummary.pending }) }}</span>
+      <span v-if="gwTaskFilter" style="color:var(--muted)">{{ t('requests.list.trace.taskFilter', { id: gwTaskFilter }) }}</span>
+      <span v-if="gwSessionFilter" style="color:var(--muted)">{{ t('requests.list.trace.sessionFilter', { id: shortHash(gwSessionFilter) }) }}</span>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" @click="clearTraceFilter">{{ t('requests.list.trace.clear') }}</button>
     </div>
 
     <div v-if="canSummarizeSession" class="card" style="margin-bottom:12px;padding:12px">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <strong>会话总结</strong>
-        <span style="color:var(--muted);font-size:12px">仅在会话 ID 筛选下可用</span>
+        <strong>{{ t('requests.list.trace.sessionSummary') }}</strong>
+        <span style="color:var(--muted);font-size:12px">{{ t('requests.list.trace.sessionSummaryHint') }}</span>
         <button class="btn btn-primary btn-sm" :disabled="summaryLoading" @click="generateSessionSummary">
-          {{ summaryLoading ? '总结中…' : '生成总结' }}
+          {{ summaryLoading ? t('requests.list.trace.generating') : t('requests.list.trace.generate') }}
         </button>
         <button
           v-if="summaryResult"
           class="btn btn-ghost btn-sm"
           @click="exportSessionSummary('md')"
-        >导出 Markdown</button>
+        >{{ t('requests.list.trace.exportMd') }}</button>
         <button
           v-if="summaryResult"
           class="btn btn-ghost btn-sm"
           @click="exportSessionSummary('txt')"
-        >导出 TXT</button>
+        >{{ t('requests.list.trace.exportTxt') }}</button>
         <button
           class="btn btn-ghost btn-sm"
           :disabled="memoraLoading"
           @click="writeSummaryToMemora"
-        >{{ memoraLoading ? '写入中…' : '写入 Memora' }}</button>
+        >{{ memoraLoading ? t('requests.list.trace.writingMemora') : t('requests.list.trace.writeMemora') }}</button>
       </div>
       <p v-if="summaryError" style="margin:8px 0 0;color:var(--danger)">{{ summaryError }}</p>
       <p v-if="memoraError" style="margin:8px 0 0;color:var(--danger)">Memora: {{ memoraError }}</p>
       <p v-if="memoraResult" style="margin:8px 0 0;color:var(--success, #22c55e)">
-        已写入 Memora：{{ memoraResult.written }} 条（{{ memoraResult.status }}）
+        {{ t('requests.list.trace.memoraWritten', { n: memoraResult.written, status: memoraResult.status }) }}
       </p>
       <div v-if="summaryResult" style="margin-top:10px;font-size:12px">
         <div style="color:var(--muted);margin-bottom:6px">
-          范围：{{ fmtTs(summaryResult.meta.data_from) }} ~ {{ fmtTs(summaryResult.meta.data_to) }} · {{ summaryResult.meta.log_count }} 条
+          {{ t('requests.list.trace.summaryRange', { from: fmtTs(summaryResult.meta.data_from), to: fmtTs(summaryResult.meta.data_to), n: summaryResult.meta.log_count }) }}
         </div>
         <div style="white-space:pre-wrap;line-height:1.6">{{ summaryResult.summary }}</div>
         <ul v-if="summaryResult.key_points?.length" style="margin:8px 0 0;padding-left:18px">
@@ -1119,10 +1128,10 @@ onMounted(async () => {
 
     <div v-if="!loading && total > 0" class="pagination-bar">
       <div class="pagination-info">
-        <span>共 {{ total }} 条</span>
-        <span v-if="total > 0">· 第 {{ page }} / {{ Math.max(1, Math.ceil(total / pageSize)) }} 页</span>
+        <span>{{ t('requests.list.pagination.total', { n: total }) }}</span>
+        <span v-if="total > 0">{{ t('requests.list.pagination.pageInfo', { page, totalPages: Math.max(1, Math.ceil(total / pageSize)) }) }}</span>
         <span class="pagination-divider">·</span>
-        <span class="page-size-label">每页</span>
+        <span class="page-size-label">{{ t('requests.list.pagination.pageSize') }}</span>
         <select v-model.number="pageSize" @change="resetPageAndLoad" class="page-size-select">
           <option :value="50">50</option>
           <option :value="100">100</option>
@@ -1131,8 +1140,8 @@ onMounted(async () => {
         </select>
       </div>
       <div class="pagination-controls">
-        <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="changePage(-1)">上一页</button>
-        <button class="btn btn-ghost btn-sm" :disabled="page >= Math.ceil(total / pageSize)" @click="changePage(1)">下一页</button>
+        <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="changePage(-1)">{{ t('requests.list.pagination.previous') }}</button>
+        <button class="btn btn-ghost btn-sm" :disabled="page >= Math.ceil(total / pageSize)" @click="changePage(1)">{{ t('requests.list.pagination.next') }}</button>
       </div>
     </div>
 
@@ -1141,21 +1150,21 @@ onMounted(async () => {
         <thead>
           <tr>
             <th v-if="traceMode" class="col-seq">#</th>
-            <th class="col-time">时间</th>
-            <th class="col-trace">脉络</th>
-            <th class="col-caller">调用方</th>
-            <th class="col-route">路由</th>
+            <th class="col-time">{{ t('requests.list.table.colTime') }}</th>
+            <th class="col-trace">{{ t('requests.list.table.colTrace') }}</th>
+            <th class="col-caller">{{ t('requests.list.table.colCaller') }}</th>
+            <th class="col-route">{{ t('requests.list.table.colRoute') }}</th>
             <th class="col-tokens">Token</th>
-            <th v-if="!isDefaultTenant()" class="col-credits">积分</th>
-            <th class="col-lat">延迟</th>
-            <th class="col-compress">压缩</th>
-            <th class="col-status">状态</th>
-            <th class="col-attachments" title="附件">📎</th>
+            <th v-if="!isDefaultTenant()" class="col-credits">{{ t('requests.list.table.colCredits') }}</th>
+            <th class="col-lat">{{ t('requests.list.table.colLat') }}</th>
+            <th class="col-compress">{{ t('requests.list.table.colCompress') }}</th>
+            <th class="col-status">{{ t('requests.list.table.colStatus') }}</th>
+            <th class="col-attachments" :title="t('requests.list.table.attachmentsTitle')">📎</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading"><td :colspan="traceMode ? (isDefaultTenant() ? 10 : 11) : (isDefaultTenant() ? 9 : 10)">加载中…</td></tr>
-          <tr v-else-if="!rows.length"><td :colspan="traceMode ? (isDefaultTenant() ? 10 : 11) : (isDefaultTenant() ? 9 : 10)">无记录</td></tr>
+          <tr v-if="loading"><td :colspan="traceMode ? (isDefaultTenant() ? 10 : 11) : (isDefaultTenant() ? 9 : 10)">{{ t('requests.common.loading') }}</td></tr>
+          <tr v-else-if="!rows.length"><td :colspan="traceMode ? (isDefaultTenant() ? 10 : 11) : (isDefaultTenant() ? 9 : 10)">{{ t('requests.common.noRecord') }}</td></tr>
           <tr
             v-for="r in rows"
             :key="r.request_id + r.ts"
@@ -1175,13 +1184,13 @@ onMounted(async () => {
                 v-if="r.gw_session_id"
                 class="trace-link trace-full"
                 :title="traceSessionTitle(r.gw_session_id)"
-              >会话 {{ ellipsize(r.gw_session_id, 36) }}</div>
+              >{{ t('requests.list.table.sessionPrefix') }} {{ ellipsize(r.gw_session_id, 36) }}</div>
               <div
                 v-if="r.gw_task_id"
                 class="trace-sub trace-full"
                 :title="traceTaskTitle(r.gw_task_id)"
                 @click.stop="filterByTask(r.gw_task_id)"
-              >任务 {{ ellipsize(r.gw_task_id, 36) }}</div>
+              >{{ t('requests.list.table.taskPrefix') }} {{ ellipsize(r.gw_task_id, 36) }}</div>
               <span v-if="!r.gw_task_id && !r.gw_session_id" class="cell-line2" style="color:var(--muted)">—</span>
             </td>
             <td class="col-caller">
@@ -1194,13 +1203,13 @@ onMounted(async () => {
             </td>
             <td class="col-tokens" :title="tokenTitle(r.usage_source)">
               <div class="cell-line1">
-                读 {{ token(r.prompt_tokens, r.usage_source) }} / 写 {{ token(r.completion_tokens, r.usage_source) }}
+                {{ t('requests.list.table.tokenTooltip', { in: token(r.prompt_tokens, r.usage_source), out: token(r.completion_tokens, r.usage_source) }) }}
               </div>
               <div class="cell-line2">
-                缓读 {{ token(r.cache_read_tokens, r.usage_source) }} / 缓写 {{ token(r.cache_write_tokens, r.usage_source) }}
+                {{ t('requests.list.table.cacheTokenTooltip', { in: token(r.cache_read_tokens, r.usage_source), out: token(r.cache_write_tokens, r.usage_source) }) }}
               </div>
             </td>
-            <td v-if="!isDefaultTenant()" class="col-credits" title="本次请求扣除的积分">
+            <td v-if="!isDefaultTenant()" class="col-credits" :title="t('requests.list.table.creditsTitle')">
               <div class="cell-line1">{{ creditsDisplay(r.credits_charged) }}</div>
             </td>
             <td class="col-lat">
@@ -1225,7 +1234,7 @@ onMounted(async () => {
                 <div
                   v-if="r.parent_request_id"
                   class="cell-line2 parent-id parent-id-clickable"
-                  :title="'跳转到父请求 ' + r.parent_request_id"
+                  :title="t('requests.list.table.parentJumpTitle', { id: r.parent_request_id })"
                   @click="jumpToParent(r)"
                 >
                   ← {{ r.parent_request_id.slice(0, 8) }}
@@ -1240,10 +1249,10 @@ onMounted(async () => {
               <div v-if="r.error_kind && r.request_status === 'failure'" class="cell-line2">{{ r.error_kind }}</div>
             </td>
             <td class="col-attachments" style="text-align:center">
-              <span 
-                v-if="r.has_attachments && r.attachment_count && r.attachment_count > 0" 
+              <span
+                v-if="r.has_attachments && r.attachment_count && r.attachment_count > 0"
                 class="attachment-badge"
-                :title="`${r.attachment_count} 个附件`"
+                :title="t('requests.list.table.attachmentCountTitle', { n: r.attachment_count })"
               >
                 📎 {{ r.attachment_count }}
               </span>
@@ -1256,10 +1265,10 @@ onMounted(async () => {
 
     <div v-if="!loading && total > 0" class="pagination-bar">
       <div class="pagination-info">
-        <span>共 {{ total }} 条</span>
-        <span>· 第 {{ page }} / {{ Math.max(1, Math.ceil(total / pageSize)) }} 页</span>
+        <span>{{ t('requests.list.pagination.total', { n: total }) }}</span>
+        <span>{{ t('requests.list.pagination.pageInfo', { page, totalPages: Math.max(1, Math.ceil(total / pageSize)) }) }}</span>
         <span class="pagination-divider">·</span>
-        <span class="page-size-label">每页</span>
+        <span class="page-size-label">{{ t('requests.list.pagination.pageSize') }}</span>
         <select v-model.number="pageSize" @change="resetPageAndLoad" class="page-size-select">
           <option :value="50">50</option>
           <option :value="100">100</option>
@@ -1268,8 +1277,8 @@ onMounted(async () => {
         </select>
       </div>
       <div class="pagination-controls">
-        <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="changePage(-1)">上一页</button>
-        <button class="btn btn-ghost btn-sm" :disabled="page >= Math.ceil(total / pageSize)" @click="changePage(1)">下一页</button>
+        <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="changePage(-1)">{{ t('requests.list.pagination.previous') }}</button>
+        <button class="btn btn-ghost btn-sm" :disabled="page >= Math.ceil(total / pageSize)" @click="changePage(1)">{{ t('requests.list.pagination.next') }}</button>
       </div>
     </div>
 
@@ -1277,59 +1286,59 @@ onMounted(async () => {
     <div v-if="detailVisible" class="drawer-backdrop" @click="closeDetail">
       <div class="drawer-panel card drawer-panel-wide" @click.stop>
         <div class="drawer-header">
-          <h3 style="margin:0">请求详情</h3>
-          <button class="btn btn-sm" @click="closeDetail">关闭</button>
+          <h3 style="margin:0">{{ t('requests.detail.inlineDrawerTitle') }}</h3>
+          <button class="btn btn-sm" @click="closeDetail">{{ t('requests.common.close') }}</button>
         </div>
 
-        <div v-if="detailLoading" style="text-align:center;padding:40px">加载中…</div>
+        <div v-if="detailLoading" style="text-align:center;padding:40px">{{ t('requests.common.loading') }}</div>
 
         <template v-else-if="detail">
           <div class="drawer-section">
             <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:12px">
-              <span><strong>请求ID:</strong> {{ detail.request_id }}</span>
-              <span><strong>会话:</strong> {{ detail.gw_session_id ?? '—' }}</span>
-              <span><strong>任务:</strong> {{ detail.gw_task_id ?? '—' }}</span>
-              <span><strong>Key:</strong> {{ detail.api_key_prefix ?? (detail.api_key_id != null ? '#' + detail.api_key_id : '无key') }}</span>
-              <span v-if="detail.api_key_owner_user"><strong>Key用户:</strong> {{ detail.api_key_owner_user }}</span>
-              <span v-if="detail.application_code"><strong>应用:</strong> {{ detail.application_code }}</span>
-              <span><strong>时间:</strong> {{ fmtTs(detail.ts) }}</span>
-              <span><strong>客户端模型:</strong> {{ detail.client_model ?? '—' }}</span>
-              <span :title="outboundModelTitle(detail)"><strong>出站模型:</strong> {{ outboundModelDisplay(detail) }}</span>
-              <span><strong>供应商:</strong> {{ detail.provider_name ?? '—' }}</span>
-              <span><strong>状态:</strong> <span :style="{ color: detail.success ? 'var(--success)' : 'var(--danger)' }">{{ detail.success ? '成功' : statusLabel(detail) }}</span></span>
-              <span v-if="detail.failure_stage"><strong>失败阶段:</strong> {{ detail.failure_stage }}</span>
+              <span><strong>{{ t('requests.detail_extra.requestId') }}:</strong> {{ detail.request_id }}</span>
+              <span><strong>{{ t('requests.detail_extra.session') }}:</strong> {{ detail.gw_session_id ?? '—' }}</span>
+              <span><strong>{{ t('requests.detail_extra.task') }}:</strong> {{ detail.gw_task_id ?? '—' }}</span>
+              <span><strong>{{ t('requests.detail_extra.apiKeyPrefix') }}:</strong> {{ detail.api_key_prefix ?? (detail.api_key_id != null ? t('requests.detail_extra.apiKeyIdPrefix') + detail.api_key_id : t('requests.detail_extra.noKey')) }}</span>
+              <span v-if="detail.api_key_owner_user"><strong>{{ t('requests.detail_extra.keyUser') }}:</strong> {{ detail.api_key_owner_user }}</span>
+              <span v-if="detail.application_code"><strong>{{ t('requests.detail_extra.application') }}:</strong> {{ detail.application_code }}</span>
+              <span><strong>{{ t('requests.detail_extra.time') }}:</strong> {{ fmtTs(detail.ts) }}</span>
+              <span><strong>{{ t('requests.detail_extra.clientModel') }}:</strong> {{ detail.client_model ?? '—' }}</span>
+              <span :title="outboundModelTitle(detail)"><strong>{{ t('requests.detail_extra.outboundModel') }}:</strong> {{ outboundModelDisplay(detail) }}</span>
+              <span><strong>{{ t('requests.detail_extra.provider') }}:</strong> {{ detail.provider_name ?? '—' }}</span>
+              <span><strong>{{ t('requests.detail_extra.status') }}:</strong> <span :style="{ color: detail.success ? 'var(--success)' : 'var(--danger)' }">{{ detail.success ? t('requests.detail_extra.success') : statusLabel(detail) }}</span></span>
+              <span v-if="detail.failure_stage"><strong>{{ t('requests.detail_extra.failureStage') }}:</strong> {{ detail.failure_stage }}</span>
               <span v-if="detail.failure_detail_code">
-                <strong>失败详情:</strong>
+                <strong>{{ t('requests.detail_extra.failureDetail') }}:</strong>
                 {{ FAILURE_DETAIL_LABELS[detail.failure_detail_code] ?? detail.failure_detail_code }}
               </span>
               <!-- 2026-06-19 T-NEW-7: surface the upstream finish_reason
                    separately from failure_detail_code so a successful
                    `tool_calls` response stops looking like a failure. -->
-              <span v-if="detail.upstream_finish_reason" :title="`上游 finish_reason（不等于失败）`">
-                <strong>结束原因:</strong>
+              <span v-if="detail.upstream_finish_reason" :title="t('requests.detail_extra.finishReasonTitle')">
+                <strong>{{ t('requests.detail_extra.finishReason') }}:</strong>
                 {{ upstreamFinishReasonLabel(detail.upstream_finish_reason) }}
               </span>
-              <span><strong>延迟:</strong> {{ detail.latency_ms ?? '—' }}ms</span>
+              <span><strong>{{ t('requests.detail_extra.latency') }}:</strong> {{ detail.latency_ms ?? '—' }}ms</span>
               <span><strong>Token:</strong> {{ token(detail.prompt_tokens) }} / {{ token(detail.completion_tokens) }}</span>
-              <span v-if="!isDefaultTenant()"><strong>积分消耗:</strong> {{ creditsDisplay(detail.credits_charged) }}</span>
+              <span v-if="!isDefaultTenant()"><strong>{{ t('requests.detail_extra.creditsUsed') }}:</strong> {{ creditsDisplay(detail.credits_charged) }}</span>
               <!-- v3 (2026-06-19) session-level outbound metadata.
                    Displayed when v3 ran for this request (compression_strategy
                    in {delta_append, sliding_window_*, mechanical_trim}). -->
               <template v-if="hasOutboundBody(detail)">
                 <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 10px;background:var(--surface-primary,#16213e);border-radius:6px;margin-top:4px;font-size:12px">
-                  <span><strong>转发消息数:</strong> {{ detail.outbound_msg_count ?? '—' }}</span>
-                  <span><strong>转发 token 估算:</strong> {{ detail.outbound_token_est ?? '—' }}</span>
+                  <span><strong>{{ t('requests.detail_extra.outboundMsgCount') }}:</strong> {{ detail.outbound_msg_count ?? '—' }}</span>
+                  <span><strong>{{ t('requests.detail_extra.outboundTokenEst') }}:</strong> {{ detail.outbound_token_est ?? '—' }}</span>
                   <span v-if="calcSavingDetail(detail).hasSaving" style="color:var(--success,#22c55e);font-weight:600">
-                    节约: {{ calcSavingDetail(detail).savingStr }}
+                    {{ t('requests.detail_extra.saving') }}: {{ calcSavingDetail(detail).savingStr }}
                   </span>
                   <span v-if="calcSavingDetail(detail).hasSaving" style="color:var(--warning,#f59e0b)">
                     Token: {{ calcSavingDetail(detail).tokenSavingStr }}
                   </span>
                   <span v-if="calcSavingDetail(detail).hasSaving" style="color:var(--text-secondary,#6b7280)">
-                    消息: {{ calcSavingDetail(detail).msgReductionStr }}
+                    {{ t('requests.detail_extra.msgReduction') }}: {{ calcSavingDetail(detail).msgReductionStr }}
                   </span>
                   <span v-if="outboundSummaryMarker(detail)">
-                    <span class="summary-marker-badge" :title="outboundSummaryMarker(detail)">含 LLM 摘要</span>
+                    <span class="summary-marker-badge" :title="outboundSummaryMarker(detail)">{{ t('requests.detail_extra.containsLlmSummary') }}</span>
                   </span>
                 </div>
                 <div v-if="detail.compression_strategy" style="margin-top:4px;font-size:11px;color:var(--text-secondary,#6b7280)">
@@ -1341,22 +1350,22 @@ onMounted(async () => {
 
           <div class="drawer-section">
             <div style="display:flex;gap:8px;margin-bottom:12px">
-              <button class="btn btn-sm" :class="{ 'btn-primary': detailTab === 'request' }" @click="detailTab = 'request'">请求消息</button>
+              <button class="btn btn-sm" :class="{ 'btn-primary': detailTab === 'request' }" @click="detailTab = 'request'">{{ t('requests.detail_extra.requestMsgsTab') }}</button>
               <!-- v3 outbound tab: only shown when the row has an outbound body. -->
               <button v-if="hasOutboundBody(detail)" class="btn btn-sm" :class="{ 'btn-primary': detailTab === 'outbound' }" @click="detailTab = 'outbound'">
-                转发消息
+                {{ t('requests.detail_extra.outboundMsgsTab') }}
                 <span class="outbound-diff-badge" :class="{ unchanged: outboundEqualsRequest(detail) }">
-                  {{ outboundEqualsRequest(detail) ? '= 请求' : `Δ${outboundMsgDelta(detail)}` }}
+                  {{ outboundEqualsRequest(detail) ? t('requests.detail_extra.equalsRequest') : `${t('requests.detail_extra.deltaPrefix')}${outboundMsgDelta(detail)}` }}
                 </span>
               </button>
-              <button class="btn btn-sm" :class="{ 'btn-primary': detailTab === 'response' }" @click="detailTab = 'response'">响应内容</button>
-              <button 
-                v-if="detail.has_attachments && detail.attachment_count && detail.attachment_count > 0" 
-                class="btn btn-sm" 
-                :class="{ 'btn-primary': detailTab === 'attachments' }" 
+              <button class="btn btn-sm" :class="{ 'btn-primary': detailTab === 'response' }" @click="detailTab = 'response'">{{ t('requests.detail_extra.responseTab') }}</button>
+              <button
+                v-if="detail.has_attachments && detail.attachment_count && detail.attachment_count > 0"
+                class="btn btn-sm"
+                :class="{ 'btn-primary': detailTab === 'attachments' }"
                 @click="detailTab = 'attachments'"
               >
-                📎 附件 ({{ detail.attachment_count }})
+                {{ t('requests.detail_extra.attachmentsTab') }} ({{ detail.attachment_count }})
               </button>
             </div>
           </div>
@@ -1370,47 +1379,47 @@ onMounted(async () => {
                   </div>
                   <pre style="margin:0;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;font-size:11px;line-height:1.5">{{ formatJson(msg.content ?? msg) }}</pre>
                   <div v-if="msg.tool_calls" style="margin-top:6px">
-                    <div style="color:var(--muted);font-size:11px;margin-bottom:4px">工具调用:</div>
+                    <div style="color:var(--muted);font-size:11px;margin-bottom:4px">{{ t('requests.detail.toolCalls') }}</div>
                     <pre v-for="(tc, j) in msg.tool_calls" :key="j" style="margin:0 0 4px;white-space:pre-wrap;word-break:break-all;font-size:11px;padding:4px;background:var(--surface-primary, #16213e);border-radius:4px">{{ formatJson(tc) }}</pre>
                   </div>
                 </div>
               </template>
-              <div v-else style="color:var(--muted)">(无请求数据)</div>
+              <div v-else style="color:var(--muted)">{{ t('requests.detail.noRequest') }}</div>
             </template>
 
             <template v-else-if="detailTab === 'outbound'">
               <!-- v3 outbound body: shows what was actually forwarded to the
                    upstream LLM after delta-append / sliding-window summary. -->
               <div v-if="detail.outbound_body" style="margin-bottom:8px;padding:6px 10px;background:var(--surface-primary, #16213e);border-radius:4px;color:var(--text-secondary);font-size:11px">
-                <strong>v3 转发体</strong> · 消息数 {{ detail.outbound_msg_count }} · 估算 {{ detail.outbound_token_est }} tokens
+                <strong>v3 {{ t('requests.detail_extra.outboundMsgsTab') }}</strong> · {{ t('requests.detail_extra.outboundMsgCount') }} {{ detail.outbound_msg_count }} · {{ t('requests.detail_extra.outboundTokenEstLabel', { n: detail.outbound_token_est }) }}
                 <span v-if="outboundSummaryMarker(detail)" style="margin-left:8px">
                   <span class="summary-marker-badge">{{ truncate(outboundSummaryMarker(detail), 24) }}</span>
-                  <span style="color:var(--muted);font-size:10px">(含 LLM 摘要边界)</span>
+                  <span style="color:var(--muted);font-size:10px">{{ t('requests.detail_extra.containsSummaryMarker') }}</span>
                 </span>
               </div>
               <template v-if="hasOutboundBody(detail)">
                 <div v-for="(msg, i) in extractMessagesFromBody(detail.outbound_body)" :key="i" style="margin-bottom:12px">
                   <div style="margin-bottom:4px">
                     <span :style="{ color: roleColor(msg.role || ''), fontWeight: 600 }">[{{ msg.role || 'unknown' }}]</span>
-                    <span v-if="isSummaryMarkerMessage(msg)" style="margin-left:6px;font-size:10px;color:#1d4ed8">(smm_v1 摘要边界)</span>
+                    <span v-if="isSummaryMarkerMessage(msg)" style="margin-left:6px;font-size:10px;color:#1d4ed8">{{ t('requests.detail_extra.summaryMarkerBadge') }}</span>
                   </div>
                   <pre style="margin:0;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;font-size:11px;line-height:1.5">{{ formatJson(msg.content ?? msg) }}</pre>
                   <div v-if="msg.tool_calls" style="margin-top:6px">
-                    <div style="color:var(--muted);font-size:11px;margin-bottom:4px">工具调用:</div>
+                    <div style="color:var(--muted);font-size:11px;margin-bottom:4px">{{ t('requests.detail.toolCalls') }}</div>
                     <pre v-for="(tc, j) in msg.tool_calls" :key="j" style="margin:0 0 4px;white-space:pre-wrap;word-break:break-all;font-size:11px;padding:4px;background:var(--surface-primary, #16213e);border-radius:4px">{{ formatJson(tc) }}</pre>
                   </div>
                 </div>
               </template>
-              <div v-else style="color:var(--muted)">(该请求未触发 v3 会话压缩：转发体 == 客户端请求体)</div>
+              <div v-else style="color:var(--muted)">{{ t('requests.detail_extra.noOutbound') }}</div>
             </template>
 
             <template v-else-if="detailTab === 'attachments'">
-              <div v-if="attachmentsLoading" style="text-align:center;padding:20px;color:var(--muted)">加载附件中…</div>
-              <div v-else-if="attachments.length === 0" style="text-align:center;padding:20px;color:var(--muted)">无附件</div>
+              <div v-if="attachmentsLoading" style="text-align:center;padding:20px;color:var(--muted)">{{ t('requests.detail_extra.attachmentsLoading') }}</div>
+              <div v-else-if="attachments.length === 0" style="text-align:center;padding:20px;color:var(--muted)">{{ t('requests.detail_extra.noAttachments') }}</div>
               <div v-else style="display:flex;flex-direction:column;gap:12px">
-                <div 
-                  v-for="attachment in attachments" 
-                  :key="attachment.id" 
+                <div
+                  v-for="attachment in attachments"
+                  :key="attachment.id"
                   class="attachment-item"
                 >
                   <div style="display:flex;align-items:center;gap:12px">
@@ -1418,7 +1427,7 @@ onMounted(async () => {
                       <img
                         :src="attachment.download_url"
                         :alt="attachment.id"
-                        title="点击查看大图"
+                        :title="t('requests.detail_extra.clickToPreviewTitle')"
                         style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border,#333);cursor:zoom-in;transition:transform .15s ease"
                         @click="openImagePreview(attachment)"
                         @mouseover="(e) => ((e.currentTarget as HTMLImageElement).style.transform = 'scale(1.03)')"
@@ -1429,22 +1438,22 @@ onMounted(async () => {
                     <div style="flex:1;min-width:0">
                       <div style="font-weight:600;margin-bottom:4px;word-break:break-all">{{ attachment.id }}</div>
                       <div style="font-size:11px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap">
-                        <span>类型: {{ attachment.media_type }}</span>
-                        <span>大小: {{ formatBytes(attachment.file_size) }}</span>
-                        <span>哈希: {{ attachment.content_hash.substring(0, 12) }}...</span>
+                        <span>{{ t('requests.common.typeLabel') }}: {{ attachment.media_type }}</span>
+                        <span>{{ t('requests.common.sizeLabel') }}: {{ formatBytes(attachment.file_size) }}</span>
+                        <span>{{ t('requests.common.hashLabel') }}: {{ attachment.content_hash.substring(0, 12) }}...</span>
                       </div>
                       <div style="font-size:10px;color:var(--muted);margin-top:2px">
-                        创建时间: {{ fmtTs(attachment.created_at) }}
+                        {{ t('requests.common.createdAtLabel') }}: {{ fmtTs(attachment.created_at) }}
                       </div>
                     </div>
                     <div style="flex-shrink:0">
-                      <a 
-                        :href="attachment.download_url" 
-                        target="_blank" 
+                      <a
+                        :href="attachment.download_url"
+                        target="_blank"
                         class="btn btn-sm"
                         :download="attachment.id"
                       >
-                        下载
+                        {{ t('requests.detail_extra.download') }}
                       </a>
                     </div>
                   </div>
@@ -1464,7 +1473,7 @@ onMounted(async () => {
                       <span :style="{ color: roleColor(choice.message.role || ''), fontWeight: 600 }">[{{ choice.message.role || 'unknown' }}]</span>
                       <pre v-if="choice.message.content" style="margin:4px 0;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;font-size:11px;line-height:1.5">{{ choice.message.content }}</pre>
                       <div v-if="choice.message.tool_calls" style="margin-top:6px">
-                        <div style="color:var(--muted);font-size:11px;margin-bottom:4px">工具调用:</div>
+                        <div style="color:var(--muted);font-size:11px;margin-bottom:4px">{{ t('requests.detail.toolCalls') }}</div>
                         <pre v-for="(tc, j) in choice.message.tool_calls" :key="j" style="margin:0 0 4px;white-space:pre-wrap;word-break:break-all;font-size:11px;padding:4px;background:var(--surface-primary, #16213e);border-radius:4px">{{ formatJson(tc) }}</pre>
                       </div>
                     </div>
@@ -1475,7 +1484,7 @@ onMounted(async () => {
                 </template>
                 <pre v-else style="white-space:pre-wrap;word-break:break-all;font-size:11px;line-height:1.5">{{ formatJson(detail.response_body) }}</pre>
               </template>
-              <div v-else style="color:var(--muted)">(无响应数据 — 流式响应暂不记录完整内容)</div>
+              <div v-else style="color:var(--muted)">{{ t('requests.detail.noStreamContent') }}</div>
             </template>
           </div>
         </template>
@@ -1511,16 +1520,16 @@ onMounted(async () => {
           />
           <div style="display:flex;align-items:center;gap:16px;color:var(--muted,#aaa);font-size:12px;flex-wrap:wrap;justify-content:center">
             <span style="color:var(--fg,#eee);font-weight:600;word-break:break-all">{{ previewAttachment.id }}</span>
-            <span>类型: {{ previewAttachment.media_type }}</span>
-            <span>大小: {{ formatBytes(previewAttachment.file_size) }}</span>
-            <span>哈希: {{ previewAttachment.content_hash.substring(0, 16) }}...</span>
+            <span>{{ t('requests.common.typeLabel') }}: {{ previewAttachment.media_type }}</span>
+            <span>{{ t('requests.common.sizeLabel') }}: {{ formatBytes(previewAttachment.file_size) }}</span>
+            <span>{{ t('requests.common.hashLabel') }}: {{ previewAttachment.content_hash.substring(0, 16) }}...</span>
             <a
               :href="previewAttachment.download_url"
               target="_blank"
               class="btn btn-sm"
               :download="previewAttachment.id"
-            >下载原图</a>
-            <button class="btn btn-sm" @click="closeImagePreview">关闭 (ESC)</button>
+            >{{ t('requests.detail_extra.downloadOriginal') }}</a>
+            <button class="btn btn-sm" @click="closeImagePreview">{{ t('requests.detail_extra.closePreview') }}</button>
           </div>
         </div>
       </div>

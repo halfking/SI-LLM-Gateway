@@ -163,6 +163,8 @@ export default {
   detail: {
     // RequestLogDrawer.vue 使用
     drawerTitle: '原始请求详情',
+    // RequestLogsView.vue 详情弹窗使用
+    inlineDrawerTitle: '请求详情',
     loading: '加载中…',
     noRequest: '(无请求数据)',
     noResponse: '(无响应数据)',

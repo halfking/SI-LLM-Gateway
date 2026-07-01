@@ -153,6 +153,7 @@ export default {
   },
   detail: {
     drawerTitle: 'Original request details',
+    inlineDrawerTitle: 'Request details',
     loading: 'Loading…',
     noRequest: '(no request data)',
     noResponse: '(no response data)',
