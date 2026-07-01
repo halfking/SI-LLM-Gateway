@@ -7,6 +7,9 @@ func PlatformSpecs() []*Spec {
 	out = append(out, CompressionSpecs()...)
 	out = append(out, RateLimitPlatformSpecs()...)
 	out = append(out, PassthroughSpecs()...)
+	out = append(out, FpSlotSpecs()...)
+	out = append(out, ContentIDSpecs()...)
+	out = append(out, GeneralSpecs()...)
 	return out
 }
 
