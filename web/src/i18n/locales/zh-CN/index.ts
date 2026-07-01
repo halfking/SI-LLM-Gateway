@@ -7,6 +7,7 @@ import errors from './errors'
 import users from './users'
 import keys from './keys'
 import requests from './requests'
+import credentialMonitor from './credentialMonitor'
 
 export default {
   common,
@@ -17,4 +18,5 @@ export default {
   users,
   keys,
   requests,
+  credentialMonitor,
 }

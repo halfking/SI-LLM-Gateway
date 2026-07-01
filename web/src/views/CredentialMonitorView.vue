@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getCredentialMonitorSummary, getSlidingWindow, promoteCredential, demoteCredential, setConcurrencyAuto, toggleModelAvailability, getModelHistory, getCredentialFpSlotStats, getCredentialDecisions, clearManualDisabled, setManualDisabled, type CredentialMonitorSummary, type CredentialModelStatus, type CallEntry, type ModelHistoryEvent, type ModelToggleAction, type FpSlotStats, type CredentialRoutingDecision } from '../api'
 import { Chart, registerables } from 'chart.js'
 import FpSlotVisualizer from '../components/FpSlotVisualizer.vue'
 import SlotInfoCard from '../components/SlotInfoCard.vue'
 import SegTabs, { type SegTab } from '../components/SegTabs.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+
+const { t } = useI18n()
+// Short alias for the credentialMonitor locale namespace. Accepts an
+// optional params object for templated strings (e.g. cm('key', { n: 5 })).
+const cm = (k: string, params?: Record<string, unknown>): string =>
+  t(`credentialMonitor.${k}` as never, params as never)
 
 Chart.register(...registerables)
 
@@ -23,9 +30,9 @@ const windowLoading = ref(false)
 type DetailTab = 'overview' | 'models' | 'requests'
 const detailActiveTab = ref<DetailTab>('overview')
 const detailTabs: SegTab[] = [
-  { value: 'overview',  label: '基础信息' },
-  { value: 'models',    label: '模型' },
-  { value: 'requests',  label: '请求数据' },
+  { value: 'overview',  label: cm('drawer.tab.overview') },
+  { value: 'models',    label: cm('drawer.tab.models') },
+  { value: 'requests',  label: cm('drawer.tab.requests') },
 ]
 // 打开 detail 时默认到第一个 tab
 watch(selectedCred, (newVal) => {
@@ -132,7 +139,7 @@ async function submitClearDisabled() {
     clearDisabledDialogOpen.value = false
     await refreshDetailDrawer()
   } catch (e) {
-    alert('清除失败: ' + (e instanceof Error ? e.message : String(e)))
+    alert(t('credentialMonitor.error.clearFailed') + (e instanceof Error ? e.message : String(e)))
   }
 }
 
@@ -150,7 +157,7 @@ async function submitSetManualDisabled() {
     setManualDisabledDialogOpen.value = false
     await refreshDetailDrawer()
   } catch (e) {
-    alert('操作失败: ' + (e instanceof Error ? e.message : String(e)))
+    alert(t('credentialMonitor.error.setManualDisabledFailed') + (e instanceof Error ? e.message : String(e)))
   }
 }
 
@@ -407,7 +414,7 @@ function renderErrorPieChart(errorKinds: Record<string, number>) {
     errorPieChart = new Chart(canvas, {
       type: 'pie',
       data: {
-        labels: ['全部健康'],
+        labels: [cm('chart.allHealthy')],
         datasets: [{
           data: [1],
           backgroundColor: ['#10b981'], // var(--success)
@@ -420,7 +427,7 @@ function renderErrorPieChart(errorKinds: Record<string, number>) {
         maintainAspectRatio: false,
         plugins: {
           legend: { position: 'right' },
-          title: { display: true, text: '错误类型分布 · 全部健康' },
+          title: { display: true, text: cm('chart.errorsWhenHealthy') },
         },
       },
     })
@@ -444,7 +451,7 @@ function renderErrorPieChart(errorKinds: Record<string, number>) {
       maintainAspectRatio: false,
       plugins: {
         legend: { position: 'right' },
-        title: { display: true, text: '错误类型分布' },
+        title: { display: true, text: cm('chart.errorsTitle') },
       },
     },
   })
@@ -470,7 +477,7 @@ function toggleAutoRefresh() {
 
 function openBatchDialog(action: 'promote' | 'demote') {
   if (selectedIds.value.size === 0) {
-    alert('请先选择凭据')
+    alert(cm('error.selectFirst'))
     return
   }
   batchAction.value = action
@@ -492,7 +499,7 @@ async function submitBatch() {
     selectedIds.value.clear()
     load()
   } catch (e) {
-    alert('批量操作失败: ' + (e instanceof Error ? e.message : String(e)))
+    alert(cm('error.batchFailed') + (e instanceof Error ? e.message : String(e)))
   }
 }
 
@@ -510,7 +517,7 @@ async function submitDemote() {
     load()
     selectedCred.value = null
   } catch (e) {
-    alert('降级失败: ' + (e instanceof Error ? e.message : String(e)))
+    alert(cm('error.demoteFailed') + (e instanceof Error ? e.message : String(e)))
   }
 }
 
@@ -527,7 +534,7 @@ async function submitPromote() {
     load()
     selectedCred.value = null
   } catch (e) {
-    alert('升级失败: ' + (e instanceof Error ? e.message : String(e)))
+    alert(cm('error.promoteFailed') + (e instanceof Error ? e.message : String(e)))
   }
 }
 
@@ -544,7 +551,7 @@ async function submitConcurrency() {
     concurrencyDialogOpen.value = false
     load()
   } catch (e) {
-    alert('设置失败: ' + (e instanceof Error ? e.message : String(e)))
+    alert(cm('error.concurrencyFailed') + (e instanceof Error ? e.message : String(e)))
   }
 }
 
@@ -572,7 +579,7 @@ async function submitToggle() {
     await load() // refresh summary so the row badge updates
     await loadHistory() // refresh history with the new manual event on top
   } catch (e) {
-    alert(`${t.action === 'offline' ? '下线' : '上线'}失败: ` + (e instanceof Error ? e.message : String(e)))
+    alert(`${t.action === 'offline' ? cm('error.offlineFailed') : cm('error.onlineFailed')}` + (e instanceof Error ? e.message : String(e)))
   } finally {
     toggleBusy.value[key] = false
   }
@@ -661,79 +668,74 @@ onUnmounted(() => {
 
 <template>
   <div class="page-container">
-    <!-- Unified top bar: title + auto-refresh + filters + batch actions,
-         ALL in a single horizontal row (per 2026-06-24 request).
-         No max-width / auto-margin on .page-container so the whole content
-         area is top-left aligned and stretches across the full available
-         width instead of being centered with a 1200px cap. -->
     <div class="top-bar">
-      <h1>凭据监控</h1>
+      <h1>{{ cm('page.title') }}</h1>
       <div class="refresh-group">
         <label>
           <input type="checkbox" :checked="autoRefresh" @change="toggleAutoRefresh" />
-          自动刷新
+          {{ cm('page.autoRefresh') }}
         </label>
         <select v-model.number="refreshInterval" class="field-input">
-          <option :value="10">10秒</option>
-          <option :value="30">30秒</option>
-          <option :value="60">60秒</option>
+          <option :value="10">{{ cm('page.refreshInterval.s10') }}</option>
+          <option :value="30">{{ cm('page.refreshInterval.s30') }}</option>
+          <option :value="60">{{ cm('page.refreshInterval.s60') }}</option>
         </select>
-        <button class="btn btn-primary btn-sm" @click="load">手动刷新</button>
+        <button class="btn btn-primary btn-sm" @click="load">{{ cm('page.manualRefresh') }}</button>
       </div>
       <span class="tb-sep" aria-hidden="true"></span>
-      <span class="label">可用性</span>
+      <span class="label">{{ cm('filter.availability') }}</span>
       <select v-model="availStateFilter" class="field-input">
-        <option value="">全部</option>
+        <option value="">{{ cm('filter.all') }}</option>
         <option value="ready">ready</option>
         <option value="degraded">degraded</option>
         <option value="cooling">cooling</option>
         <option value="unreachable">unreachable</option>
       </select>
-      <span class="label">健康</span>
+      <span class="label">{{ cm('filter.health') }}</span>
       <select v-model="healthFilter" class="field-input">
-        <option value="">全部</option>
+        <option value="">{{ cm('filter.all') }}</option>
         <option value="healthy">healthy</option>
         <option value="warning">warning</option>
         <option value="unreachable">unreachable</option>
       </select>
       <div class="quick-filter-group">
-        <button class="btn btn-sm btn-ghost" :class="quickFilter === 'none' ? 'qf-active' : ''" @click="quickFilter = 'none'">全部</button>
-        <button class="btn btn-sm btn-ghost" :class="quickFilter === 'broken' ? 'qf-active qf-bad' : ''" @click="quickFilter = 'broken'">只看 broken</button>
-        <button class="btn btn-sm btn-ghost" :class="quickFilter === 'low-rate' ? 'qf-active qf-warn' : ''" @click="quickFilter = 'low-rate'">成功率&lt;50%</button>
+        <button class="btn btn-sm btn-ghost" :class="quickFilter === 'none' ? 'qf-active' : ''" @click="quickFilter = 'none'">{{ cm('filter.quickNone') }}</button>
+        <button class="btn btn-sm btn-ghost" :class="quickFilter === 'broken' ? 'qf-active qf-bad' : ''" @click="quickFilter = 'broken'">{{ cm('filter.quickBroken') }}</button>
+        <button class="btn btn-sm btn-ghost" :class="quickFilter === 'low-rate' ? 'qf-active qf-warn' : ''" @click="quickFilter = 'low-rate'">{{ cm('filter.quickLowRate') }}</button>
       </div>
       <span class="spacer"></span>
       <button class="btn btn-sm btn-success" :disabled="selectedIds.size === 0" @click="openBatchDialog('promote')">
-        批量恢复 ({{ selectedIds.size }})
+        {{ cm('filter.batchRestore', { n: selectedIds.size }) }}
       </button>
       <button class="btn btn-sm btn-danger" :disabled="selectedIds.size === 0" @click="openBatchDialog('demote')">
-        批量降级 ({{ selectedIds.size }})
+        {{ cm('filter.batchDemote', { n: selectedIds.size }) }}
       </button>
     </div>
 
     <!-- Summary cards -->
     <div class="summary-row">
       <div class="summary-card">
-        <div class="summary-label">总凭据</div>
+        <div class="summary-label">{{ cm('summary.total') }}</div>
         <div class="summary-value">{{ summary.total }}</div>
       </div>
       <div class="summary-card summary-good">
-        <div class="summary-label">可用 (ready)</div>
+        <div class="summary-label">{{ cm('summary.ready') }}</div>
         <div class="summary-value">{{ summary.ready }}</div>
       </div>
       <div class="summary-card" :class="summary.abnormal > 0 ? 'summary-warn' : ''">
-        <div class="summary-label">异常</div>
+        <div class="summary-label">{{ cm('summary.abnormal') }}</div>
         <div class="summary-value">{{ summary.abnormal }}</div>
-        <div class="summary-sub">unreachable/cooling/rate_limited</div>
+        <div class="summary-sub">{{ cm('summary.unreachable') }}</div>
       </div>
       <div class="summary-card" :class="summary.brokenModels > 0 ? 'summary-bad' : ''">
-        <div class="summary-label">broken 模型</div>
+        <div class="summary-label">{{ cm('summary.brokenModels') }}</div>
         <div class="summary-value">{{ summary.brokenModels }}</div>
-        <div class="summary-sub">probe 确认坏掉</div>
+        <div class="summary-sub">{{ cm('summary.brokenModelsHint') }}</div>
       </div>
     </div>
 
-    <div v-if="loading" style="text-align:center;padding:32px">加载中...</div>
-    <div v-else-if="!filteredCreds.length" style="text-align:center;padding:32px">暂无凭据</div>
+    <div v-if="loading" style="text-align:center;padding:32px">{{ cm('table.loading') }}</div>
+    <div v-else-if="!filteredCreds.length" style="text-align:center;padding:32px">{{ cm('table.empty') }}</div>
 
     <div v-else class="card" style="overflow-x:auto;padding:0">
       <table class="data-table dense">
@@ -742,14 +744,14 @@ onUnmounted(() => {
             <th style="width:40px">
               <input type="checkbox" :checked="allSelected" @change="toggleSelectAll" />
             </th>
-            <th>凭据</th>
-            <th>供应商</th>
-            <th>可用性</th>
-            <th>健康</th>
-            <th>模型 (可用/总数)</th>
-            <th>最近成功率</th>
-            <th>broken 模型</th>
-            <th>并发</th>
+            <th>{{ cm('table.header.credential') }}</th>
+            <th>{{ cm('table.header.provider') }}</th>
+            <th>{{ cm('table.header.availability') }}</th>
+            <th>{{ cm('table.header.health') }}</th>
+            <th>{{ cm('table.header.models') }}</th>
+            <th>{{ cm('table.header.recentSuccessRate') }}</th>
+            <th>{{ cm('table.header.brokenModels') }}</th>
+            <th>{{ cm('table.header.concurrency') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -759,7 +761,7 @@ onUnmounted(() => {
             </td>
             <td>
               <div>{{ c.label || `#${c.id}` }}</div>
-              <div class="cell-sub">ID: {{ c.id }}</div>
+              <div class="cell-sub">{{ cm('table.cell.idPrefix') }}{{ c.id }}</div>
             </td>
             <td>{{ c.provider_name }}</td>
             <td>
@@ -789,8 +791,8 @@ onUnmounted(() => {
               </div>
             </td>
             <td>
-              <div>手动: {{ c.concurrency_limit || '—' }}</div>
-              <div class="cell-sub">生效: {{ c.effective_concurrency }}</div>
+              <div>{{ cm('table.cell.manualPrefix') }}{{ c.concurrency_limit || '—' }}</div>
+              <div class="cell-sub">{{ cm('table.cell.effectivePrefix') }}{{ c.effective_concurrency }}</div>
             </td>
           </tr>
         </tbody>
@@ -802,96 +804,93 @@ onUnmounted(() => {
       <div class="drawer-panel card drawer-panel-wide" @click.stop>
         <div class="drawer-header">
           <div>
-            <h3 style="margin:0">{{ selectedCred.label || `凭据 #${selectedCred.id}` }}</h3>
+            <h3 style="margin:0">{{ selectedCred.label || `${cm('drawer.action.clearManualDisabled').replace('🔓 ', '')} #${selectedCred.id}` }}</h3>
             <div class="drawer-sub">{{ selectedCred.provider_name }}</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
-            <!-- 🆕 2026-06-23: 整凭据 manual_disabled drawer 入口 (一键禁用/解除).
-                 之前必须切到 Provider 详情页 / CredsTab 才能改, 现在抽屉内直接可点. -->
             <button
               v-if="selectedCred.manual_disabled"
               class="btn btn-xs btn-warning"
-              title="解除整凭据禁用"
+              :title="cm('drawer.action.clearManualDisabledTitle')"
               @click="openClearDisabledDialog"
-            >🔓 解除禁用</button>
+            >{{ cm('drawer.action.clearManualDisabled') }}</button>
             <button
               v-else
               class="btn btn-xs btn-danger"
-              title="手动禁用此凭据 (路由时将不被选中)"
+              :title="cm('drawer.action.setManualDisabledTitle')"
               @click="openSetManualDisabledDialog(true)"
-            >⛔ 手动禁用</button>
+            >{{ cm('drawer.action.setManualDisabled') }}</button>
             <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
               <input type="checkbox" :checked="detailAutoRefresh" @change="toggleDetailAutoRefresh" />
-              自动刷新
+              {{ cm('page.autoRefresh') }}
             </label>
             <select v-model.number="detailRefreshInterval" class="field-input" style="width:auto;font-size:13px;padding:2px 6px">
-              <option :value="5">5秒</option>
-              <option :value="10">10秒</option>
-              <option :value="30">30秒</option>
+              <option :value="5">{{ cm('page.refreshInterval.s5') }}</option>
+              <option :value="10">{{ cm('page.refreshInterval.s10') }}</option>
+              <option :value="30">{{ cm('page.refreshInterval.s30') }}</option>
             </select>
-            <button class="btn btn-sm btn-ghost" @click="refreshDetailDrawer" title="刷新详情">
+            <button class="btn btn-sm btn-ghost" @click="refreshDetailDrawer" :title="cm('drawer.refreshTooltip')">
               <span style="font-size:16px">↻</span>
             </button>
-            <button class="btn btn-ghost btn-sm" @click="selectedCred = null">关闭</button>
+            <button class="btn btn-ghost btn-sm" @click="selectedCred = null">{{ cm('drawer.close') }}</button>
           </div>
         </div>
 
-        <!-- 🆕 2026-06-23: 4-tab segmented tabs 容器 (复用 RoutingDashboardView 的 .seg-tabs 风格) -->
         <div style="padding:8px 16px 0;display:flex;align-items:center;gap:8px">
           <SegTabs v-model="detailActiveTab" :tabs="detailTabs" />
           <span class="cell-sub" style="margin-left:auto">
-            凭据 ID: <code class="mono-sm">{{ selectedCred.id }}</code>
+            {{ cm('drawer.credentialIdPrefix') }}<code class="mono-sm">{{ selectedCred.id }}</code>
           </span>
         </div>
 
         <div class="drawer-body">
-          <!-- ════════════ Tab 1: 基础信息 (Overview) ════════════ -->
+          <!-- Tab 1: Overview -->
           <div v-if="detailActiveTab === 'overview'" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
             <div class="drawer-section">
-              <div class="drawer-section-title">基础信息 · 凭据统计</div>
+              <div class="drawer-section-title">{{ cm('drawer.overview.sectionTitle') }}</div>
               <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">
                 <div>
-                  <label class="field-label">可用性</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.availability') }}</label>
                   <span class="badge" :class="statusBadge(selectedCred.availability_state)">{{ selectedCred.availability_state }}</span>
                 </div>
                 <div>
-                  <label class="field-label">健康</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.health') }}</label>
                   <span class="badge" :class="healthBadge(selectedCred.health_status)">{{ selectedCred.health_status }}</span>
                 </div>
                 <div>
-                  <label class="field-label">配额</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.quota') }}</label>
                   <span>{{ selectedCred.quota_state }}</span>
                 </div>
                 <div>
-                  <label class="field-label">连续失败</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.consecutiveFailures') }}</label>
                   <span>{{ selectedCred.consecutive_failures }}</span>
                 </div>
                 <div>
-                  <label class="field-label">manual_disabled</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.manualDisabled') }}</label>
                   <span :class="selectedCred.manual_disabled ? 'badge badge-red' : 'badge badge-gray'">
-                    {{ selectedCred.manual_disabled ? 'YES' : 'NO' }}
+                    {{ selectedCred.manual_disabled ? cm('drawer.overview.fields.yes') : cm('drawer.overview.fields.no') }}
                   </span>
                 </div>
                 <div>
-                  <label class="field-label">总请求数</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.totalRequests') }}</label>
                   <span class="mono-sm">{{ selectedCred.total_requests }}</span>
                 </div>
                 <div>
-                  <label class="field-label">模型总数</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.totalModels') }}</label>
                   <span class="mono-sm">{{ modelCount(selectedCred).total }}</span>
                 </div>
                 <div>
-                  <label class="field-label">可用模型数</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.availableModels') }}</label>
                   <span class="mono-sm">{{ modelCount(selectedCred).avail }} / {{ modelCount(selectedCred).total }}</span>
                 </div>
                 <div>
-                  <label class="field-label">聚合成功率</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.aggregateSuccessRate') }}</label>
                   <span class="rate-cell" :class="rateClass(selectedCred.aggregated_success_rate)">
                     {{ rateText(selectedCred.aggregated_success_rate) }}
                   </span>
                 </div>
                 <div>
-                  <label class="field-label">broken 模型数</label>
+                  <label class="field-label">{{ cm('drawer.overview.fields.brokenModelCount') }}</label>
                   <span :class="brokenModels(selectedCred).length > 0 ? 'badge badge-red' : 'badge badge-gray'">
                     {{ brokenModels(selectedCred).length }}
                   </span>
@@ -903,39 +902,38 @@ onUnmounted(() => {
             </div>
 
             <div class="drawer-section">
-              <div class="drawer-section-title">并发限流</div>
+              <div class="drawer-section-title">{{ cm('drawer.concurrency.sectionTitle') }}</div>
               <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
                 <div>
-                  <label class="field-label">手动</label>
-                  <div>{{ selectedCred.concurrency_limit || '未设置' }}</div>
+                  <label class="field-label">{{ cm('drawer.concurrency.manual') }}</label>
+                  <div>{{ selectedCred.concurrency_limit || cm('drawer.concurrency.notSet') }}</div>
                 </div>
                 <div>
-                  <label class="field-label">自动</label>
-                  <div>{{ selectedCred.concurrency_limit_auto || '未设置' }}</div>
+                  <label class="field-label">{{ cm('drawer.concurrency.auto') }}</label>
+                  <div>{{ selectedCred.concurrency_limit_auto || cm('drawer.concurrency.notSet') }}</div>
                 </div>
                 <div>
-                  <label class="field-label">生效</label>
+                  <label class="field-label">{{ cm('drawer.concurrency.effective') }}</label>
                   <div class="badge badge-blue">{{ selectedCred.effective_concurrency }}</div>
                 </div>
               </div>
               <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-                <button class="btn btn-sm" @click="openConcurrencyDialog">调整自动值</button>
-                <button class="btn btn-sm btn-danger" @click="openDemoteDialog">临时降级</button>
-                <button class="btn btn-sm btn-success" @click="openPromoteDialog">恢复上线</button>
+                <button class="btn btn-sm" @click="openConcurrencyDialog">{{ cm('drawer.concurrency.adjustAuto') }}</button>
+                <button class="btn btn-sm btn-danger" @click="openDemoteDialog">{{ cm('drawer.concurrency.tempDemote') }}</button>
+                <button class="btn btn-sm btn-success" @click="openPromoteDialog">{{ cm('drawer.concurrency.restore') }}</button>
               </div>
             </div>
           </div>
 
-          <!-- ════════════ Tab 2: 模型 (Models — 左列表 + 右详情) ════════════ -->
+          <!-- Tab 2: Models -->
           <div v-else-if="detailActiveTab === 'models'" class="models-tab">
             <div class="models-tab-grid">
-              <!-- 左侧：简要模型列表 -->
               <div class="model-list-panel">
                 <div class="drawer-section-title">
-                  模型列表 ({{ (selectedCred.models || []).length }})
-                  <span class="cell-sub" style="margin-left:8px;font-weight:400">点击查看详情</span>
+                  {{ cm('drawer.modelsTab.listTitle', { n: (selectedCred.models || []).length }) }}
+                  <span class="cell-sub" style="margin-left:8px;font-weight:400">{{ cm('drawer.modelsTab.clickHint') }}</span>
                 </div>
-                <div v-if="!(selectedCred.models || []).length" class="cell-muted" style="padding:12px">无模型</div>
+                <div v-if="!(selectedCred.models || []).length" class="cell-muted" style="padding:12px">{{ cm('drawer.modelsTab.empty') }}</div>
                 <div v-else class="model-list">
                   <div v-for="m in selectedCred.models" :key="m.raw_model_name"
                       class="model-list-item"
@@ -951,91 +949,84 @@ onUnmounted(() => {
                     </div>
                     <div class="mli-row2">
                       <span class="rate-cell" :class="rateClass(m.recent_success_rate)">{{ rateText(m.recent_success_rate) }}</span>
-                      <span class="cell-sub">{{ m.recent_samples ?? 0 }}样本</span>
-                      <span v-if="m.data_source === 'declared'" class="badge badge-gray mli-tag">未调用</span>
-                      <span v-else-if="!m.offer_available || !m.binding_available" class="badge badge-yellow mli-tag">unavail</span>
+                      <span class="cell-sub">{{ m.recent_samples ?? 0 }}{{ cm('drawer.modelsTab.sampleUnit') }}</span>
+                      <span v-if="m.data_source === 'declared'" class="badge badge-gray mli-tag">{{ cm('drawer.modelsTab.neverCalled') }}</span>
+                      <span v-else-if="!m.offer_available || !m.binding_available" class="badge badge-yellow mli-tag">{{ cm('drawer.modelsTab.unavail') }}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- 右侧：模型详细统计（有选中模型时显示完整详情） -->
               <div v-if="selectedModel && currentModel" class="model-detail-panel">
-                <!-- 模型名称 + 3 个状态图标 -->
                 <div class="model-header">
                   <div class="model-header-title">
                     <code class="model-name">{{ selectedModel }}</code>
                     <StatusBadge :state="currentModel.effective_state" :reason="currentModel.model_disabled_reason" />
                   </div>
                   <div class="status-icons">
-                    <!-- 1. 手工禁用 (整凭据 manual_disabled) -->
                     <button
                       class="status-icon icon-manual-disable"
                       :class="{ active: currentModel.effective_state === 'manual_disabled' }"
-                      :title="currentModel.effective_state === 'manual_disabled' ? '当前为手工禁用状态，点击解除' : '手工禁用此模型'"
+                      :title="currentModel.effective_state === 'manual_disabled' ? cm('drawer.modelsTab.manualDisabledTitle') : cm('drawer.modelsTab.manualDisabledNot')"
                       :disabled="toggleBusy[selectedCred.id + '|' + selectedModel]"
                       @click="handleManualDisableClick"
                     >
                       <span class="status-icon-dot"></span>
-                      手工禁用
+                      {{ cm('drawer.modelsTab.manualDisabled') }}
                     </button>
-                    <!-- 2. 手工启动 (manual_offline) -->
                     <button
                       class="status-icon icon-manual-enable"
                       :class="{ active: currentModel.binding_unavailable_reason === 'manual_offline' && currentModel.effective_state !== 'manual_disabled' }"
-                      :title="currentModel.binding_unavailable_reason === 'manual_offline' ? '当前为手工启动（offline）状态，点击切换为自动' : '将此模型手工设为 offline（自动探测将跳过）'"
+                      :title="currentModel.binding_unavailable_reason === 'manual_offline' ? cm('drawer.modelsTab.manualOnlineTitle') : cm('drawer.modelsTab.manualOnlineNot')"
                       :disabled="toggleBusy[selectedCred.id + '|' + selectedModel]"
                       @click="handleManualOnlineClick"
                     >
                       <span class="status-icon-dot"></span>
-                      手工启动
+                      {{ cm('drawer.modelsTab.manualOnline') }}
                     </button>
-                    <!-- 3. 自动 (auto_probe 控制) -->
                     <button
                       class="status-icon icon-auto"
                       :class="{ active: !['manual_disabled', 'manual_offline'].includes(currentModel.binding_unavailable_reason || '') && !currentModel.effective_state.startsWith('manual_') }"
-                      :title="'由自动探测控制（不可手动切换到该状态）'"
+                      :title="cm('drawer.modelsTab.autoTitle')"
                       @click="handleAutoClick"
                     >
                       <span class="status-icon-dot"></span>
-                      自动
+                      {{ cm('drawer.modelsTab.auto') }}
                     </button>
                   </div>
                 </div>
 
-                <!-- 4 个统计指标卡 -->
                 <div class="model-stats-grid">
                   <div class="stat-card">
-                    <span class="label">P95 延迟</span>
+                    <span class="label">{{ cm('drawer.modelsTab.stats.p95') }}</span>
                     <span :class="p95Class(currentModel.p95_latency_ms)">
-                      <template v-if="currentModel.p95_latency_ms != null">{{ currentModel.p95_latency_ms }}ms</template>
+                      <template v-if="currentModel.p95_latency_ms != null">{{ currentModel.p95_latency_ms }}{{ cm('drawer.modelsTab.stats.msUnit') }}</template>
                       <template v-else>—</template>
                     </span>
                   </div>
                   <div class="stat-card">
-                    <span class="label">最近成功率</span>
+                    <span class="label">{{ cm('drawer.modelsTab.stats.recentSuccessRate') }}</span>
                     <span class="rate-cell" :class="rateClass(currentModel.recent_success_rate)">{{ rateText(currentModel.recent_success_rate) }}</span>
                   </div>
                   <div class="stat-card">
-                    <span class="label">样本数</span>
+                    <span class="label">{{ cm('drawer.modelsTab.stats.sampleCount') }}</span>
                     <span class="mono-sm">{{ currentModel.recent_samples ?? '—' }}</span>
                   </div>
                   <div class="stat-card">
-                    <span class="label">24h 调用次数</span>
+                    <span class="label">{{ cm('drawer.modelsTab.stats.last24hCalls') }}</span>
                     <span class="mono-sm">{{ currentModel.total_calls ?? 0 }}</span>
                   </div>
                 </div>
 
-                <!-- 滑动窗口 -->
                 <div class="drawer-section">
                   <div class="drawer-section-title">
-                    滑动窗口 (最近 1 小时)
+                    {{ cm('drawer.modelsTab.slidingTitle') }}
                     <span class="source-tag" :class="windowSource === 'redis' ? 'src-redis' : 'src-rl'">
-                      {{ windowSource === 'redis' ? 'Redis' : 'request_logs' }}
+                      {{ windowSource === 'redis' ? cm('drawer.modelsTab.redisSource') : cm('drawer.modelsTab.requestLogsSource') }}
                     </span>
                   </div>
-                  <div v-if="windowLoading">加载中...</div>
-                  <div v-else-if="!windowEntries.length" class="cell-muted">无数据</div>
+                  <div v-if="windowLoading">{{ cm('drawer.modelsTab.loading') }}</div>
+                  <div v-else-if="!windowEntries.length" class="cell-muted">{{ cm('drawer.modelsTab.noData') }}</div>
                   <div v-else>
                     <div class="spark-bar-row">
                       <div v-for="(e, i) in windowEntries.slice(0, 100)" :key="i"
@@ -1044,31 +1035,29 @@ onUnmounted(() => {
                              background: e.ok ? '#10b981' : '#ef4444',
                              opacity: 0.8,
                            }"
-                           :title="`${e.ok ? '✓' : '✗'} ${e.lat}ms ${e.err || ''}`"></div>
+                           :title="`${e.ok ? '✓' : '✗'} ${e.lat}${cm('drawer.modelsTab.stats.msUnit')} ${e.err || ''}`"></div>
                     </div>
                     <div class="window-stats">
-                      <span>总计: {{ windowEntries.length }}</span>
-                      <span style="color:#10b981">成功: {{ windowEntries.filter(e => e.ok).length }}</span>
-                      <span style="color:#ef4444">失败: {{ windowEntries.filter(e => !e.ok).length }}</span>
-                      <span>失败率: {{ ((windowEntries.filter(e => !e.ok).length / windowEntries.length) * 100).toFixed(1) }}%</span>
+                      <span>{{ cm('chart.slidingStatsTotal') }}{{ windowEntries.length }}</span>
+                      <span style="color:#10b981">{{ cm('chart.slidingStatsSuccess') }}{{ windowEntries.filter(e => e.ok).length }}</span>
+                      <span style="color:#ef4444">{{ cm('chart.slidingStatsFailed') }}{{ windowEntries.filter(e => !e.ok).length }}</span>
+                      <span>{{ cm('chart.slidingStatsFailureRate') }}{{ ((windowEntries.filter(e => !e.ok).length / windowEntries.length) * 100).toFixed(1) }}%</span>
                     </div>
                   </div>
                 </div>
 
-                <!-- 错误分布（饼图，无错时显示绿色） -->
                 <div class="drawer-section">
-                  <div class="drawer-section-title">错误分布</div>
+                  <div class="drawer-section-title">{{ cm('drawer.modelsTab.errorsTitle') }}</div>
                   <div style="height:200px;position:relative">
                     <canvas id="errorPieChart"></canvas>
                   </div>
                 </div>
 
-                <!-- 并发槽位（保留） -->
                 <div class="drawer-section">
                   <div class="drawer-section-title" style="display:flex;justify-content:space-between;align-items:center">
-                    <span>双层槽位信息</span>
+                    <span>{{ cm('drawer.modelsTab.slotInfoTitle') }}</span>
                     <button class="btn btn-xs btn-ghost" @click="refreshSlotInfo" :disabled="fpSlotStatsLoading">
-                      {{ fpSlotStatsLoading ? '加载中…' : '↻ 刷新' }}
+                      {{ fpSlotStatsLoading ? cm('drawer.modelsTab.loading') : cm('drawer.modelsTab.refresh') }}
                     </button>
                   </div>
                   <SlotInfoCard
@@ -1079,36 +1068,35 @@ onUnmounted(() => {
                   />
                 </div>
               </div>
-              <!-- 右侧：未选中模型时的占位 -->
               <div v-else class="model-detail-panel empty">
-                <div class="cell-muted">请从左侧选择模型查看详情</div>
+                <div class="cell-muted">{{ cm('drawer.modelsTab.emptyHint') }}</div>
               </div>
             </div>
           </div>
 
-          <!-- ════════════ Tab 3: 请求数据 (Requests — 原 历史+决策) ════════════ -->
+          <!-- Tab 3: Requests -->
           <div v-else-if="detailActiveTab === 'requests'" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
             <div class="drawer-section">
               <div class="drawer-section-title" style="display:flex;align-items:center;gap:8px">
-                请求数据 · 模型状态变化历史
+                {{ cm('drawer.requestsTab.historySectionTitle') }}
                 <span v-if="historyEvents.length" class="cell-sub">({{ historyEvents.length }})</span>
                 <button
                   class="btn btn-xs btn-ghost"
                   :disabled="historyLoading || !selectedModel"
                   style="margin-left:auto"
                   @click="loadHistory"
-                >↻ 刷新</button>
+                >{{ cm('drawer.requestsTab.historyRefresh') }}</button>
               </div>
-              <div v-if="!selectedModel" class="cell-muted">点击「模型」tab 中的模型查看</div>
-              <div v-else-if="historyLoading">加载中...</div>
-              <div v-else-if="!historyEvents.length" class="cell-muted">无状态变化记录</div>
+              <div v-if="!selectedModel" class="cell-muted">{{ cm('drawer.requestsTab.historyEmpty') }}</div>
+              <div v-else-if="historyLoading">{{ cm('drawer.requestsTab.historyLoading') }}</div>
+              <div v-else-if="!historyEvents.length" class="cell-muted">{{ cm('drawer.requestsTab.historyNoEvents') }}</div>
               <table v-else class="history-table">
                 <thead>
                   <tr>
-                    <th>时间</th>
-                    <th>来源</th>
-                    <th>事件</th>
-                    <th>详情</th>
+                    <th>{{ cm('drawer.requestsTab.historyColTime') }}</th>
+                    <th>{{ cm('drawer.requestsTab.historyColSource') }}</th>
+                    <th>{{ cm('drawer.requestsTab.historyColEvent') }}</th>
+                    <th>{{ cm('drawer.requestsTab.historyColDetail') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1119,12 +1107,12 @@ onUnmounted(() => {
                         v-if="ev.source === 'auto'"
                         class="badge"
                         :class="ev.event === 'broke' ? 'badge-red' : 'badge-green'"
-                      >自动 · {{ ev.triggered_by || 'scheduler' }}</span>
+                      >{{ cm('drawer.requestsTab.autoPrefix') }}{{ ev.triggered_by || 'scheduler' }}</span>
                       <span
                         v-else
                         class="badge"
                         :class="ev.event === 'offline' ? 'badge-red' : 'badge-green'"
-                      >手动 · {{ ev.actor || 'admin' }}</span>
+                      >{{ cm('drawer.requestsTab.manualPrefix') }}{{ ev.actor || 'admin' }}</span>
                     </td>
                     <td><code class="mono-sm">{{ ev.event }}</code></td>
                     <td class="cell-sub">
@@ -1141,37 +1129,37 @@ onUnmounted(() => {
 
             <div class="drawer-section" style="grid-column:1 / -1">
               <div class="drawer-section-title" style="display:flex;justify-content:space-between;align-items:center">
-                <span>请求数据 · 最近路由决策 (50条)</span>
+                <span>{{ cm('drawer.requestsTab.routingSectionTitle', { n: 50 }) }}</span>
                 <button
                   class="btn btn-xs btn-ghost"
                   :disabled="credentialDecisionsLoading"
                   @click="loadCredentialDecisions"
-                >↻ 刷新</button>
+                >{{ cm('drawer.requestsTab.routingRefresh') }}</button>
               </div>
-              <div v-if="credentialDecisionsLoading">加载中...</div>
-              <div v-else-if="!credentialDecisions.length" class="cell-muted">无路由决策记录</div>
+              <div v-if="credentialDecisionsLoading">{{ cm('drawer.requestsTab.routingLoading') }}</div>
+              <div v-else-if="!credentialDecisions.length" class="cell-muted">{{ cm('drawer.requestsTab.routingNoEvents') }}</div>
               <div v-else style="overflow-x:auto">
                 <table class="decision-table">
                   <thead>
                     <tr>
-                      <th>时间</th>
-                      <th>请求ID</th>
-                      <th>模型</th>
-                      <th>Tier</th>
-                      <th>结果</th>
-                      <th>延迟</th>
-                      <th>错误</th>
+                      <th>{{ cm('drawer.requestsTab.routingColTime') }}</th>
+                      <th>{{ cm('drawer.requestsTab.routingColRequestId') }}</th>
+                      <th>{{ cm('drawer.requestsTab.routingColModel') }}</th>
+                      <th>{{ cm('drawer.requestsTab.routingColTier') }}</th>
+                      <th>{{ cm('drawer.requestsTab.routingColResult') }}</th>
+                      <th>{{ cm('drawer.requestsTab.routingColLatency') }}</th>
+                      <th>{{ cm('drawer.requestsTab.routingColError') }}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="(d, i) in credentialDecisions" :key="i" :class="d.success ? 'decision-success' : 'decision-fail'">
+                    <tr v-for="d in credentialDecisions" :key="d.request_id">
                       <td class="mono-sm">{{ formatTs(d.ts) }}</td>
-                      <td class="mono-sm" style="font-size:10px">{{ d.request_id.substring(0, 8) }}</td>
+                      <td class="mono-sm"><code>{{ d.request_id }}</code></td>
                       <td>
-                        <div class="mono-sm" style="font-size:11px">{{ d.client_model || d.model }}</div>
-                        <div v-if="d.outbound_model && d.outbound_model !== d.client_model" class="cell-sub" style="font-size:10px">
-                          → {{ d.outbound_model }}
-                        </div>
+                        <span v-if="d.outbound_model && d.outbound_model !== d.canonical_name">
+                          {{ d.canonical_name }} → {{ d.outbound_model }}
+                        </span>
+                        <span v-else>{{ d.canonical_name }}</span>
                       </td>
                       <td class="mono-sm">{{ d.tier ?? '—' }}</td>
                       <td>
@@ -1179,7 +1167,7 @@ onUnmounted(() => {
                         <span v-else class="badge badge-red">✗</span>
                         <span v-if="d.sticky_hit" class="badge badge-blue" style="margin-left:4px;font-size:9px">sticky</span>
                       </td>
-                      <td class="mono-sm">{{ d.latency_ms != null ? d.latency_ms + 'ms' : '—' }}</td>
+                      <td class="mono-sm">{{ d.latency_ms != null ? d.latency_ms + cm('drawer.requestsTab.msUnit') : '—' }}</td>
                       <td class="cell-sub" style="font-size:10px">{{ d.error_class || '—' }}</td>
                     </tr>
                   </tbody>
@@ -1194,19 +1182,19 @@ onUnmounted(() => {
     <!-- Batch Dialog -->
     <div v-if="batchDialogOpen" class="drawer-backdrop" @click="batchDialogOpen = false">
       <div class="card" @click.stop style="max-width:500px;margin:auto;margin-top:100px;padding:24px">
-        <h3 style="margin-top:0">批量{{ batchAction === 'promote' ? '恢复' : '降级' }} ({{ selectedIds.size }} 个凭据)</h3>
+        <h3 style="margin-top:0">{{ batchAction === 'promote' ? cm('dialog.batchTitle.promote') : cm('dialog.batchTitle.demote') }} ({{ selectedIds.size }} {{ cm('dialog.batchTitleSuffix') }}</h3>
         <div style="margin-bottom:16px">
-          <label class="field-label">原因</label>
-          <input v-model="batchReason" class="field-input" placeholder="请输入原因" />
+          <label class="field-label">{{ cm('dialog.batchReasonLabel') }}</label>
+          <input v-model="batchReason" class="field-input" :placeholder="cm('dialog.batchReasonPlaceholder')" />
         </div>
         <div v-if="batchAction === 'demote'" style="margin-bottom:16px">
-          <label class="field-label">自动恢复时间 (小时)</label>
+          <label class="field-label">{{ cm('dialog.batchHoursLabel') }}</label>
           <input v-model.number="batchHours" type="number" min="0.5" step="0.5" class="field-input" />
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-ghost" @click="batchDialogOpen = false">取消</button>
+          <button class="btn btn-ghost" @click="batchDialogOpen = false">{{ cm('dialog.cancel') }}</button>
           <button :class="batchAction === 'promote' ? 'btn btn-success' : 'btn btn-danger'" @click="submitBatch">
-            确认{{ batchAction === 'promote' ? '恢复' : '降级' }}
+            {{ batchAction === 'promote' ? cm('dialog.batchSubmit.promote') : cm('dialog.batchSubmit.demote') }}
           </button>
         </div>
       </div>
@@ -1215,143 +1203,142 @@ onUnmounted(() => {
     <!-- Demote / Promote / Concurrency dialogs -->
     <div v-if="demoteDialogOpen" class="drawer-backdrop" @click="demoteDialogOpen = false">
       <div class="card" @click.stop style="max-width:500px;margin:auto;margin-top:100px;padding:24px">
-        <h3 style="margin-top:0">临时降级</h3>
+        <h3 style="margin-top:0">{{ cm('dialog.demoteTitle') }}</h3>
         <div style="margin-bottom:16px">
-          <label class="field-label">降级原因</label>
-          <input v-model="demoteReason" class="field-input" placeholder="请输入原因" />
+          <label class="field-label">{{ cm('dialog.demoteReasonLabel') }}</label>
+          <input v-model="demoteReason" class="field-input" :placeholder="cm('dialog.demoteReasonPlaceholder')" />
         </div>
         <div style="margin-bottom:16px">
-          <label class="field-label">自动恢复时间 (小时)</label>
+          <label class="field-label">{{ cm('dialog.demoteHoursLabel') }}</label>
           <input v-model.number="demoteHours" type="number" min="0.5" step="0.5" class="field-input" />
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-ghost" @click="demoteDialogOpen = false">取消</button>
-          <button class="btn btn-danger" @click="submitDemote">确认降级</button>
+          <button class="btn btn-ghost" @click="demoteDialogOpen = false">{{ cm('dialog.cancel') }}</button>
+          <button class="btn btn-danger" @click="submitDemote">{{ cm('dialog.demoteSubmit') }}</button>
         </div>
       </div>
     </div>
 
     <div v-if="promoteDialogOpen" class="drawer-backdrop" @click="promoteDialogOpen = false">
       <div class="card" @click.stop style="max-width:500px;margin:auto;margin-top:100px;padding:24px">
-        <h3 style="margin-top:0">恢复上线</h3>
+        <h3 style="margin-top:0">{{ cm('dialog.promoteTitle') }}</h3>
         <div style="margin-bottom:16px">
-          <label class="field-label">恢复原因</label>
-          <input v-model="promoteReason" class="field-input" placeholder="请输入原因" />
+          <label class="field-label">{{ cm('dialog.promoteReasonLabel') }}</label>
+          <input v-model="promoteReason" class="field-input" :placeholder="cm('dialog.promoteReasonPlaceholder')" />
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-ghost" @click="promoteDialogOpen = false">取消</button>
-          <button class="btn btn-success" @click="submitPromote">确认恢复</button>
+          <button class="btn btn-ghost" @click="promoteDialogOpen = false">{{ cm('dialog.cancel') }}</button>
+          <button class="btn btn-success" @click="submitPromote">{{ cm('dialog.promoteSubmit') }}</button>
         </div>
       </div>
     </div>
 
     <div v-if="concurrencyDialogOpen" class="drawer-backdrop" @click="concurrencyDialogOpen = false">
       <div class="card" @click.stop style="max-width:500px;margin:auto;margin-top:100px;padding:24px">
-        <h3 style="margin-top:0">手动调整并发自动值</h3>
+        <h3 style="margin-top:0">{{ cm('dialog.concurrencyTitle') }}</h3>
         <div style="margin-bottom:16px">
-          <label class="field-label">并发上限</label>
+          <label class="field-label">{{ cm('dialog.concurrencyLimitLabel') }}</label>
           <input v-model.number="concurrencyValue" type="number" min="1" class="field-input" />
         </div>
         <div style="margin-bottom:16px">
-          <label class="field-label">调整原因</label>
-          <input v-model="concurrencyReason" class="field-input" placeholder="请输入原因" />
+          <label class="field-label">{{ cm('dialog.concurrencyReasonLabel') }}</label>
+          <input v-model="concurrencyReason" class="field-input" :placeholder="cm('dialog.concurrencyReasonPlaceholder')" />
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-ghost" @click="concurrencyDialogOpen = false">取消</button>
-          <button class="btn btn-primary" @click="submitConcurrency">确认</button>
+          <button class="btn btn-ghost" @click="concurrencyDialogOpen = false">{{ cm('dialog.cancel') }}</button>
+          <button class="btn btn-primary" @click="submitConcurrency">{{ cm('dialog.concurrencySubmit') }}</button>
         </div>
       </div>
     </div>
 
-    <!-- 2026-06-23: per-model toggle dialog -->
+    <!-- per-model toggle dialog -->
     <div v-if="toggleDialogOpen" class="drawer-backdrop" @click="toggleDialogOpen = false">
       <div class="card" @click.stop style="max-width:480px;margin:auto;margin-top:120px;padding:20px">
         <h3 style="margin-top:0">
-          确认{{ toggleTarget?.action === 'offline' ? '下线' : '上线' }}
+          {{ toggleTarget?.action === 'offline' ? cm('dialog.toggleTitle.offline') : cm('dialog.toggleTitle.online') }}
         </h3>
         <div class="cell-sub" style="margin-bottom:12px">
-          <code class="mono-sm">{{ toggleTarget?.rawModel }}</code> · 凭据 #{{ toggleTarget?.credId }}
+          <code class="mono-sm">{{ toggleTarget?.rawModel }}</code> · {{ cm('dialog.toggleCredentialPrefix') }}{{ toggleTarget?.credId }}
         </div>
         <div v-if="toggleTarget?.action === 'offline'" class="cell-sub" style="margin-bottom:12px">
-          下线后自动探测将不再触碰该模型（原因 = <code>manual_offline</code>），需你手动恢复。
+          {{ cm('dialog.toggleOfflineBody', { code: 'manual_offline' }) }}
         </div>
         <div v-else class="cell-sub" style="margin-bottom:12px">
-          恢复后下一轮自动探测（~10 min）会重新评估。
+          {{ cm('dialog.toggleOnlineBody') }}
         </div>
-        <label class="field-label">原因（必填）</label>
+        <label class="field-label">{{ cm('dialog.toggleReasonLabel') }}</label>
         <input
           v-model="toggleReason"
           class="field-input"
-          placeholder="例如: 误判 broken / 紧急封禁 / 灰度验证"
+          :placeholder="cm('dialog.toggleReasonPlaceholder')"
           @keyup.enter="submitToggle"
         />
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn btn-ghost" @click="toggleDialogOpen = false">取消</button>
+          <button class="btn btn-ghost" @click="toggleDialogOpen = false">{{ cm('dialog.cancel') }}</button>
           <button
             :class="toggleTarget?.action === 'offline' ? 'btn btn-danger' : 'btn btn-success'"
             :disabled="!toggleReason.trim()"
             @click="submitToggle"
-          >确认{{ toggleTarget?.action === 'offline' ? '下线' : '上线' }}</button>
+          >{{ toggleTarget?.action === 'offline' ? cm('dialog.toggleSubmit.offline') : cm('dialog.toggleSubmit.online') }}</button>
         </div>
       </div>
     </div>
 
-    <!-- Clear manual_disabled dialog (2026-06-23) -->
-    <!-- Clear manual_disabled dialog (2026-06-23) -->
+    <!-- Clear manual_disabled dialog -->
     <div v-if="clearDisabledDialogOpen" class="drawer-backdrop" @click="clearDisabledDialogOpen = false">
       <div class="card" @click.stop style="max-width:480px;margin:auto;margin-top:120px;padding:20px">
-        <h3 style="margin-top:0">清除 manual_disabled</h3>
+        <h3 style="margin-top:0">{{ cm('dialog.clearTitle') }}</h3>
         <div class="cell-sub" style="margin-bottom:12px">
-          凭据 #{{ selectedCred?.id }} - {{ selectedCred?.label || '无标签' }}
+          {{ cm('dialog.toggleCredentialPrefix') }}{{ selectedCred?.id }} {{ cm('dialog.toggleCredentialSep') }} {{ selectedCred?.label || cm('dialog.toggleNoLabel') }}
         </div>
         <div style="margin-bottom:12px;padding:12px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:6px;font-size:13px">
-          ⚠️ 此操作将立即恢复凭据到正常路由池，manual_disabled 标志将被清除。请确认此凭据已经可以正常使用。
+          {{ cm('dialog.clearWarning') }}
         </div>
-        <label class="field-label">操作原因（必填）</label>
+        <label class="field-label">{{ cm('dialog.clearReasonLabel') }}</label>
         <input
           v-model="clearDisabledReason"
           class="field-input"
-          placeholder="例如: 供应商恢复正常 / 误操作修正 / 灰度验证完成"
+          :placeholder="cm('dialog.clearReasonPlaceholder')"
           @keyup.enter="submitClearDisabled"
         />
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn btn-ghost" @click="clearDisabledDialogOpen = false">取消</button>
+          <button class="btn btn-ghost" @click="clearDisabledDialogOpen = false">{{ cm('dialog.cancel') }}</button>
           <button
             class="btn btn-warning"
             :disabled="!clearDisabledReason.trim()"
             @click="submitClearDisabled"
-          >确认清除</button>
+          >{{ cm('dialog.clearSubmit') }}</button>
         </div>
       </div>
     </div>
 
-    <!-- Set manual_disabled dialog (2026-06-23) -->
+    <!-- Set manual_disabled dialog -->
     <div v-if="setManualDisabledDialogOpen" class="drawer-backdrop" @click="setManualDisabledDialogOpen = false">
       <div class="card" @click.stop style="max-width:480px;margin:auto;margin-top:120px;padding:20px">
-        <h3 style="margin-top:0">{{ setManualDisabledTargetValue ? '禁用凭据' : '启用凭据' }}</h3>
+        <h3 style="margin-top:0">{{ setManualDisabledTargetValue ? cm('dialog.setTitle.disable') : cm('dialog.setTitle.enable') }}</h3>
         <div class="cell-sub" style="margin-bottom:12px">
-          凭据 #{{ selectedCred?.id }} - {{ selectedCred?.label || '无标签' }}
+          {{ cm('dialog.toggleCredentialPrefix') }}{{ selectedCred?.id }} {{ cm('dialog.toggleCredentialSep') }} {{ selectedCred?.label || cm('dialog.toggleNoLabel') }}
         </div>
         <div v-if="setManualDisabledTargetValue" style="margin-bottom:12px;padding:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;font-size:13px">
-          ⚠️ 此操作将设置 manual_disabled = true，凭据将从路由池移除，不再处理任何流量，直到手动恢复。
+          {{ cm('dialog.setDisableBody') }}
         </div>
         <div v-else style="margin-bottom:12px;padding:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:6px;font-size:13px">
-          ✓ 此操作将设置 manual_disabled = false，凭据将恢复到正常路由池。
+          {{ cm('dialog.setEnableBody') }}
         </div>
-        <label class="field-label">操作原因（必填）</label>
+        <label class="field-label">{{ cm('dialog.setReasonLabel') }}</label>
         <input
           v-model="setManualDisabledReason"
           class="field-input"
-          :placeholder="setManualDisabledTargetValue ? '例如: 供应商维护 / 配额耗尽 / 临时下线' : '例如: 供应商恢复 / 维护完成 / 测试通过'"
+          :placeholder="setManualDisabledTargetValue ? cm('dialog.setReasonPlaceholderDisable') : cm('dialog.setReasonPlaceholderEnable')"
           @keyup.enter="submitSetManualDisabled"
         />
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn btn-ghost" @click="setManualDisabledDialogOpen = false">取消</button>
+          <button class="btn btn-ghost" @click="setManualDisabledDialogOpen = false">{{ cm('dialog.cancel') }}</button>
           <button
             :class="setManualDisabledTargetValue ? 'btn btn-danger' : 'btn btn-success'"
             :disabled="!setManualDisabledReason.trim()"
             @click="submitSetManualDisabled"
-          >确认{{ setManualDisabledTargetValue ? '禁用' : '启用' }}</button>
+          >{{ setManualDisabledTargetValue ? cm('dialog.setSubmit.disable') : cm('dialog.setSubmit.enable') }}</button>
         </div>
       </div>
     </div>
