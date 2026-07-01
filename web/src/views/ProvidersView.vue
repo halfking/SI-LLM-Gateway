@@ -1183,31 +1183,6 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
-          <input v-model="credKey" type="password" placeholder="sk-…" autocomplete="off" :disabled="credSaving" />
-        </div>
-        <div class="form-group">
-          <label>标签（可选）</label>
-          <input v-model="credLabel" placeholder="如: 生产密钥" :disabled="credSaving" />
-        </div>
-        <div v-if="credProbeStatus === 'probing'" style="margin:8px 0;font-size:13px;color:var(--accent)">
-          ⏳ 凭据已保存，正在自动探测凭据状态…
-        </div>
-        <div v-else-if="credProbeStatus === 'done'" style="margin:8px 0;font-size:13px;color:var(--success)">
-          ✅ 探测完成
-        </div>
-        <div v-else-if="credProbeStatus === 'failed'" style="margin:8px 0;font-size:13px;color:var(--warning)">
-          ⚠️ 凭据已保存，但自动探测未完成（可稍后手动检测）
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn btn-ghost" @click="showCred = false" :disabled="credSaving && credProbeStatus === 'probing'">取消</button>
-          <button class="btn btn-primary" @click="submitCred" :disabled="credSaving">
-            {{ credSaving && !credProbeStatus ? '保存中…' : credProbeStatus === 'probing' ? '探测中…' : '添加' }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 /* ── Filter Bar ─────────────────────────────────────────────────────────── */
