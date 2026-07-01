@@ -223,7 +223,18 @@ func main() {
 	if dbConn != nil && dbConn.Enabled() {
 		storagePath := os.Getenv("ATTACHMENT_STORAGE_PATH")
 		if storagePath == "" {
-			storagePath = "./data/attachments"
+			// 2026-07-02 fix: the previous default `./data/attachments`
+			// is a RELATIVE path that resolves against the process cwd.
+			// When gateway runs inside the systemd-launched Docker
+			// container (`--entrypoint /opt/llm-gateway-go/llm-gateway-go`
+			// without `--workdir`), the container's cwd is `/`, so the
+			// attachments end up in `/data/attachments` on the alpine
+			// rootfs — invisible to the host and impossible for the
+			// server to read back via /api/admin/attachments/{id}
+			// (HTTP 500, "failed to read attachment"). We now anchor
+			// to the absolute path the systemd unit bind-mounts
+			// into the container (`/opt/llm-gateway-go/data`).
+			storagePath = "/opt/llm-gateway-go/data/attachments"
 		}
 		attachmentEnabled := os.Getenv("ATTACHMENT_ENABLED")
 		enabled := attachmentEnabled == "" || attachmentEnabled == "true" || attachmentEnabled == "1"
@@ -321,6 +332,7 @@ func main() {
 		Enabled:            cfg.EnableCredentialFpSlots,
 		ActiveGateSeconds:  cfg.CredentialFpSlotActiveGateSeconds,
 		ReclaimIdleSeconds: cfg.CredentialFpSlotReclaimIdleSeconds,
+		MaxInflightPerSlot: cfg.CredentialFpSlotMaxInflightPerSlot,
 	}, fpSlotRedis)
 
 	// 2026-06-23: enable background idle-slot reclaim.
