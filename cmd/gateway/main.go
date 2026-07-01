@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/kaixuan/llm-gateway-go/admin"
+	"github.com/kaixuan/llm-gateway-go/attachmentanalysis"
 	"github.com/kaixuan/llm-gateway-go/attachments"
 	"github.com/kaixuan/llm-gateway-go/audit"
 	"github.com/kaixuan/llm-gateway-go/auth"
@@ -220,6 +221,10 @@ func main() {
 	// Extracts and saves base64 images/files before forwarding to upstream.
 	// Reduces request_body size and enables separate attachment management.
 	var attachmentMgr *attachments.Manager
+	var attachmentAnalyzer *attachmentanalysis.Analyzer
+	var attachmentAnalysisSink *attachmentanalysis.Sink
+	var attachmentSweeper *bg.AttachmentAnalysisSweeper
+
 	if dbConn != nil && dbConn.Enabled() {
 		storagePath := os.Getenv("ATTACHMENT_STORAGE_PATH")
 		if storagePath == "" {
@@ -254,6 +259,34 @@ func main() {
 			slog.Info("attachment manager enabled",
 				"storage_path", storagePath,
 				"max_size_mb", maxSizeMB)
+
+			// ── Content Identification (2026-07-02) ────────────────────
+			// Async pipeline: archiveAndEnqueueAnalysis → sink → analyzer
+			// → 5 sources (hash_cache, response_reuse, vision_loopback,
+			// ocr, classification) → metadata JSONB. Main switch defaults
+			// OFF; each source has its own switch. Vision/OCR have real
+			// cost; hash/response/classification are zero-cost. Optional
+			// injection (#4) adds [image context: ...] text blocks on
+			// cache hits.
+			attachmentAnalyzer = attachmentanalysis.NewAnalyzer(
+				dbConn.Pool(),
+				storagePath,
+			)
+			attachmentAnalysisSink = attachmentanalysis.NewSink(
+				attachmentAnalyzer,
+				2,   // workers
+				500, // queue size
+			)
+
+			// Background sweeper: recovers pending + reloads config (5min).
+			attachmentSweeper = bg.NewAttachmentAnalysisSweeper(
+				attachmentAnalyzer,
+				attachmentAnalysisSink,
+				5*time.Minute,
+			)
+			attachmentSweeper.Start(context.Background())
+
+			slog.Info("attachment content-identification enabled (async pipeline + bg sweeper)")
 		}
 	}
 
@@ -1425,9 +1458,18 @@ func main() {
 		// archived from request bodies. Registered under wrapAdmin so only
 		// authenticated admin users can fetch them.
 		if attachmentMgr != nil && attachmentMgr.Enabled() {
-			attachmentsHandler := admin.NewAttachmentsHandler(attachmentMgr)
-			mux.HandleFunc("/api/admin/attachments/", wrapAdmin(attachmentsHandler.ServeHTTP))
+			attachmentsHandler := admin.NewAttachmentsHandler(attachmentMgr, cfg.SecretKey)
+			mux.HandleFunc("/api/admin/attachments/", admin.AttachmentsWithAuth(attachmentsHandler, dbConn.Pool(), cfg.SecretKey))
 			slog.Info("attachment download API enabled (/api/admin/attachments/)")
+
+			// Attachment content-identification admin API (2026-07-02):
+			// manual re-analyze, pending-recovery, and queue stats.
+			if attachmentAnalysisSink != nil && attachmentAnalyzer != nil {
+				analysisHandler := admin.NewAttachmentAnalysisHandler(
+					attachmentAnalysisSink, attachmentAnalyzer, attachmentMgr)
+				mux.HandleFunc("/api/admin/attachments/analysis/", wrapAdmin(analysisHandler.ServeHTTP))
+				slog.Info("attachment analysis API enabled (/api/admin/attachments/analysis/)")
+			}
 		}
 	}
 

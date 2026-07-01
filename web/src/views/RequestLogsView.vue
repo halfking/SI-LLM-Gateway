@@ -8,7 +8,6 @@ import {
   sessionSummaryToMemora,
   getKeys,
   getAttachments,
-  getAttachmentUrl,
   type RequestLogRow,
   type RequestLogDetail,
   type ApiKey,
@@ -1417,7 +1416,7 @@ onMounted(async () => {
                   <div style="display:flex;align-items:center;gap:12px">
                     <div v-if="attachment.media_type.startsWith('image/')" style="flex-shrink:0">
                       <img
-                        :src="getAttachmentUrl(attachment.id)"
+                        :src="attachment.download_url"
                         :alt="attachment.id"
                         title="点击查看大图"
                         style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border,#333);cursor:zoom-in;transition:transform .15s ease"
@@ -1440,7 +1439,7 @@ onMounted(async () => {
                     </div>
                     <div style="flex-shrink:0">
                       <a 
-                        :href="getAttachmentUrl(attachment.id)" 
+                        :href="attachment.download_url" 
                         target="_blank" 
                         class="btn btn-sm"
                         :download="attachment.id"
@@ -1500,7 +1499,7 @@ onMounted(async () => {
           style="position:relative;max-width:92vw;max-height:92vh;display:flex;flex-direction:column;align-items:center;gap:12px;background:var(--card,#1e1e1e);padding:16px;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.6)"
         >
           <img
-            :src="getAttachmentUrl(previewAttachment.id)"
+            :src="previewAttachment.download_url"
             :alt="previewAttachment.id"
             :style="{
               maxWidth: '90vw',
@@ -1516,7 +1515,7 @@ onMounted(async () => {
             <span>大小: {{ formatBytes(previewAttachment.file_size) }}</span>
             <span>哈希: {{ previewAttachment.content_hash.substring(0, 16) }}...</span>
             <a
-              :href="getAttachmentUrl(previewAttachment.id)"
+              :href="previewAttachment.download_url"
               target="_blank"
               class="btn btn-sm"
               :download="previewAttachment.id"

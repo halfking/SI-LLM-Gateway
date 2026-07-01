@@ -117,6 +117,12 @@ type Config struct {
 	// the two knobs can be tuned separately.
 	CredentialFpSlotReclaimIdleSeconds int `yaml:"credential_fp_slot_reclaim_idle_seconds" env:"LLM_GATEWAY_CREDENTIAL_FP_SLOT_RECLAIM_IDLE_SECONDS"`
 
+	// CredentialFpSlotMaxInflightPerSlot caps how many in-flight requests
+	// may hold the same fingerprint slot concurrently. Set to 0 to fall
+	// back to DefaultMaxInflightPerSlot (10). Exposed via the fp-slot
+	// admin observability API.
+	CredentialFpSlotMaxInflightPerSlot int `yaml:"credential_fp_slot_max_inflight_per_slot" env:"LLM_GATEWAY_CREDENTIAL_FP_SLOT_MAX_INFLIGHT_PER_SLOT"`
+
 	// EnableDisguise rotates User-Agent, Accept-Language, and (optionally)
 	// TLS ClientHello fingerprints. See docs/legal/disguise-compliance.md
 	// for the legal/ToS implications.
@@ -172,6 +178,7 @@ func Load() *Config {
 		EnableCredentialFpSlots:            true,
 		CredentialFpSlotActiveGateSeconds:  300,   // 5 min — "5 min 内不允许抢的"
 		CredentialFpSlotReclaimIdleSeconds: 1800,  // 30 min — 自动清除无活动的时长
+		CredentialFpSlotMaxInflightPerSlot: 10,    // 2026-07-01: 单 slot 最大并发数，防止占满
 		EnableDisguise:                     false, // off by default; opt-in
 	}
 
@@ -224,6 +231,11 @@ func Load() *Config {
 	if v := os.Getenv("LLM_GATEWAY_CREDENTIAL_FP_SLOT_RECLAIM_IDLE_SECONDS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 			cfg.CredentialFpSlotReclaimIdleSeconds = n
+		}
+	}
+	if v := os.Getenv("LLM_GATEWAY_CREDENTIAL_FP_SLOT_MAX_INFLIGHT_PER_SLOT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.CredentialFpSlotMaxInflightPerSlot = n
 		}
 	}
 

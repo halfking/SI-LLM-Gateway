@@ -58,6 +58,11 @@ type Config struct {
 	// anyway, so reclaim is mostly a Redis-persistence safety net.
 	// Set to 0 to fall back to DefaultReclaimIdleSeconds (1800).
 	ReclaimIdleSeconds int
+
+	// MaxInflightPerSlot caps how many in-flight requests may hold the
+	// same fingerprint slot concurrently. Set to 0 to fall back to
+	// DefaultMaxInflightPerSlot (10). Exposed via Manager.MaxInflightPerSlot().
+	MaxInflightPerSlot int
 }
 
 // DefaultActiveGateSeconds is the fallback when Config.ActiveGateSeconds
@@ -85,6 +90,12 @@ const DefaultActiveGateSeconds = 300 // 5 minutes
 // 分钟，这个可以作成常量，由系统设置中来设置". The constant is
 // here; the env var is in config.go.
 const DefaultReclaimIdleSeconds = 1800 // 30 minutes
+
+// DefaultMaxInflightPerSlot is the fallback when Config.MaxInflightPerSlot
+// is 0. Each fingerprint slot may host up to this many concurrent in-flight
+// requests before a new acquire is told to retry/evict. 10 matches the
+// historical behaviour.
+const DefaultMaxInflightPerSlot = 10
 
 // Lease is one acquired fingerprint slot.
 type Lease struct {
@@ -160,6 +171,9 @@ func New(cfg Config, client *redis.Client) *Manager {
 	if cfg.ReclaimIdleSeconds <= 0 {
 		cfg.ReclaimIdleSeconds = DefaultReclaimIdleSeconds
 	}
+	if cfg.MaxInflightPerSlot <= 0 {
+		cfg.MaxInflightPerSlot = DefaultMaxInflightPerSlot
+	}
 	return &Manager{
 		cfg:      cfg,
 		client:   client,
@@ -170,6 +184,16 @@ func New(cfg Config, client *redis.Client) *Manager {
 
 func (m *Manager) Enabled() bool {
 	return m != nil && m.cfg.Enabled
+}
+
+// MaxInflightPerSlot returns the configured per-slot in-flight cap, falling
+// back to DefaultMaxInflightPerSlot. New() normalises a zero/missing value
+// to the default, so this is mainly a read accessor for observability.
+func (m *Manager) MaxInflightPerSlot() int {
+	if m == nil || m.cfg.MaxInflightPerSlot <= 0 {
+		return DefaultMaxInflightPerSlot
+	}
+	return m.cfg.MaxInflightPerSlot
 }
 
 // StartReclaim launches the background goroutine that proactively
@@ -870,10 +894,10 @@ func (m *Manager) acquireRedis(ctx context.Context, credentialID, limit int, hol
 				[]string{
 					slotRedisKey(credentialID, slot),
 					pinKey,
-					inflightKey(credentialID, slot),
-				},
-				holder, slotTTLSeconds, sessionPinTTLSeconds, slot, gate,
-			).Result()
+				inflightKey(credentialID, slot),
+			},
+			holder, slotTTLSeconds, sessionPinTTLSeconds, slot, gate, m.MaxInflightPerSlot(),
+		).Result()
 			if err != nil {
 				slog.Debug("cred_fp_slot redis pin-reuse failed", "cred", credentialID, "slot", slot, "error", err)
 			} else if r, ok := arr.([]interface{}); ok && len(r) >= 1 {
@@ -921,7 +945,7 @@ func (m *Manager) acquireRedis(ctx context.Context, credentialID, limit int, hol
 func (m *Manager) tryRedisLock(ctx context.Context, credentialID, slot int, holder string) bool {
 	acquired, err := acquireSlotScript.Run(ctx, m.client,
 		[]string{slotRedisKey(credentialID, slot), ""},
-		holder, slotTTLSeconds, 0, slot, m.cfg.resolveActiveGateSeconds(),
+		holder, slotTTLSeconds, 0, slot, m.cfg.resolveActiveGateSeconds(), m.MaxInflightPerSlot(),
 	).Bool()
 	if err != nil {
 		slog.Debug("cred_fp_slot redis lock failed", "cred", credentialID, "error", err)

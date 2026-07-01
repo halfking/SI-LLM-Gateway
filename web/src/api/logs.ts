@@ -223,15 +223,21 @@ export function probeModel(model: string, messages?: Array<{role: string; conten
 }
 
 // 2026-07-01: Attachment APIs
+// 2026-07-02: tenant_id is a string (matches backend), download_url is a
+// short-lived HMAC-signed link the browser can use in <img>/<a> without an
+// Authorization header.
 export interface Attachment {
   id: string
   request_id: string
-  tenant_id: number
+  tenant_id: string
+  attachment_type: string
   media_type: string
   file_size: number
+  file_path: string
+  original_data_type: string
   content_hash: string
-  storage_path: string
   created_at: string
+  download_url?: string
 }
 
 export function getAttachments(requestId: string): Promise<Attachment[]> {

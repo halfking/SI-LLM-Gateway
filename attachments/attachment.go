@@ -18,6 +18,11 @@ type Attachment struct {
 	ContentHash      string    `json:"content_hash"`      // SHA256
 	CreatedAt        time.Time `json:"created_at"`
 	Metadata         []byte    `json:"metadata,omitempty"` // JSONB
+
+	// DownloadURL is not a DB column. The list endpoint populates it with a
+	// short-lived HMAC-signed URL so the admin UI's browser-native <img>/
+	// <a> elements can fetch the file without an Authorization header.
+	DownloadURL string `json:"download_url,omitempty"`
 }
 
 // AttachmentType constants
