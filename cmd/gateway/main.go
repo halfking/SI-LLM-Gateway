@@ -41,6 +41,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/internal/ir"
 	"github.com/kaixuan/llm-gateway-go/internal/modelpolicy"
 	"github.com/kaixuan/llm-gateway-go/internal/observability"
+	"github.com/kaixuan/llm-gateway-go/observability/rotate"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/maas"
 	"github.com/kaixuan/llm-gateway-go/memora"
@@ -93,6 +94,11 @@ func main() {
 	// ── Logging ───────────────────────────────────────────────────────────
 	cfg := config.Load()
 
+	// Stderr handler is always installed as the primary handler
+	// (so docker logs / kubectl logs continues to work). The
+	// optional rotated file handler is added below, after the
+	// YAML config (if any) is loaded so LLM_GATEWAY_LOG_FILE /
+	// log_file overrides take effect.
 	level := slog.LevelInfo
 	switch cfg.LogLevel {
 	case "debug":
@@ -102,9 +108,8 @@ func main() {
 	case "error":
 		level = slog.LevelError
 	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: level,
-	})))
+	stderrHandler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+	slog.SetDefault(slog.New(stderrHandler))
 
 	// ── Optional YAML config file ─────────────────────────────────────────
 	configFile := os.Getenv("LLM_GATEWAY_CONFIG_FILE")
@@ -118,6 +123,45 @@ func main() {
 			slog.Warn("config: failed to load YAML file, using env-only", "path", configFile, "error", err)
 		} else {
 			slog.Info("config: loaded YAML file", "path", configFile)
+		}
+	}
+
+	// ── Optional rotated log file (LLM_GATEWAY_LOG_FILE) ──────────────────
+	// Installed AFTER the YAML config so log_file / log_max_size_mb /
+	// etc. can override the env defaults. Mirrors observability/siem
+	// fail-soft: if the file cannot be opened, the process continues
+	// with stderr-only logging. Defaults (set in config.Load):
+	//   ./logs/gateway.log, 100 MiB, 10 backups, gzip on.
+	//
+	// TODO(rotate-hot-reload): when config.Store.ReloadFile swaps the
+	// config, the slog default handler is not re-created; the file
+	// path / size cap stay pinned to the startup values. Re-wiring
+	// on hot-reload is out of scope for this change.
+	if cfg.Log.File != "" {
+		compress := true
+		if cfg.Log.Compress != nil {
+			compress = *cfg.Log.Compress
+		}
+		rot, err := rotate.New(rotate.Config{
+			File:       cfg.Log.File,
+			MaxSizeMB:  cfg.Log.MaxSizeMB,
+			MaxBackups: cfg.Log.MaxBackups,
+			MaxAgeDays: cfg.Log.MaxAgeDays,
+			Compress:   &compress,
+		})
+		if err != nil {
+			slog.Warn("log: file rotation disabled, using stderr only",
+				"path", cfg.Log.File, "error", err)
+		} else {
+			defer rot.Close()
+			fileHandler := slog.NewJSONHandler(rot.Writer(), &slog.HandlerOptions{Level: level})
+			slog.SetDefault(slog.New(rotate.NewMultiHandler(stderrHandler, fileHandler)))
+			slog.Info("log: file rotation enabled",
+				"path", rot.Path(),
+				"max_size_mb", cfg.Log.MaxSizeMB,
+				"max_backups", cfg.Log.MaxBackups,
+				"max_age_days", cfg.Log.MaxAgeDays,
+				"compress", compress)
 		}
 	}
 

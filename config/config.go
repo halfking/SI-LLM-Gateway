@@ -10,6 +10,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// LogConfig controls the optional rotated log file. The process
+// always logs to stderr; when Log.File is non-empty, the same
+// JSON-formatted records are also appended to a file managed by
+// observability/rotate (which wraps lumberjack). See
+// observability/rotate.Defaults for the per-knob defaults.
+//
+// Environment variables (and matching YAML keys at the top level
+// of config.yml):
+//
+//	LLM_GATEWAY_LOG_FILE            path of the active log file
+//	LLM_GATEWAY_LOG_MAX_SIZE_MB     rotate when current file exceeds this
+//	LLM_GATEWAY_LOG_MAX_BACKUPS     number of rotated files to keep
+//	LLM_GATEWAY_LOG_MAX_AGE_DAYS    delete rotated files older than this
+//	LLM_GATEWAY_LOG_COMPRESS        gzip rotated files (true / 1 / yes)
+type LogConfig struct {
+	File       string `yaml:"log_file" env:"LLM_GATEWAY_LOG_FILE"`
+	MaxSizeMB  int    `yaml:"log_max_size_mb" env:"LLM_GATEWAY_LOG_MAX_SIZE_MB"`
+	MaxBackups int    `yaml:"log_max_backups" env:"LLM_GATEWAY_LOG_MAX_BACKUPS"`
+	MaxAgeDays int    `yaml:"log_max_age_days" env:"LLM_GATEWAY_LOG_MAX_AGE_DAYS"`
+	// Compress is a *bool so we can distinguish "unset" (nil →
+	// default true) from "explicitly false" in YAML and env.
+	// Note: a zero-value LogConfig{} struct produces a nil
+	// pointer, and observability/rotate's applyDefaults will
+	// fill in *true.
+	Compress *bool `yaml:"log_compress"`
+}
+
 type Config struct {
 	// PostgreSQL
 	DatabaseURL string `yaml:"database_url" env:"LLM_GATEWAY_DATABASE_URL"`
@@ -32,6 +59,14 @@ type Config struct {
 	APIKey      string `yaml:"api_key" env:"LLM_GATEWAY_API_KEY"`
 	CORSOrigins string `yaml:"cors_origins" env:"LLM_GATEWAY_CORS_ORIGINS"`
 	StaticDir   string `yaml:"static_dir" env:"LLM_GATEWAY_STATIC_DIR"`
+
+	// Log file rotation. The active log is written by the
+	// process via a slog JSON handler to a lumberjack-backed
+	// file in addition to stderr. See observability/rotate for
+	// defaults. 2026-07-01: added so operational and error
+	// logs are preserved in a size-bounded, age-bounded,
+	// optionally-compressed file.
+	Log LogConfig `yaml:",inline"`
 
 	// Upstream
 	PythonEndpoint  string `yaml:"python_endpoint" env:"LLM_GATEWAY_PYTHON_ENDPOINT"`
@@ -192,8 +227,41 @@ func Load() *Config {
 		}
 	}
 
+	// Log file rotation defaults. The process always logs to
+	// stderr; the file sink is opt-in via LLM_GATEWAY_LOG_FILE.
+	// Defaults: ./logs/gateway.log, 100 MiB, 10 backups, no
+	// time-based expiry, gzip ON. Matches operator spec
+	// "最大 1G 的 log,过期删除" (≈ 1 GiB worst-case disk).
+	cfg.Log.File = envOrDefault("LLM_GATEWAY_LOG_FILE", "logs/gateway.log")
+	cfg.Log.MaxSizeMB = 100
+	cfg.Log.MaxBackups = 10
+	cfg.Log.MaxAgeDays = 0
+	cfg.Log.Compress = boolPtr(true)
+	if v := os.Getenv("LLM_GATEWAY_LOG_MAX_SIZE_MB"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Log.MaxSizeMB = n
+		}
+	}
+	if v := os.Getenv("LLM_GATEWAY_LOG_MAX_BACKUPS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			cfg.Log.MaxBackups = n
+		}
+	}
+	if v := os.Getenv("LLM_GATEWAY_LOG_MAX_AGE_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			cfg.Log.MaxAgeDays = n
+		}
+	}
+	if v := os.Getenv("LLM_GATEWAY_LOG_COMPRESS"); v != "" {
+		cfg.Log.Compress = boolPtr(v == "true" || v == "1" || v == "yes")
+	}
+
 	return cfg
 }
+
+// boolPtr returns &b. Tiny helper so Load() can build *bool
+// values without a separate var-decl per use.
+func boolPtr(b bool) *bool { return &b }
 
 // LoadFile merges config from a YAML file on top of the current config.
 // File values are overridden by environment variables for security.
@@ -280,6 +348,28 @@ func (cfg *Config) mergeFrom(other *Config) {
 	}
 	if other.SessionTTLHours != 0 && os.Getenv("LLM_GATEWAY_SESSION_TTL_HOURS") == "" {
 		cfg.SessionTTLHours = other.SessionTTLHours
+	}
+	// Log rotation knobs. Note: env vars ALWAYS win over YAML
+	// for the same reason as every other field above (security:
+	// an ops override of LLM_GATEWAY_LOG_FILE must not be
+	// silently shadowed by a stale config.yml). For the
+	// *bool Compress, presence of the env var is the test
+	// ("was the operator explicit?"); absence means "use YAML
+	// if set, else default true".
+	if other.Log.File != "" && os.Getenv("LLM_GATEWAY_LOG_FILE") == "" {
+		cfg.Log.File = other.Log.File
+	}
+	if other.Log.MaxSizeMB != 0 && os.Getenv("LLM_GATEWAY_LOG_MAX_SIZE_MB") == "" {
+		cfg.Log.MaxSizeMB = other.Log.MaxSizeMB
+	}
+	if other.Log.MaxBackups != 0 && os.Getenv("LLM_GATEWAY_LOG_MAX_BACKUPS") == "" {
+		cfg.Log.MaxBackups = other.Log.MaxBackups
+	}
+	if other.Log.MaxAgeDays != 0 && os.Getenv("LLM_GATEWAY_LOG_MAX_AGE_DAYS") == "" {
+		cfg.Log.MaxAgeDays = other.Log.MaxAgeDays
+	}
+	if other.Log.Compress != nil && os.Getenv("LLM_GATEWAY_LOG_COMPRESS") == "" {
+		cfg.Log.Compress = other.Log.Compress
 	}
 }
 
