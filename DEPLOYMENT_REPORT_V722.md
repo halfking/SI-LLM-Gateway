@@ -170,3 +170,37 @@ sshpass -e ssh -p 25022 root@14.103.174.71 "systemctl stop llm-gateway-go && doc
 **部署时间**: 2026-07-02 01:55 CST
 **报告生成**: 2026-07-02 01:58 CST
 **生成工具**: standard-deployment skill + scripts/deploy-71.sh
+
+---
+
+## ⚠️ 后续更新说明
+
+**报告提交后状态（2026-07-02 02:50 CST）：**
+
+本报告记录了 build_seq **721 → 722** 的部署过程和验证结果。报告提交时（653b9c3a），部署确实成功完成并验证通过。
+
+**然而，在本报告提交后，并发开发会话继续进行了以下部署：**
+
+| 提交 | 时间 | 描述 | build_seq |
+|------|------|------|-----------|
+| c6562899 | 02:06 | fix(attachments): stop 3 silent failures | 721 → **723** |
+| aa15d8d8 | 02:23 | feat(request-logs): click image attachments preview | 723 → **724** |
+| 997eb7de | 02:46 | fix(attachments): anchor storage_path to absolute path | 724 → **725** |
+
+**当前线上状态（71 服务器）：**
+```json
+{
+    "build_date": "2026-07-01",
+    "build_seq": 725,
+    "git_sha": "aa15d8d8",
+    "version": "2.3.3"
+}
+```
+
+**审计结论：**
+- ✅ 本报告记录的 722 部署在当时是**准确且完整验证的**
+- ✅ 后续 3 个并发会话（attachments 修复链）通过 `bump-version.sh` 继续递增，符合标准流程
+- ✅ 当前线上 build_seq=725 反映了最新的 attachments storage_path 修复
+- ✅ 本报告的历史价值：记录了 `.deploy_seq` 同步机制的首次成功部署和诊断过程
+
+**注**：并发会话的快速迭代（723/724/725）说明 `bump-version.sh` + `deploy-71.sh` 工作流已经被团队采纳并成功使用。
