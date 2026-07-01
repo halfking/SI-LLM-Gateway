@@ -3002,6 +3002,14 @@ func writeErrorJSONWithKind(w http.ResponseWriter, status int, requestID, msg, e
 // lookup table for the cases where LastKind is empty (e.g. no
 // candidates returned at all from the router).
 //
+// 2026-07-01 (V3.1.2): if every failed attempt recorded in Attempts
+// is "circuit open for credential N", we treat the whole call as
+// KindCircuitOpen so the request_logs row carries the actionable kind
+// instead of being demoted to "unknown". Without this, the
+// circuit-break-cascade case (minimax-m3 2026-06-30 incident) showed
+// up as a flood of `err_kind=unknown` rows that operators could not
+// diagnose from the admin UI.
+//
 // Returns "" when no kind can be determined (caller should omit the
 // header and the field).
 func mapExecuteErrorToKind(err *routing.ExecuteError) string {
@@ -3013,6 +3021,15 @@ func mapExecuteErrorToKind(err *routing.ExecuteError) string {
 	}
 	if err.Tried == 0 {
 		return "no_candidates"
+	}
+	// 2026-07-01: last-resort diagnostic — if every attempt was
+	// "circuit open for credential X" (the only LastErr-style message
+	// the executor emits without setting LastKind), surface it as
+	// KindCircuitOpen so request_logs.err_kind is informative.
+	if len(err.Attempts) > 0 && err.LastErr != nil {
+		if strings.Contains(err.LastErr.Error(), "circuit open for credential") {
+			return string(errorsx.KindCircuitOpen)
+		}
 	}
 	return "unknown"
 }

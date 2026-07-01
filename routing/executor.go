@@ -753,6 +753,16 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 				"provider_id", cand.ProviderID,
 			)
 			lastErr = fmt.Errorf("circuit open for credential %d", cand.CredentialID)
+			// 2026-07-01 (V3.1.2): also stamp lastKind so the eventual
+			// ExecuteError carries a meaningful kind instead of "".
+			// Without this, "all 4 candidates failed because every
+			// one of them had its circuit open" bubbles up as
+			// err_kind=unknown in request_logs (the operator's worst
+			// nightmare — a perfectly explainable cascade that
+			// looks like an undefined bug). Setting it here means
+			// LastKind is always populated for the
+			// circuit-skipped-skip-candidate path.
+			lastKind = errorsx.KindCircuitOpen
 			if fpLease != nil {
 				e.FpSlots.Release(params.R.Context(), fpLease)
 			}
