@@ -674,7 +674,14 @@ async function showDetail(requestId: string) {
 async function loadAttachments(requestId: string) {
   attachmentsLoading.value = true
   try {
-    attachments.value = await getAttachments(requestId)
+    // 2026-07-02: defensive coercion. The backend's ListByRequestID
+    // returns nil when no rows are found, and Go's encoding/json
+    // serialises a nil []*Attachment as JSON `null` (not `[]`). Without
+    // this fallback, the `attachments.length === 0` check in the
+    // template throws "Cannot read properties of null (reading 'length')"
+    // and Vue aborts rendering the whole detail panel → white page.
+    const result = await getAttachments(requestId)
+    attachments.value = Array.isArray(result) ? result : []
   } catch (e: unknown) {
     console.error('Failed to load attachments:', e)
   } finally {

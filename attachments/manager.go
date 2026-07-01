@@ -203,12 +203,24 @@ func (m *Manager) archiveBase64(ctx context.Context, mediaType, b64, requestID, 
 
 	// Dedupe by (tenant, hash) so repeated images don't duplicate files.
 	if existing, err := m.findByHash(ctx, contentHash, tenantID); err == nil && existing != nil {
-		// Still record the association to this request_id so the request
-		// log can list it, but reuse the file path.
+		// 2026-07-02 fix: the original code only mutated the in-memory
+		// existing.RequestID and returned without writing to the database.
+		// That meant a repeat-image request (e.g. user uploads the same
+		// screenshot three times in three consecutive turns) would show
+		// attachment_count=N in request_logs but `attachments` would
+		// have ZERO rows tagged with this request_id, causing
+		// /api/admin/attachments?request_id=... to return [] for a row
+		// that the admin UI badges as "3 attachments" — a phantom
+		// list. We now UPDATE the existing row's request_id so the
+		// admin "request attachments" view actually finds the image.
+		if _, err := m.pool.Exec(ctx,
+			`UPDATE attachments SET request_id = $1 WHERE id = $2`,
+			requestID, existing.ID,
+		); err != nil {
+			slog.Warn("attachments: dedupe UPDATE failed",
+				"id", existing.ID, "request_id", requestID, "error", err)
+		}
 		existing.RequestID = requestID
-		// Best-effort: record a thin association row only if we track
-		// request_id separately. Current schema keys on id, so we just
-		// return the existing metadata to count toward this request.
 		return []*Attachment{existing}
 	}
 
@@ -257,8 +269,15 @@ func (m *Manager) archiveBase64(ctx context.Context, mediaType, b64, requestID, 
 // ── persistence helpers ───────────────────────────────────────────────
 
 func (m *Manager) save(ctx context.Context, att *Attachment) error {
+	// 2026-07-02 fix: the previous `return nil` here was a silent
+	// no-op that masked misconfiguration (e.g. caller forgot to
+	// pass a pool, or a tenant_id mismatch with RLS). It let the
+	// caller archiveBase64() return a populated []*Attachment while
+	// the row never landed in the database, producing phantom
+	// "has_attachments=t, attachment_count=N, attachments[]=<empty>"
+	// rows. We now return a hard error so the failure is loud.
 	if m.pool == nil {
-		return nil
+		return fmt.Errorf("attachments: manager has no DB pool; cannot save %s", att.ID)
 	}
 	_, err := m.pool.Exec(ctx, `
 		INSERT INTO attachments (
@@ -368,7 +387,12 @@ func (m *Manager) ListByRequestID(ctx context.Context, requestID, tenantID strin
 	}
 	defer rows.Close()
 
-	var out []*Attachment
+	// 2026-07-02 fix: initialise to an empty slice (not nil) so the
+	// JSON encoder emits `[]` instead of `null`. Frontend code reads
+	// `attachments.length` and crashes with "Cannot read properties
+	// of null" when the API returns null. An empty slice is the
+	// semantically correct response when zero rows match.
+	out := []*Attachment{}
 	for rows.Next() {
 		var a Attachment
 		if err := rows.Scan(
