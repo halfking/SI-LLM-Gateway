@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 export interface LandingFeature {
   title: string;
@@ -35,16 +36,18 @@ const props = withDefaults(
   {
     heroPoints: () => [],
     advantages: () => [],
-    advantagesTitle: '竞争优势',
-    advantagesSubtitle: '差异化能力，面向企业生产场景',
-    ctaLabel: '登录开始使用',
-    footerText: '开轩启圭 · 企业智能工作台',
+    advantagesTitle: '',
+    advantagesSubtitle: '',
+    ctaLabel: '',
+    footerText: '',
     accent: '',
     hideCta: true,
   },
 );
 
 const emit = defineEmits<{ login: [] }>();
+
+const { t } = useI18n()
 
 const accentStyle = computed(() =>
   props.accent ? { '--landing-accent': props.accent } : {},
@@ -57,7 +60,7 @@ const accentStyle = computed(() =>
       <p class="kx-landing__kicker">{{ kicker }}</p>
       <h1 class="kx-landing__title">{{ title }}</h1>
       <p class="kx-landing__subtitle">{{ subtitle }}</p>
-      <ul v-if="heroPoints.length" class="kx-landing__points" aria-label="核心亮点">
+      <ul v-if="heroPoints.length" class="kx-landing__points" :aria-label="t('landing.ariaPoints')">
         <li v-for="point in heroPoints" :key="point">{{ point }}</li>
       </ul>
       <button v-if="!hideCta" type="button" class="kx-landing__cta" @click="emit('login')">
@@ -68,8 +71,8 @@ const accentStyle = computed(() =>
 
     <section class="kx-landing__features">
       <header class="kx-landing__section-head">
-        <h2 class="kx-landing__section-title">核心能力</h2>
-        <p class="kx-landing__section-sub">覆盖从接入到运营的关键环节</p>
+        <h2 class="kx-landing__section-title">{{ t('landing.featuresTitle') }}</h2>
+        <p class="kx-landing__section-sub">{{ t('landing.featuresSubtitle') }}</p>
       </header>
       <div class="kx-landing__feature-grid">
         <article v-for="item in features" :key="item.title" class="kx-landing__card">

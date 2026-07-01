@@ -7,6 +7,8 @@ export default {
   title: '开轩企业 AI 与智能体网关',
   subtitle:
     '从大模型代理到智能体编排的统一入口。统一接入多家 LLM，智能路由、安全护盾、缓存降本、全链路审计——让企业的每一次 AI 调用可控、可观测、可计费。',
+  featuresTitle: '核心能力',
+  featuresSubtitle: '覆盖从接入到运营的关键环节',
   heroPoints: ['智能路由', '调用安全', '缓存降本', 'Agent 就绪', '全链路审计', 'MaaS 计费'],
   features: {
     smartRouting: {

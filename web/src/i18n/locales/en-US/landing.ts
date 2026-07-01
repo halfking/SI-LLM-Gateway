@@ -9,6 +9,8 @@ export default {
   title: 'Kaixuan Enterprise AI & Agent Gateway',
   subtitle:
     'The unified gateway from LLM proxy to agent orchestration. One entry point for every LLM — intelligent routing, safety shields, cache-driven cost control, full-chain audit. Every AI call is observable, controllable, and billable.',
+  featuresTitle: 'Core Capabilities',
+  featuresSubtitle: 'Covering the full chain from access to operations',
   heroPoints: [
     'Smart Routing',
     'Call Safety',

@@ -7,6 +7,12 @@ const { t } = useI18n()
 
 // Feature cards (8) — keys are camelCase ids that match `landing.features.<id>`
 // in the i18n bundles. The icon is purely visual and stays in code.
+//
+// Note: vue-i18n v9's `t('a.b.c', {}, { returnObjects: true })` does NOT
+// auto-traverse a nested message object — it only returns the raw key
+// string when the full key isn't found verbatim in `messages`. We therefore
+// look up each leaf string via `t('landing.features.<id>.title')` etc.,
+// which works correctly under any locale.
 const FEATURE_META: ReadonlyArray<{ key: string; icon: string }> = [
   { key: 'smartRouting', icon: '🧭' },
   { key: 'safety', icon: '🔐' },
@@ -20,12 +26,19 @@ const FEATURE_META: ReadonlyArray<{ key: string; icon: string }> = [
 
 const features = computed(() =>
   FEATURE_META.map(({ key, icon }) => {
-    const f = t(`landing.features.${key}`, {}, { returnObjects: true }) as {
-      title: string
-      description: string
-      badge?: string
+    // vue-i18n returns the raw key (e.g. "landing.features.smartRouting.badge") when
+    // a leaf string is missing. Filter those out so optional badges don't render
+    // as visible fallback text.
+    const rawBadge = t(`landing.features.${key}.badge`)
+    const badge = rawBadge.startsWith(`landing.features.${key}.badge`)
+      ? undefined
+      : (rawBadge || undefined)
+    return {
+      icon,
+      title: t(`landing.features.${key}.title`),
+      description: t(`landing.features.${key}.description`),
+      badge,
     }
-    return { icon, title: f.title, description: f.description, badge: f.badge }
   }),
 )
 
@@ -37,26 +50,28 @@ const ADVANTAGE_META: ReadonlyArray<{ key: string; icon: string }> = [
 ]
 
 const advantages = computed(() =>
-  ADVANTAGE_META.map(({ key, icon }) => {
-    const a = t(`landing.advantages.${key}`, {}, { returnObjects: true }) as {
-      title: string
-      description: string
-    }
-    return { icon, title: a.title, description: a.description }
-  }),
+  ADVANTAGE_META.map(({ key, icon }) => ({
+    icon,
+    title: t(`landing.advantages.${key}.title`),
+    description: t(`landing.advantages.${key}.description`),
+  })),
 )
 
 const ROADMAP_KEYS = ['v31', 'v32', 'v40', 'v50'] as const
 
 const roadmapPhases = computed(() =>
-  ROADMAP_KEYS.map((k) => {
-    const p = t(`landing.roadmap.${k}`, {}, { returnObjects: true }) as {
-      phase: string
-      title: string
-      description: string
-    }
-    return { phase: p.phase, title: p.title, description: p.description }
-  }),
+  ROADMAP_KEYS.map((k) => ({
+    phase: t(`landing.roadmap.${k}.phase`),
+    title: t(`landing.roadmap.${k}.title`),
+    description: t(`landing.roadmap.${k}.description`),
+  })),
+)
+
+// heroPoints is a 6-element string array. Vue-i18n v9's `t('a.b', { returnObjects: true })`
+// cannot auto-traverse a nested message object, so we look up each element via its
+// full dot path (which IS how vue-i18n resolves leaf keys in nested trees).
+const heroPoints = computed(() =>
+  [0, 1, 2, 3, 4, 5].map((i) => t(`landing.heroPoints.${i}`)),
 )
 </script>
 
@@ -66,7 +81,7 @@ const roadmapPhases = computed(() =>
       :kicker="t('landing.kicker')"
       :title="t('landing.title')"
       :subtitle="t('landing.subtitle')"
-      :hero-points="(t('landing.heroPoints', {}, { returnObjects: true }) as string[])"
+      :hero-points="heroPoints"
       :features="features"
       :advantages="advantages"
       :advantages-title="t('landing.advantagesTitle')"
