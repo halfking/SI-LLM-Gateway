@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, computed, onBeforeUnmount, watch, Teleport } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   getRequestLogs,
@@ -72,7 +72,17 @@ watch(autoRefresh, (enabled) => {
 
 onBeforeUnmount(() => {
   stopAutoRefresh()
+  window.removeEventListener('keydown', handleKeydown)
 })
+
+// 2026-07-02: close the image preview lightbox on ESC, regardless of
+// focus. bound globally so the operator does not have to click back
+// into the modal first.
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && previewAttachment.value) {
+    closeImagePreview()
+  }
+}
 
 const showCompressionGuide = ref(false)
 
@@ -100,6 +110,21 @@ const detailTab = ref<'request' | 'outbound' | 'response' | 'attachments'>('requ
 // Attachments
 const attachments = ref<Attachment[]>([])
 const attachmentsLoading = ref(false)
+
+// 2026-07-02: image preview lightbox. The thumbnail in each
+// attachment row is a small 80x80 cover; clicking it pops a full-size
+// modal so the operator can see the actual image at native
+// resolution. previewAttachment holds the currently-displayed
+// attachment (null = modal closed).
+const previewAttachment = ref<Attachment | null>(null)
+
+function openImagePreview(att: Attachment) {
+  if (!att.media_type.startsWith('image/')) return
+  previewAttachment.value = att
+}
+function closeImagePreview() {
+  previewAttachment.value = null
+}
 
 // Tenant info for display
 const tenantLabel = computed(() => {
@@ -693,6 +718,7 @@ function closeDetail() {
   detailVisible.value = false
   detail.value = null
   attachments.value = []
+  closeImagePreview()
 }
 
 function formatJson(obj: any): string {
@@ -873,6 +899,10 @@ onMounted(async () => {
   if (typeof q.hours === 'string' && /^\d+$/.test(q.hours)) {
     hours.value = Number(q.hours)
   }
+  // 2026-07-02: register global ESC handler for the image-preview
+  // lightbox. We attach to window (not the modal root) so it fires
+  // regardless of which element currently has focus.
+  window.addEventListener('keydown', handleKeydown)
   await loadKeys()
   await load()
 })
@@ -1386,11 +1416,15 @@ onMounted(async () => {
                 >
                   <div style="display:flex;align-items:center;gap:12px">
                     <div v-if="attachment.media_type.startsWith('image/')" style="flex-shrink:0">
-                      <img 
-                        :src="getAttachmentUrl(attachment.id)" 
+                      <img
+                        :src="getAttachmentUrl(attachment.id)"
                         :alt="attachment.id"
-                        style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border,#333)"
-                        @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
+                        title="点击查看大图"
+                        style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border,#333);cursor:zoom-in;transition:transform .15s ease"
+                        @click="openImagePreview(attachment)"
+                        @mouseover="(e) => ((e.currentTarget as HTMLImageElement).style.transform = 'scale(1.03)')"
+                        @mouseleave="(e) => ((e.currentTarget as HTMLImageElement).style.transform = 'scale(1)')"
+                        @error="(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')"
                       />
                     </div>
                     <div style="flex:1;min-width:0">
@@ -1448,6 +1482,50 @@ onMounted(async () => {
         </template>
       </div>
     </div>
+
+    <!-- 2026-07-02: image preview lightbox. Rendered as a sibling of the
+         detail drawer so it can overlay the entire viewport regardless
+         of where the originating click came from. ESC and backdrop
+         click both close it. -->
+    <Teleport to="body">
+      <div
+        v-if="previewAttachment"
+        class="image-preview-backdrop"
+        @click="closeImagePreview"
+        style="position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)"
+      >
+        <div
+          class="image-preview-modal"
+          @click.stop
+          style="position:relative;max-width:92vw;max-height:92vh;display:flex;flex-direction:column;align-items:center;gap:12px;background:var(--card,#1e1e1e);padding:16px;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.6)"
+        >
+          <img
+            :src="getAttachmentUrl(previewAttachment.id)"
+            :alt="previewAttachment.id"
+            :style="{
+              maxWidth: '90vw',
+              maxHeight: '80vh',
+              objectFit: 'contain',
+              borderRadius: '4px',
+              background: '#000',
+            }"
+          />
+          <div style="display:flex;align-items:center;gap:16px;color:var(--muted,#aaa);font-size:12px;flex-wrap:wrap;justify-content:center">
+            <span style="color:var(--fg,#eee);font-weight:600;word-break:break-all">{{ previewAttachment.id }}</span>
+            <span>类型: {{ previewAttachment.media_type }}</span>
+            <span>大小: {{ formatBytes(previewAttachment.file_size) }}</span>
+            <span>哈希: {{ previewAttachment.content_hash.substring(0, 16) }}...</span>
+            <a
+              :href="getAttachmentUrl(previewAttachment.id)"
+              target="_blank"
+              class="btn btn-sm"
+              :download="previewAttachment.id"
+            >下载原图</a>
+            <button class="btn btn-sm" @click="closeImagePreview">关闭 (ESC)</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
