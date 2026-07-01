@@ -439,7 +439,7 @@ func (e *Executor) doCompactionUpstream(
 	payload []byte,
 	anthropic bool,
 ) (*http.Response, error) {
-	if e.Circuit != nil && !e.Circuit.Allow(cand.ProviderID, cand.CredentialID) {
+	if e.Circuit != nil && !e.Circuit.Allow(cand.ProviderID, cand.CredentialID, cand.RawModel) {
 		return nil, fmt.Errorf("compaction: circuit open for credential %d", cand.CredentialID)
 	}
 
@@ -471,15 +471,15 @@ func (e *Executor) doCompactionUpstream(
 	resp, err := e.doCompactionHTTP(req)
 	if err != nil {
 		if e.Circuit != nil {
-			e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, errorsx.KindNetwork)
+			e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, errorsx.KindNetwork)
 		}
 		return nil, err
 	}
 	if e.Circuit != nil {
 		if resp.StatusCode >= 500 || resp.StatusCode == 429 {
-			e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, errorsx.ClassifyErrorWithBody(resp.StatusCode, nil))
+			e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, errorsx.ClassifyErrorWithBody(resp.StatusCode, nil))
 		} else if resp.StatusCode < 400 {
-			e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID)
+			e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
 		}
 	}
 	return resp, nil

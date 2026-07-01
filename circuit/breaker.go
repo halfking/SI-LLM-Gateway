@@ -397,7 +397,11 @@ func (b *Breaker) Stats() map[string]any {
 // Manager — global registry of circuit breakers
 // ---------------------------------------------------------------------------
 
-// Manager manages all circuit breakers keyed by (provider, credential).
+// Manager manages all circuit breakers keyed by (provider, credential, raw_model).
+// V3.2.1 (2026-07-01): Changed from (provider, credential) to (provider, credential, raw_model)
+// to isolate circuit state per model variant. Previously, failures on MiniMax-M2.7 would
+// open the circuit for MiniMax-M3, causing false-positive outages when the same credential
+// served multiple model variants as failover candidates.
 type Manager struct {
 	mu       sync.RWMutex
 	breakers map[string]*Breaker
@@ -408,9 +412,9 @@ func NewManager() *Manager {
 	return &Manager{breakers: make(map[string]*Breaker)}
 }
 
-// GetOrCreate returns the breaker for the given provider/credential.
-func (m *Manager) GetOrCreate(providerID, credentialID int) *Breaker {
-	key := fmt.Sprintf("%d/%d", providerID, credentialID)
+// GetOrCreate returns the breaker for the given provider/credential/rawModel.
+func (m *Manager) GetOrCreate(providerID, credentialID int, rawModel string) *Breaker {
+	key := fmt.Sprintf("%d/%d/%s", providerID, credentialID, rawModel)
 
 	m.mu.RLock()
 	b, ok := m.breakers[key]
@@ -430,9 +434,9 @@ func (m *Manager) GetOrCreate(providerID, credentialID int) *Breaker {
 	return b
 }
 
-// Get returns the breaker for the given provider/credential, or nil.
-func (m *Manager) Get(providerID, credentialID int) *Breaker {
-	key := fmt.Sprintf("%d/%d", providerID, credentialID)
+// Get returns the breaker for the given provider/credential/rawModel, or nil.
+func (m *Manager) Get(providerID, credentialID int, rawModel string) *Breaker {
+	key := fmt.Sprintf("%d/%d/%s", providerID, credentialID, rawModel)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.breakers[key]
@@ -460,28 +464,28 @@ func (m *Manager) ResetAll() {
 }
 
 // RecordFailure records a failure on the appropriate breaker.
-func (m *Manager) RecordFailure(providerID, credentialID int, kind ErrorKind) {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) RecordFailure(providerID, credentialID int, rawModel string, kind ErrorKind) {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	b.RecordFailure(kind)
 }
 
 // RecordSuccess records a success on the appropriate breaker.
-func (m *Manager) RecordSuccess(providerID, credentialID int) {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) RecordSuccess(providerID, credentialID int, rawModel string) {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	b.RecordSuccess()
 }
 
 // Allow checks if a request should be allowed through the circuit.
-func (m *Manager) Allow(providerID, credentialID int) bool {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) Allow(providerID, credentialID int, rawModel string) bool {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	return b.Allow()
 }
 
 // ProbeCheck performs a half-open probe: if the circuit is HALF_OPEN,
 // it returns true. The caller should make a lightweight probe request
 // and then call RecordSuccess/RecordFailure.
-func (m *Manager) ProbeCheck(providerID, credentialID int) bool {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) ProbeCheck(providerID, credentialID int, rawModel string) bool {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	state := b.State()
 	if state == StateHalfOpen {
 		return true
@@ -494,8 +498,8 @@ func (m *Manager) ProbeCheck(providerID, credentialID int) bool {
 }
 
 // CloseProbe completes a half-open probe by recording the result.
-func (m *Manager) CloseProbe(providerID, credentialID int, success bool, kind ErrorKind) {
-	b := m.GetOrCreate(providerID, credentialID)
+func (m *Manager) CloseProbe(providerID, credentialID int, rawModel string, success bool, kind ErrorKind) {
+	b := m.GetOrCreate(providerID, credentialID, rawModel)
 	if success {
 		b.RecordSuccess()
 	} else {

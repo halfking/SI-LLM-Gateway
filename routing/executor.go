@@ -747,10 +747,11 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 			}
 		}
 
-		if !e.Circuit.Allow(cand.ProviderID, cand.CredentialID) {
+		if !e.Circuit.Allow(cand.ProviderID, cand.CredentialID, cand.RawModel) {
 			slog.Debug("executor: circuit open, skipping candidate",
 				"credential_id", cand.CredentialID,
 				"provider_id", cand.ProviderID,
+				"raw_model", cand.RawModel,
 			)
 			lastErr = fmt.Errorf("circuit open for credential %d", cand.CredentialID)
 			// 2026-07-01 (V3.1.2): also stamp lastKind so the eventual
@@ -1027,11 +1028,11 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 				// because the executor's outer loop now drives the failover
 				// to the next candidate, and we want the DB state to be
 				// authoritative before that next lookup.
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
+				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind)
 				if kind == errorsx.KindConcurrent {
 					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, kind, execErr)
 					e.forceUnpinOnFatalKind(params.R.Context(), holder, cand.CredentialID, kind)
-				} else if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, kind) {
+				} else if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind) {
 					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, kind, execErr)
 					e.forceUnpinOnFatalKind(params.R.Context(), holder, cand.CredentialID, kind)
 				}
@@ -1056,8 +1057,8 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 				// The inner tryCandidate already wrote the credential state
 				// with the correct kind; this branch keeps the circuit counter
 				// consistent and ensures the kind is recorded.
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
-				if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, kind) {
+				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind)
+				if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind) {
 					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, kind, execErr)
 					e.forceUnpinOnFatalKind(params.R.Context(), holder, cand.CredentialID, kind)
 				}
@@ -1174,7 +1175,7 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 			// 防止会话继续粘滞到已失效的凭证
 			e.clearSessionPreferenceOnNodeDisable(params, cand.CredentialID, cand.RawModel)
 		}
-		e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, kind)
+		e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind)
 		trace.BlockedCandidates = append(trace.BlockedCandidates, TraceCandidate{
 			ProviderID:   cand.ProviderID,
 			CredentialID: cand.CredentialID,
@@ -1182,7 +1183,7 @@ func (e *Executor) Execute(params *ExecParams) (*ExecuteResult, error) {
 			Tier:         cand.Tier,
 			Reason:       fmt.Sprintf("request_failed:%s", kind),
 		})
-		if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, kind) {
+		if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, kind) {
 			e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, kind, execErr)
 			e.forceUnpinOnFatalKind(params.R.Context(), holder, cand.CredentialID, kind)
 		}
@@ -2540,7 +2541,7 @@ func shouldWriteCredentialState(kind errorsx.ErrorKind) bool {
 	}
 }
 
-func (e *Executor) shouldWriteCredentialStateOnConfirmedFailure(providerID, credentialID int, kind errorsx.ErrorKind) bool {
+func (e *Executor) shouldWriteCredentialStateOnConfirmedFailure(providerID, credentialID int, rawModel string, kind errorsx.ErrorKind) bool {
 	if !shouldWriteCredentialState(kind) {
 		return false
 	}
@@ -2554,7 +2555,7 @@ func (e *Executor) shouldWriteCredentialStateOnConfirmedFailure(providerID, cred
 	if e.Circuit == nil {
 		return true
 	}
-	b := e.Circuit.GetOrCreate(providerID, credentialID)
+	b := e.Circuit.GetOrCreate(providerID, credentialID, rawModel)
 	state := b.State()
 	if state == circuit.StateOpen || state == circuit.StateQuarantined {
 		return true

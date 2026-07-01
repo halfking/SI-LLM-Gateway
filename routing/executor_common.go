@@ -40,17 +40,21 @@ type CommonExecutor struct {
 	// these to record circuit success/failure. Lower-case because
 	// they are only meant to be set by the surrounding Executor /
 	// protocol-specific executor at composition time.
+	// V3.2.1 (2026-07-01): added rawModel to support per-model circuit keys.
 	providerID   int
 	credentialID int
+	rawModel     string
 }
 
 // SetProviderCredential binds the CommonExecutor instance to a
-// specific (providerID, credentialID) pair so RunWithCredential can
+// specific (providerID, credentialID, rawModel) tuple so RunWithCredential can
 // record circuit success/failure. Called by the surrounding Executor
 // before invoking a protocol-specific executor.
-func (c *CommonExecutor) SetProviderCredential(providerID, credentialID int) {
+// V3.2.1 (2026-07-01): added rawModel parameter.
+func (c *CommonExecutor) SetProviderCredential(providerID, credentialID int, rawModel string) {
 	c.providerID = providerID
 	c.credentialID = credentialID
+	c.rawModel = rawModel
 }
 
 // AttemptFunc is the per-attempt callback passed to RunWithCredential.
@@ -87,7 +91,7 @@ func (c *CommonExecutor) RunWithCredential(ctx context.Context, attempt AttemptF
 		err := attempt(n)
 		if err == nil {
 			if c.Circuit != nil {
-				c.Circuit.RecordSuccess(c.providerID, c.credentialID)
+				c.Circuit.RecordSuccess(c.providerID, c.credentialID, c.rawModel)
 			}
 			return nil
 		}
@@ -95,7 +99,7 @@ func (c *CommonExecutor) RunWithCredential(ctx context.Context, attempt AttemptF
 			return err
 		}
 		if c.Circuit != nil {
-			c.Circuit.RecordFailure(c.providerID, c.credentialID, classifyKind(err))
+			c.Circuit.RecordFailure(c.providerID, c.credentialID, c.rawModel, classifyKind(err))
 		}
 	}
 	return errors.New("exhausted retries")

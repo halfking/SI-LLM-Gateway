@@ -480,7 +480,7 @@ func (e *Executor) executeOpenAI(
 					resp.StatusCode != 403 && resp.StatusCode != 402 &&
 					errKind != errorsx.KindConcurrent {
 					if !errorsx.IsClientBug(errKind) {
-						e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID)
+						e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
 					} else {
 						slog.Info("upstream rejected request as client bug",
 							"credential_id", cand.CredentialID,
@@ -491,9 +491,9 @@ func (e *Executor) executeOpenAI(
 						)
 					}
 				} else if errKind == errorsx.KindRateLimit {
-					e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
-				} else if errKind == errorsx.KindConcurrent {
-					e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, errorsx.KindConcurrent)
+				e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
+			} else if errKind == errorsx.KindConcurrent {
+				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, errorsx.KindConcurrent)
 					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, errorsx.KindConcurrent,
 						fmt.Errorf("upstream %d concurrent overload: %s", resp.StatusCode, string(body[:min(n, 200)])))
 					e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, errorsx.KindConcurrent)
@@ -556,9 +556,9 @@ func (e *Executor) executeOpenAI(
 					return nil, fmt.Errorf("upstream %d: %s", resp.StatusCode, string(body[:min(n, 200)]))
 				}
 				return nil, &retryableError{err: fmt.Errorf("upstream %d", resp.StatusCode)}
-			}
+		}
 
-			e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID)
+		e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
 			latencyMs := int(time.Since(tTotal).Milliseconds())
 
 			if params.IsStream {
@@ -598,8 +598,8 @@ func (e *Executor) executeOpenAI(
 						"benign_eof", isBenignEOF,
 					)
 
-					if isBenignEOF {
-						e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID)
+				if isBenignEOF {
+					e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
 						return &ExecuteResult{
 							Response:    resp,
 							Candidate:   cand,
@@ -613,31 +613,31 @@ func (e *Executor) executeOpenAI(
 							CompressionReason:   strPtrCompat(contextLenRecovery.lastReason),
 							CompressionStrategy: strPtrCompat(contextLenRecovery.lastStrategy),
 							CompressionMeta:     mergeCompressionMeta(contextLenRecovery.lastMeta, preTrimMeta),
-						}, nil
-					} else if isResumable {
-						e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, streamKind)
-						if streamKind == errorsx.KindConcurrent {
-							e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind,
-								fmt.Errorf("stream %s (concurrent-overload inferred)", streamOutcome.Reason))
-							e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
-						} else if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, streamKind) {
-							e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind, fmt.Errorf("stream %s", streamOutcome.Reason))
-							e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
-						}
-					} else if streamKind == errorsx.KindConcurrent {
-						e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, streamKind)
+					}, nil
+				} else if isResumable {
+					e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
+					if streamKind == errorsx.KindConcurrent {
 						e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind,
-							fmt.Errorf("stream %s (concurrent-overload inferred, non-resumable)", streamOutcome.Reason))
+							fmt.Errorf("stream %s (concurrent-overload inferred)", streamOutcome.Reason))
 						e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
-						slog.Warn("non-resumable stream interrupted by concurrent-overload, credential now in 5-min cooling",
-							"credential_id", cand.CredentialID,
-							"provider_id", cand.ProviderID,
-							"reason", streamOutcome.Reason,
-							"chunk_count", streamOutcome.ChunkCount,
-						)
-					} else {
-						e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, streamKind)
-						if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, streamKind) {
+					} else if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind) {
+						e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind, fmt.Errorf("stream %s", streamOutcome.Reason))
+						e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
+					}
+				} else if streamKind == errorsx.KindConcurrent {
+					e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
+					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind,
+						fmt.Errorf("stream %s (concurrent-overload inferred, non-resumable)", streamOutcome.Reason))
+					e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
+					slog.Warn("non-resumable stream interrupted by concurrent-overload, credential now in 5-min cooling",
+						"credential_id", cand.CredentialID,
+						"provider_id", cand.ProviderID,
+						"reason", streamOutcome.Reason,
+						"chunk_count", streamOutcome.ChunkCount,
+					)
+				} else {
+					e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
+						if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind) {
 							e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind,
 								fmt.Errorf("stream %s (non-resumable)", streamOutcome.Reason))
 							e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
