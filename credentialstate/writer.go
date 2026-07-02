@@ -91,6 +91,11 @@ func (w *Writer) RestoreOnSuccess(ctx context.Context, credentialID int, rawMode
 	// Restore the specific (credential, model) binding. Skip rows that
 	// are admin-pinned. If rawModel is empty, restore every binding on
 	// the credential (legacy path).
+	//
+	// 2026-07-03 fix (P1-1): Skip rows with future unavailable_recover_at
+	// to prevent overriding AntiFlap/Checker long cooldowns (2h). Without
+	// this check, a single success during the cooldown period would
+	// immediately restore availability, defeating the anti-flapping logic.
 	if rawModel == "" {
 		if _, err = tx.Exec(ctx, `
 			UPDATE credential_model_bindings cmb
@@ -105,6 +110,8 @@ func (w *Writer) RestoreOnSuccess(ctx context.Context, credentialID int, rawMode
 			  AND cmb.available = FALSE
 			  AND COALESCE(cmb.unavailable_reason, '') NOT LIKE 'manual%'
 			  AND COALESCE(cmb.admin_protected, FALSE) = FALSE
+			  AND (cmb.unavailable_recover_at IS NULL 
+			       OR cmb.unavailable_recover_at <= now())
 		`, credentialID); err != nil {
 			return err
 		}
@@ -121,6 +128,7 @@ func (w *Writer) RestoreOnSuccess(ctx context.Context, credentialID int, rawMode
 			return err
 		}
 	} else {
+		// 2026-07-03 fix (P1-1): Same guard for model-specific restoration.
 		if _, err = tx.Exec(ctx, `
 			UPDATE credential_model_bindings cmb
 			SET available          = TRUE,
@@ -135,10 +143,12 @@ func (w *Writer) RestoreOnSuccess(ctx context.Context, credentialID int, rawMode
 			  AND cmb.available = FALSE
 			  AND COALESCE(cmb.unavailable_reason, '') NOT LIKE 'manual%'
 			  AND COALESCE(cmb.admin_protected, FALSE) = FALSE
+			  AND (cmb.unavailable_recover_at IS NULL 
+			       OR cmb.unavailable_recover_at <= now())
 		`, credentialID, rawModel); err != nil {
 			return err
 		}
-			if _, err = tx.Exec(ctx, `
+		if _, err = tx.Exec(ctx, `
 				UPDATE model_offers mo
 				SET available          = TRUE,
 				    unavailable_reason = NULL,
