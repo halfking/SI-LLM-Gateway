@@ -59,6 +59,7 @@ export default {
     noData: '暂无数据',
     noResults: '无匹配结果',
     copied: '已复制',
+    clickToCopy: '点击复制',
     confirmDelete: '确认删除？',
     confirmAction: '确认执行此操作？',
   },
@@ -91,5 +92,19 @@ export default {
   error: {
     unknown: '发生未知错误',
     network: '网络错误，请检查连接',
+  },
+  // Shared cell/component labels (added 2026-07-02 to remove hardcoded Chinese from src/components/**)
+  activeFilters: {
+    label: '已选条件',
+    removeHint: '移除 {label}',
+  },
+  filterInput: {
+    noMatch: '无匹配项',
+  },
+  clientConfigGenerator: {
+    configure: '配置',
+  },
+  feeCostCell: {
+    costLabel: '成本',
   },
 }

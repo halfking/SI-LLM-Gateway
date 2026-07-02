@@ -153,7 +153,7 @@ async function confirmOrder(orderId: number) {
   confirmSaving.value = orderId
   error.value = ''
   try {
-    await confirmAdminMaasOrder(orderId, '管理员手动确认到账')
+    await confirmAdminMaasOrder(orderId, tt('confirmOrderNote'))
     await Promise.all([loadOrders(), loadWallet(), loadLedger()])
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : tt('confirmOrderFailed')
@@ -594,8 +594,8 @@ watch(() => route.params.tenantId, loadTenant)
               <th>{{ tt('ledger.colTime') }}</th>
               <th>{{ tt('ledger.colType') }}</th>
               <th>{{ tt('ledger.colPool') }}</th>
-              <th style="text-align:right">{{ tt('ledger.colDelta') }}</th>
-              <th style="text-align:right">{{ tt('ledger.colBalance') }}</th>
+              <th class="text-end">{{ tt('ledger.colDelta') }}</th>
+              <th class="text-end">{{ tt('ledger.colBalance') }}</th>
               <th>{{ tt('ledger.colRef') }}</th>
               <th>{{ tt('ledger.colNote') }}</th>
             </tr>
@@ -605,8 +605,8 @@ watch(() => route.params.tenantId, loadTenant)
               <td class="mono">{{ fmtDateTime(e.created_at) }}</td>
               <td>{{ ledgerTypeLabel(e.entry_type) }}</td>
               <td>{{ poolLabel(e.pool) }}</td>
-              <td class="mono" style="text-align:right">{{ fmtCredits(e.amount) }}</td>
-              <td class="mono" style="text-align:right">{{ fmtNumber(e.balance_after) }}</td>
+              <td class="mono text-end">{{ fmtCredits(e.amount) }}</td>
+              <td class="mono text-end">{{ fmtNumber(e.balance_after) }}</td>
               <td class="mono">{{ e.ref_type || '—' }} {{ e.ref_id || '' }}</td>
               <td>{{ e.note || '—' }}</td>
             </tr>
@@ -633,6 +633,7 @@ watch(() => route.params.tenantId, loadTenant)
   border: 1px solid var(--border);
   border-radius: 8px;
 }
+.text-end { text-align: end; }
 .btn-back {
   padding: 6px 12px;
   background: transparent;

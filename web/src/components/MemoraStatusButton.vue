@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   getMemoraStatus,
   pingMemora,
@@ -8,6 +9,7 @@ import {
   type MemoraStatus,
 } from '../api'
 
+const { t } = useI18n()
 const status = ref<MemoraStatus | null>(null)
 const panelOpen = ref(false)
 const loading = ref(false)
@@ -30,11 +32,11 @@ const state = computed<'disabled' | 'paused' | 'ok' | 'error' | 'loading'>(() =>
 
 const stateLabel = computed(() => {
   switch (state.value) {
-    case 'disabled': return '未启用'
-    case 'paused': return '已断开'
-    case 'ok': return '已连接'
-    case 'error': return '连接失败'
-    default: return '检测中'
+    case 'disabled': return t('memoraStatusButton.state.disabled')
+    case 'paused': return t('memoraStatusButton.state.paused')
+    case 'ok': return t('memoraStatusButton.state.ok')
+    case 'error': return t('memoraStatusButton.state.error')
+    default: return t('memoraStatusButton.state.loading')
   }
 })
 
@@ -63,10 +65,10 @@ async function handlePing() {
   try {
     const r = await pingMemora()
     lastPingMs.value = r.latency_ms
-    if (!r.connected) lastPingError.value = r.error || '连接失败'
+    if (!r.connected) lastPingError.value = r.error || t('memoraStatusButton.error.connectionFailed')
     await loadStatus()
   } catch (e: unknown) {
-    lastPingError.value = e instanceof Error ? e.message : '检测失败'
+    lastPingError.value = e instanceof Error ? e.message : t('memoraStatusButton.error.checkFailed')
   } finally {
     actionLoading.value = false
   }
@@ -121,45 +123,45 @@ onUnmounted(() => {
     </button>
 
     <div v-if="panelOpen" class="memora-backdrop" @click="closePanel" />
-    <div v-if="panelOpen" class="memora-panel" role="dialog" aria-label="Memora 连接状态">
+    <div v-if="panelOpen" class="memora-panel" role="dialog" :aria-label="t('memoraStatusButton.panel.title')">
       <div class="panel-head">
-        <span class="panel-title">Memora 连接</span>
+        <span class="panel-title">{{ t('memoraStatusButton.panel.title') }}</span>
         <span class="panel-badge" :class="`panel-badge--${state}`">{{ stateLabel }}</span>
-        <button type="button" class="panel-close" aria-label="关闭" @click="closePanel">×</button>
+        <button type="button" class="panel-close" :aria-label="t('memoraStatusButton.panel.closeLabel')" @click="closePanel">×</button>
       </div>
 
       <dl class="panel-meta">
         <div v-if="status?.base_url" class="meta-row">
-          <dt>服务地址</dt>
+          <dt>{{ t('memoraStatusButton.panel.fields.serviceUrl') }}</dt>
           <dd><code>{{ status.base_url }}</code></dd>
         </div>
         <div v-if="lastPingMs != null" class="meta-row">
-          <dt>最近延迟</dt>
+          <dt>{{ t('memoraStatusButton.panel.fields.recentLatency') }}</dt>
           <dd>{{ lastPingMs }} ms</dd>
         </div>
         <div v-if="status?.last_error" class="meta-row meta-row--error">
-          <dt>错误</dt>
+          <dt>{{ t('memoraStatusButton.panel.fields.error') }}</dt>
           <dd><code>{{ status.last_error }}</code></dd>
         </div>
         <div v-if="lastPingError" class="meta-row meta-row--error">
-          <dt>检测</dt>
+          <dt>{{ t('memoraStatusButton.panel.fields.check') }}</dt>
           <dd>{{ lastPingError }}</dd>
         </div>
         <template v-if="status?.sink">
           <div class="meta-row">
-            <dt>写入队列</dt>
+            <dt>{{ t('memoraStatusButton.panel.fields.writeQueue') }}</dt>
             <dd>{{ status.sink.queue_len }} / {{ status.sink.queue_cap }}</dd>
           </div>
           <div class="meta-row">
-            <dt>已处理 / 失败</dt>
+            <dt>{{ t('memoraStatusButton.panel.fields.processedErrored') }}</dt>
             <dd>{{ status.sink.processed }} / {{ status.sink.errored }}</dd>
           </div>
           <div v-if="status.sink.consecutive_errors > 0" class="meta-row meta-row--warn">
-            <dt>连续失败</dt>
+            <dt>{{ t('memoraStatusButton.panel.fields.consecutiveErrors') }}</dt>
             <dd>{{ status.sink.consecutive_errors }}</dd>
           </div>
           <div v-if="status.sink.last_error" class="meta-row meta-row--error">
-            <dt>最近写入错误</dt>
+            <dt>{{ t('memoraStatusButton.panel.fields.recentWriteError') }}</dt>
             <dd>
               <code>{{ status.sink.last_error }}</code>
               <span v-if="status.sink.last_error_at" class="meta-time">{{ fmtDate(status.sink.last_error_at) }}</span>
@@ -174,25 +176,25 @@ onUnmounted(() => {
           class="btn btn-sm btn-primary"
           :disabled="actionLoading"
           @click="handleReconnect"
-        >{{ actionLoading ? '处理中…' : (sinkPaused ? '重连' : '检测连通性') }}</button>
+        >{{ actionLoading ? t('memoraStatusButton.panel.actions.processing') : (sinkPaused ? t('memoraStatusButton.panel.actions.reconnect') : t('memoraStatusButton.panel.actions.checkConnectivity')) }}</button>
         <button
           v-if="!sinkPaused"
           type="button"
           class="btn btn-sm btn-ghost"
           :disabled="actionLoading"
           @click="handleDisconnect"
-        >断开写入</button>
+        >{{ t('memoraStatusButton.panel.actions.disconnect') }}</button>
         <button
           type="button"
           class="btn btn-sm btn-ghost"
           :disabled="loading"
           @click="loadStatus"
-        >刷新</button>
+        >{{ t('memoraStatusButton.panel.actions.refresh') }}</button>
         <RouterLink
           to="/session-context"
           class="btn btn-sm btn-ghost"
           @click="closePanel"
-        >会话上下文</RouterLink>
+        >{{ t('memoraStatusButton.panel.actions.sessionContext') }}</RouterLink>
       </div>
     </div>
   </div>

@@ -209,12 +209,12 @@ onUnmounted(() => {
               <div style="color:var(--muted)">{{ (r.resolution_raw_models || []).join(', ') || dz('table.dash') }}</div>
             </td>
             <td style="text-align:center">{{ r.tier ?? dz('table.dash') }}</td>
-            <td style="text-align:right">{{ r.latency_ms != null ? r.latency_ms + dz('table.msUnit') : dz('table.dash') }}</td>
+            <td class="text-end">{{ r.latency_ms != null ? r.latency_ms + dz('table.msUnit') : dz('table.dash') }}</td>
             <td style="font-size:12px">{{ r.chosen_provider_id ?? dz('table.dash') }}</td>
             <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.outbound_model ?? dz('table.dash') }}</td>
-            <td style="text-align:right">{{ r.prompt_tokens ?? dz('table.dash') }}</td>
-            <td style="text-align:right">{{ r.completion_tokens ?? dz('table.dash') }}</td>
-            <td style="text-align:right;font-size:12px">
+            <td class="text-end">{{ r.prompt_tokens ?? dz('table.dash') }}</td>
+            <td class="text-end">{{ r.completion_tokens ?? dz('table.dash') }}</td>
+            <td class="text-end" style="font-size:12px">
               {{ r.cost_usd != null ? dz('table.costUnit') + Number(r.cost_usd).toFixed(5) : dz('table.dash') }}
             </td>
             <td style="font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis">
@@ -337,9 +337,10 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.text-end { text-align: end; }
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th {
-  text-align: left;
+  text-align: start;
   padding: 8px 12px;
   font-size: 12px;
   color: var(--muted);

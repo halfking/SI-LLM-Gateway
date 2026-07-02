@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = withDefaults(defineProps<{
   text: string
@@ -12,6 +13,8 @@ const props = withDefaults(defineProps<{
   maxLines: 1,
   tag: 'span',
 })
+
+const { t } = useI18n()
 
 const copied = ref(false)
 let copyTimer: ReturnType<typeof setTimeout> | undefined
@@ -29,6 +32,12 @@ async function onCopy(evt: MouseEvent) {
     // ignore
   }
 }
+
+const title = computed(() =>
+  props.mode === 'ellipsis' && props.text
+    ? props.text
+    : (copied.value ? t('common.feedback.copied') : t('common.feedback.clickToCopy')),
+)
 </script>
 
 <template>
@@ -36,10 +45,10 @@ async function onCopy(evt: MouseEvent) {
     :is="tag"
     class="copyable-text"
     :class="[mode, { copied }]"
-    :title="mode === 'ellipsis' && text ? text : (copied ? '已复制' : '点击复制')"
+    :title="title"
     :style="mode === 'ellipsis' && maxLines > 1 ? { WebkitLineClamp: String(maxLines) } : undefined"
     @click="onCopy"
-  >{{ text }}<span v-if="copied" class="copy-hint">已复制</span></component>
+  >{{ text }}<span v-if="copied" class="copy-hint">{{ t('common.feedback.copied') }}</span></component>
 </template>
 
 <style scoped>

@@ -19,6 +19,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/db"
 	"github.com/kaixuan/llm-gateway-go/errorsx"
 	"github.com/kaixuan/llm-gateway-go/identity"
+	"github.com/kaixuan/llm-gateway-go/internal/adapter"
 	"github.com/kaixuan/llm-gateway-go/internal/ir"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/memora"
@@ -196,6 +197,14 @@ type Executor struct {
 	// the 6 scattered callbacks (ChatToAnthropic, AnthropicToOpenAI, etc).
 	// When nil (default), falls back to existing callback wiring.
 	IR IRConverter
+	// AdapterFactory (2026-07-02) resolves provider-specific protocol
+	// adaptations (tool_call_id vs tool_use_id, default params, etc.).
+	// When non-nil AND IR is non-nil, the executor uses the adapter's
+	// AdaptRequest before serialization, ensuring each provider gets the
+	// correct wire format. When nil, the executor falls back to the
+	// existing TargetProvider = cand.CatalogCode approach (which works
+	// for MiniMax but is less extensible). Wired from main.go.
+	AdapterFactory *adapter.Factory
 	// AnthropicPassthroughStream is the Q4 Anthropic SSE forwarder with
 	// side-channel audit capture. Wired from main.go (relay.StreamAnthropicPassthrough).
 	AnthropicPassthroughStream AnthropicPassthroughFunc

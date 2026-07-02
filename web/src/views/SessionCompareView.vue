@@ -59,7 +59,7 @@
             <div class="role-tag">{{ roleLabel(msg.role) }}</div>
             <div class="msg-text">{{ msg.content || tc('emptyContent') }}</div>
             <div v-if="msg.tool_calls" class="tool-preview">{{ msg.tool_calls }}</div>
-            <div class="text-muted" style="text-align:right;font-size:10px;">{{ msg.token_count }} tok</div>
+            <div class="text-muted text-end msg-token-count">{{ msg.token_count }} tok</div>
           </div>
           <div v-if="!data.original_msgs.length" class="empty">{{ tc('panels.emptyOriginal') }}</div>
         </div>
@@ -79,7 +79,7 @@
             <div class="role-tag">{{ roleLabel(msg.role) }}</div>
             <div class="msg-text">{{ msg.content || tc('emptyContent') }}</div>
             <div v-if="msg.tool_calls" class="tool-preview">{{ msg.tool_calls }}</div>
-            <div class="text-muted" style="text-align:right;font-size:10px;">{{ msg.token_count }} tok</div>
+            <div class="text-muted text-end msg-token-count">{{ msg.token_count }} tok</div>
           </div>
           <div v-if="!data.compressed_msgs.length && data.is_compressed" class="empty">{{ tc('panels.emptyCompressed') }}</div>
         </div>
@@ -95,7 +95,7 @@
           <div v-for="msg in data.response_msgs" :key="'r'+msg.index" :class="['msg-row', msg.role]">
             <div class="role-tag">{{ roleLabel(msg.role) }}</div>
             <div class="msg-text">{{ msg.content || tc('emptyContent') }}</div>
-            <div class="text-muted" style="text-align:right;font-size:10px;">{{ msg.token_count }} tok</div>
+            <div class="text-muted text-end msg-token-count">{{ msg.token_count }} tok</div>
           </div>
           <div v-if="!data.response_msgs.length" class="empty">{{ tc('panels.emptyResponse') }}</div>
         </div>
@@ -110,18 +110,18 @@
           <!-- Cache -->
           <div class="card-title" style="margin-bottom: 8px;">{{ tc('cache.title') }}</div>
           <table class="data-table" style="margin-bottom: 16px;">
-            <tr><td>{{ tc('cache.l1') }}</td><td style="text-align:right"><span :class="data.cache_info.l1_hit ? 'badge badge-green' : 'badge badge-red'">{{ data.cache_info.l1_hit ? tc('cache.hit') : tc('cache.miss') }}</span></td></tr>
-            <tr><td>{{ tc('cache.l2') }}</td><td style="text-align:right"><span :class="data.cache_info.l2_hit ? 'badge badge-green' : 'badge badge-red'">{{ data.cache_info.l2_hit ? tc('cache.hit') : tc('cache.miss') }}</span></td></tr>
-            <tr><td>{{ tc('cache.l3') }}</td><td style="text-align:right"><span :class="data.cache_info.l3_fallback ? 'badge badge-yellow' : 'badge badge-gray'">{{ data.cache_info.l3_fallback ? tc('cache.fallback') : tc('cache.noFallback') }}</span></td></tr>
+            <tr><td>{{ tc('cache.l1') }}</td><td class="text-end"><span :class="data.cache_info.l1_hit ? 'badge badge-green' : 'badge badge-red'">{{ data.cache_info.l1_hit ? tc('cache.hit') : tc('cache.miss') }}</span></td></tr>
+            <tr><td>{{ tc('cache.l2') }}</td><td class="text-end"><span :class="data.cache_info.l2_hit ? 'badge badge-green' : 'badge badge-red'">{{ data.cache_info.l2_hit ? tc('cache.hit') : tc('cache.miss') }}</span></td></tr>
+            <tr><td>{{ tc('cache.l3') }}</td><td class="text-end"><span :class="data.cache_info.l3_fallback ? 'badge badge-yellow' : 'badge badge-gray'">{{ data.cache_info.l3_fallback ? tc('cache.fallback') : tc('cache.noFallback') }}</span></td></tr>
           </table>
 
           <!-- Token Savings -->
           <div class="card-title" style="margin-bottom: 8px;">{{ tc('cache.tokenTitle') }}</div>
           <table class="data-table" style="margin-bottom: 16px;">
-            <tr><td>{{ tc('cache.original') }}</td><td style="text-align:right;font-family:monospace">{{ data.stats.original_tokens.toLocaleString() }}</td></tr>
-            <tr><td>{{ tc('cache.compressed') }}</td><td style="text-align:right;font-family:monospace">{{ data.stats.compressed_tokens.toLocaleString() }}</td></tr>
-            <tr v-if="data.is_compressed"><td style="color:var(--success)">{{ tc('cache.saved') }}</td><td style="text-align:right;font-family:monospace;color:var(--success)">{{ tc('stats.savedValue', { tokens: data.stats.saved_tokens.toLocaleString(), pct: Math.round(data.stats.saved_percent) }) }}</td></tr>
-            <tr><td>{{ tc('cache.strategy') }}</td><td style="text-align:right"><span class="badge badge-blue">{{ strategyLabel }}</span></td></tr>
+            <tr><td>{{ tc('cache.original') }}</td><td class="text-end mono-cell">{{ data.stats.original_tokens.toLocaleString() }}</td></tr>
+            <tr><td>{{ tc('cache.compressed') }}</td><td class="text-end mono-cell">{{ data.stats.compressed_tokens.toLocaleString() }}</td></tr>
+            <tr v-if="data.is_compressed"><td style="color:var(--success)">{{ tc('cache.saved') }}</td><td class="text-end mono-cell text-success">{{ tc('stats.savedValue', { tokens: data.stats.saved_tokens.toLocaleString(), pct: Math.round(data.stats.saved_percent) }) }}</td></tr>
+            <tr><td>{{ tc('cache.strategy') }}</td><td class="text-end"><span class="badge badge-blue">{{ strategyLabel }}</span></td></tr>
           </table>
 
           <!-- Handoff -->
@@ -286,10 +286,15 @@ onMounted(() => {
 .msg-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 .msg-row { padding: 8px; margin-bottom: 6px; border-radius: 6px; font-size: 12px; line-height: 1.5; }
-.msg-row.user { background: color-mix(in srgb, var(--accent) 10%, var(--card)); border-left: 3px solid var(--accent); }
-.msg-row.assistant { background: color-mix(in srgb, var(--success) 8%, var(--card)); border-left: 3px solid var(--success); }
-.msg-row.system { background: color-mix(in srgb, #8b5cf6 8%, var(--card)); border-left: 3px solid #8b5cf6; }
-.msg-row.tool { background: color-mix(in srgb, var(--warning) 8%, var(--card)); border-left: 3px solid var(--warning); }
+.msg-row.user { background: color-mix(in srgb, var(--accent) 10%, var(--card)); border-inline-start: 3px solid var(--accent); }
+.msg-row.assistant { background: color-mix(in srgb, var(--success) 8%, var(--card)); border-inline-start: 3px solid var(--success); }
+.msg-row.system { background: color-mix(in srgb, #8b5cf6 8%, var(--card)); border-inline-start: 3px solid #8b5cf6; }
+.msg-row.tool { background: color-mix(in srgb, var(--warning) 8%, var(--card)); border-inline-start: 3px solid var(--warning); }
+
+.text-end { text-align: end; }
+.msg-token-count { font-size: 10px; }
+.mono-cell { font-family: monospace; }
+.text-success { color: var(--success); }
 .role-tag { font-size: 10px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; }
 .msg-text { white-space: pre-wrap; word-break: break-word; }
 .tool-preview { margin-top: 4px; padding: 4px; background: var(--bg); border-radius: 4px; font-family: monospace; font-size: 10px; color: var(--warning); }

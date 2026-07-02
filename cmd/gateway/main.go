@@ -34,6 +34,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/bg"
 	"github.com/kaixuan/llm-gateway-go/circuit"
 	"github.com/kaixuan/llm-gateway-go/compressor"
+	"github.com/kaixuan/llm-gateway-go/compressor/ccr"
 	"github.com/kaixuan/llm-gateway-go/config"
 	"github.com/kaixuan/llm-gateway-go/credentialfpslot"
 	"github.com/kaixuan/llm-gateway-go/credentialhealth"
@@ -41,6 +42,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/db"
 	"github.com/kaixuan/llm-gateway-go/discovery"
 	"github.com/kaixuan/llm-gateway-go/disguise"
+	"github.com/kaixuan/llm-gateway-go/internal/adapter"
 	"github.com/kaixuan/llm-gateway-go/internal/ir"
 	"github.com/kaixuan/llm-gateway-go/internal/modelpolicy"
 	"github.com/kaixuan/llm-gateway-go/internal/observability"
@@ -509,6 +511,14 @@ func main() {
 			slog.Info("ir_converter", "enabled", true)
 		}
 
+		// Provider Adapter Factory (2026-07-02): resolves provider-specific
+		// protocol adaptations (tool_call_id vs tool_use_id, default params,
+		// etc.) via the internal/adapter package. Always wired — it's a
+		// no-op for standard providers and only activates for providers with
+		// known quirks (MiniMax, etc.).
+		routingExec.AdapterFactory = adapter.NewFactory()
+		slog.Info("adapter_factory", "registered", len(routingExec.AdapterFactory.Names()), "adapters", routingExec.AdapterFactory.Names())
+
 		// Q3 streaming: openai client -> anthropic upstream. Translates
 		// Anthropic SSE chunks to OpenAI SSE chunks so the OpenAI parser
 		// doesn't choke on event: ... lines. Capturer-aware (Track C C5).
@@ -797,9 +807,45 @@ func main() {
 	// instantly without code change. Captures `exec` from the outer scope.
 	if redisClientForCache != nil && dbConn != nil && dbConn.Enabled() && telemetryClient.Enabled() && !compressorSessionDisabled() {
 		scCache := compressor.NewSessionCache(redisBackendFromClient(redisClientForCache), dbBackendFromPool(dbConn))
+		
+		// Initialize CCR (Columnar Content Repository) for Headroom compression
+		// CCR provides three-tier storage (L1 in-mem LRU, L2 Redis, L3 PostgreSQL)
+		// for compressed array data that can be retrieved via headroom_retrieve tool.
+		var ccrManager *ccr.Manager
+		var headroomComp *compressor.HeadroomCompressor
+		
+		// Create dedicated redis client for CCR (reuses same Redis instance as sessions)
+		if cfg.RedisAddr != "" {
+			ccrRedis := redis.NewClient(&redis.Options{
+				Addr:     cfg.RedisAddr,
+				Password: cfg.RedisPassword,
+				DB:       cfg.RedisDB,
+			})
+			
+			// TODO: Wire SQL backend when ccr.Manager supports pgxpool.Pool
+			// For now, use L1 (in-memory LRU) + L2 (Redis) only
+			ccrConfig := ccr.DefaultConfig()
+			var err error
+			ccrManager, err = ccr.NewManager(ccrConfig, ccrRedis, nil)
+			if err != nil {
+				slog.Warn("ccr: failed to initialize CCR manager", "error", err)
+			} else {
+				headroomComp = compressor.NewHeadroomCompressor(ccrManager)
+				
+				// Wire CCRRetrievalTool so LLM can retrieve compressed data via headroom_retrieve
+				ccrTool := relay.NewCCRRetrievalTool(ccrManager)
+				chatHandler.SetCCRRetrievalTool(ccrTool)
+				
+				slog.Info("headroom: CCR manager + HeadroomCompressor initialized (L1+L2 only)",
+					"l1_size", ccrConfig.L1MaxItems,
+					"l2_ttl", ccrConfig.L2TTL)
+			}
+		}
+		
 		scDeps := compressor.SessionCompressorDeps{
-			Cache:          scCache,
-			CompactionDeps: NewDependenciesFromExecutor(routingExec),
+			Cache:               scCache,
+			CompactionDeps:      NewDependenciesFromExecutor(routingExec),
+			HeadroomCompressor:  headroomComp,
 		}
 		chatHandler.SetSessionCompressor(compressor.NewSessionCompressor(scDeps))
 		slog.Info("v3 session-level compressor wired (L1 in-mem + L2 Redis + L3 PG)")

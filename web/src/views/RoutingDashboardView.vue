@@ -393,7 +393,7 @@ const expandedDecision = ref<string>('')
 const autoRefresh = ref(true)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
-const simPrompt = ref('用 Python 写一个快速排序')
+const simPrompt = ref(rd('live.simulatorPromptDefault'))
 const simProfile = ref('smart')
 const simResult = ref<{ status: number; decision?: Record<string, unknown>; error?: string } | null>(null)
 const simLoading = ref(false)
@@ -442,9 +442,9 @@ const resolveFunnelStages = computed<AnalyticsFunnelStage[]>(() => {
   const total = resolveCandidates.value.length
   const routable = resolveCandidates.value.filter(c => c.routable).length
   return [
-    { key: 'candidates', label: '总候选', value: total, hint: '本次解析候选数' },
-    { key: 'routable', label: '可路由', value: routable, hint: '通过可用性检查' },
-    { key: 'success', label: '首选凭据', value: routable > 0 ? 1 : 0, hint: 'Top 可路由凭据' },
+    { key: 'candidates', label: rd('resolve.funnelStages.candidates'), value: total, hint: rd('resolve.funnelStages.candidatesHint') },
+    { key: 'routable', label: rd('resolve.funnelStages.routable'), value: routable, hint: rd('resolve.funnelStages.routableHint') },
+    { key: 'success', label: rd('resolve.funnelStages.success'), value: routable > 0 ? 1 : 0, hint: rd('resolve.funnelStages.successHint') },
   ]
 })
 

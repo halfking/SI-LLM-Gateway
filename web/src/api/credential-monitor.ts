@@ -242,6 +242,13 @@ export interface CredentialRoutingDecision {
   client_model: string | null
   outbound_model: string | null
   sticky_hit: boolean | null
+  // TODO(backend): backend handleCredentialDecisions (admin/credential_monitor.go)
+  // doesn't currently resolve `model` to canonical_name. The UI is using `model`
+  // (the request's input) as the "canonical" equivalent because at this layer
+  // model IS the user-facing name. If the API later starts returning a separate
+  // canonical_name field (join with models_canonical), add it here and switch
+  // CredentialMonitorView.vue to use it.
+  canonical_name: string | null
 }
 
 export interface CredentialDecisionsResponse {

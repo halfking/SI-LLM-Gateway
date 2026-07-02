@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { FilterChip } from '../composables/useFilterChips'
 
 defineProps<{
   chips: FilterChip[]
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
   <div v-if="chips.length" class="active-filters">
-    <span class="active-filters-label">已选条件</span>
+    <span class="active-filters-label">{{ t('common.activeFilters.label') }}</span>
     <button
       v-for="chip in chips"
       :key="chip.key"
@@ -16,7 +19,7 @@ defineProps<{
       class="active-filter-chip"
       :class="chip.className"
       @click="chip.onRemove()"
-      :title="`移除 ${chip.label}`"
+      :title="t('common.activeFilters.removeHint', { label: chip.label })"
     >
       {{ chip.label }} <span class="chip-remove">×</span>
     </button>

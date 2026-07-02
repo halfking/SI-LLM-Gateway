@@ -315,7 +315,7 @@ function dateWindow(c: RoutingCandidate): string {
               </div>
               <div v-else style="cursor:pointer" @click="startEditPriority(c.credential_id, getScoreBreakdown(c.credential_id)?.manual_priority ?? c.manual_priority ?? 99)">
                 <span style="font-weight:600">{{ getScoreBreakdown(c.credential_id)?.manual_priority ?? c.manual_priority ?? 99 }}</span>
-                <span class="cell-muted" style="font-size:10px;margin-left:4px">✎</span>
+                <span class="cell-muted edit-pencil">✎</span>
               </div>
             </td>
             <td>{{ priceLabel(c) }}</td>
@@ -341,9 +341,9 @@ function dateWindow(c: RoutingCandidate): string {
 
     <div v-if="probeErr" class="alert alert-danger">{{ probeErr }}</div>
     <div class="card" v-if="probeResult" style="margin-bottom:20px">
-      <h4 style="margin:0 0 12px">
+      <h4 class="probe-result-title">
         {{ rt('probeResult') }}
-        <span class="badge" :class="probeResult.success ? 'badge-green' : 'badge-red'" style="margin-left:8px">
+        <span class="badge probe-result-badge" :class="probeResult.success ? 'badge-green' : 'badge-red'">
           {{ probeResult.success ? rt('shared.success') : rt('shared.failed') }}
         </span>
       </h4>
@@ -395,5 +395,15 @@ function dateWindow(c: RoutingCandidate): string {
 .score-normal {
   background: #f3f4f6;
   color: #374151;
+}
+.edit-pencil {
+  font-size: 10px;
+  margin-inline-start: 4px;
+}
+.probe-result-title {
+  margin: 0 0 12px;
+}
+.probe-result-badge {
+  margin-inline-start: 8px;
 }
 </style>

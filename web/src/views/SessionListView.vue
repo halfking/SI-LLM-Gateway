@@ -62,7 +62,7 @@
               </span>
             </td>
             <td>
-              <a :href="'/session-compare?session_id=' + encodeURIComponent(s.session_id)" class="trace-link" style="margin-right:8px;">{{ tl('actionCompare') }}</a>
+              <a :href="'/session-compare?session_id=' + encodeURIComponent(s.session_id)" class="trace-link trace-link--compare">{{ tl('actionCompare') }}</a>
               <a :href="'/request-logs?gw_session_id=' + encodeURIComponent(s.session_id)" class="trace-link">{{ tl('actionLogs') }}</a>
             </td>
           </tr>
@@ -133,6 +133,7 @@ onMounted(loadData)
 .text-muted { color: var(--muted); }
 .trace-link { color: var(--accent); cursor: pointer; text-decoration: none; font-size: 12px; }
 .trace-link:hover { text-decoration: underline; }
+.trace-link--compare { margin-inline-end: 8px; }
 .badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; }
 .badge-blue { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent-h); }
 .badge-green { background: color-mix(in srgb, var(--success) 20%, transparent); color: var(--success); }

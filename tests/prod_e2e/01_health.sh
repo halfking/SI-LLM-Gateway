@@ -64,7 +64,7 @@ fi
 log_info "A4: 测试未知 API key"
 BAD_BODY='{"model":"minimax-m3","messages":[{"role":"user","content":"hi"}],"max_tokens":5}'
 TMP=$(mktemp)
-CODE=$(curl -s -o "$TMP" -w "%{http_code}" -m 30 \
+CODE=$(curl -sL -o "$TMP" -w "%{http_code}" -m 30 \
     -H "Authorization: Bearer sk-bogus-key-invalid-12345" \
     -H "Content-Type: application/json" \
     -X POST "$API_BASE/v1/chat/completions" \
@@ -79,7 +79,7 @@ assert_eq "A4.b" "invalid_key" "$ERR_CODE" "error.code=invalid_key"
 # === A5: 缺失 Authorization ===
 log_info "A5: 测试缺失 Authorization 头"
 TMP=$(mktemp)
-CODE=$(curl -s -o "$TMP" -w "%{http_code}" -m 30 \
+CODE=$(curl -sL -o "$TMP" -w "%{http_code}" -m 30 \
     -H "Content-Type: application/json" \
     -X POST "$API_BASE/v1/chat/completions" \
     -d "$BAD_BODY")

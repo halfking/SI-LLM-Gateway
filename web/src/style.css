@@ -19,7 +19,24 @@
 html, body, #app { height: 100%; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+  /* Font stack notes
+   *  - `-apple-system` / `BlinkMacSystemFont` pick up the system UI font on
+   *    macOS / iOS; falls back to `Segoe UI` on Windows.
+   *  - `'PingFang SC'` covers Simplified Chinese on macOS.
+   *  - `'Noto Sans Arabic'` is the canonical cross-platform Arabic face
+   *    shipped with most Linux distros and bundled by Chromium for Android
+   *    & Linux builds. Browsers that lack it fall back to `Tahoma`, which
+   *    ships with Windows and is widely available on macOS / Linux via
+   *    the `ttf-mscorefonts-installer` package. We pick `Noto Sans Arabic`
+   *    first because its OpenType shaping tables handle Arabic joining
+   *    (initial / medial / final / isolated forms) correctly, where
+   *    Tahoma's older tables do not always produce the canonical forms.
+   *  - `sans-serif` is the final generic fallback so we never fall back
+   *    to a serif face if no Arabic font is installed.
+   */
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Noto Sans Arabic', Tahoma, sans-serif;
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
@@ -98,7 +115,7 @@ input[type="radio"], input[type="checkbox"] {
 
 table { width: 100%; border-collapse: collapse; }
 thead th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -167,7 +184,13 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
   padding: 20px;
   animation: drawer-slide-in .2s ease-out;
   background: var(--card, #1c2128);
-  border-left: 1px solid var(--border, #30363d);
+  /* Logical edge: the drawer hugs the inline-end of its container.
+   * postcss-rtlcss flips `border-left` → `border-right` automatically,
+   * but using `border-inline-start` directly is clearer and immune to
+   * future plugin config changes. */
+  border-inline-start: 1px solid var(--border, #30363d);
+  /* Shadow must point inward toward the drawer (away from the viewport
+   * edge), so the physical offset flips in RTL — see [dir="rtl"] guard. */
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
 }
 .drawer-panel-wide {
@@ -176,6 +199,22 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
 @keyframes drawer-slide-in {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
+}
+/* Drawer slides in from the *inline-end* of the viewport.
+ * postcss-rtlcss auto-flips the translateX direction only when the rule
+ * is written with a directional keyword it recognises; for explicit
+ * pixel percentages we override manually. */
+[dir="rtl"] .drawer-panel {
+  animation-name: drawer-slide-in-rtl;
+}
+@keyframes drawer-slide-in-rtl {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+/* Mirror the inner box-shadow so the highlight still falls on the side
+ * closest to the viewport edge in RTL. */
+[dir="rtl"] .drawer-panel {
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.45);
 }
 .drawer-header {
   display: flex;
@@ -579,3 +618,54 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border);
 }
+
+/* ════════════════════════════════════════════════════════════════
+ *  RTL support — read this before touching physical CSS.
+ *
+ *  Two layers cooperate to flip the layout in right-to-left locales:
+ *
+ *  1. AUTOMATED: postcss-rtlcss (see postcss.config.js) mirrors
+ *     margin-{left,right}, padding-{left,right}, border-{left,right},
+ *     text-align: left/right, left/right, float, etc. inside CSS files
+ *     and Vue SFC `<style>` blocks. Both LTR and RTL rule branches are
+ *     emitted; the matching one is selected by `<html dir="ltr|rtl">`,
+ *     which is toggled by src/i18n/useLocale.ts.
+ *
+ *  2. MANUAL: where automation cannot reach, we use CSS logical
+ *     properties (`margin-inline-*`, `border-inline-start`, etc.) and
+ *     `[dir="rtl"]` override blocks below. Logical properties are the
+ *     preferred manual fallback because they encode intent.
+ *
+ *  KNOWN LIMITATION — INLINE STYLES:
+ *  `style="margin-left: 8px"` attributes in .vue templates are NOT
+ *  processed by PostCSS (PostCSS operates on CSS files and SFC
+ *  `<style>` blocks only). For inline directional CSS, either:
+ *    a) move it into a `<style>` block (preferred — gets auto-mirrored),
+ *    b) use logical properties (`margin-inline-start: 8px`), or
+ *    c) wrap with a `[dir="rtl"]` class defined in this stylesheet.
+ *  See src/views/ProvidersView.vue (.prov-probe-status) for an example
+ *  conversion.
+ * ════════════════════════════════════════════════════════════════ */
+
+/* Top-bar refresh button: `margin-left: auto` pushes it to the inline-end
+ * of the flex container. Logical property is correct in both directions. */
+.top-bar-head .refresh-btn { margin-inline-start: auto; }
+
+/* Compact-filter-bar meta: was `margin-left: auto` — logical form below. */
+.compact-filter-bar .cf-meta { margin-inline-start: auto; }
+.compact-filter-bar .cf-row .cf-meta { margin-inline-start: auto; }
+
+/* Section-hint floats to inline-end of its flex row. */
+.section-hint { margin-inline-start: auto; }
+
+/* Tab badge sits next to its tab label; was `margin-left: 6px`. */
+.tab-badge { margin-inline-start: 6px; }
+
+/* Tag chip: was `margin-right: 4px` (visual spacing between tags). */
+.tag { margin-inline-end: 4px; }
+
+/* RTL override guard for elements where the auto-mirroring would
+ * produce an unintended result. Use sparingly — most cases are better
+ * solved with logical properties. */
+[dir="rtl"] body { direction: rtl; }
+[dir="ltr"] body { direction: ltr; }

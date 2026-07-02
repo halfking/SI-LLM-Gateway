@@ -60,21 +60,55 @@ async function loadList() {
   }
 }
 
+// Migration map: old numeric compression.mode values → new string enum values
+// (Phase 2 of the Headroom migration: V2.3.3 enum changed from numeric to string)
+const compressionModeMigration: Record<string, string> = {
+  '0': 'off',
+  '1': 'auto_threshold',
+  '2': 'on_4xx',
+  '3': 'delta_only',
+  '4': 'smart',
+  '5': 'aggressive',
+  '6': 'headroom',
+  '7': 'headroom_aggressive',
+}
+
+/**
+ * Migrate old numeric compression.mode values to the new string enum.
+ * Returns the value as-is if it's already a valid string or not in the migration map.
+ */
+function migrateCompressionMode(rawValue: any): any {
+  if (rawValue === null || rawValue === undefined) return rawValue
+  const asString = String(rawValue)
+  if (compressionModeMigration[asString]) {
+    return compressionModeMigration[asString]
+  }
+  return rawValue
+}
+
 async function selectKey(key: string) {
   selectedKey.value = key
   try {
     const resp = await getSetting(key)
     selected.value = resp.spec
-    currentValue.value = resp.value
+    let valueToEdit = resp.value
+
+    // Apply compression.mode migration for backwards compatibility with
+    // values saved under the old numeric enum (V2.3.2 and earlier).
+    if (key === 'compression.mode') {
+      valueToEdit = migrateCompressionMode(resp.value)
+    }
+
+    currentValue.value = valueToEdit
     currentSource.value = resp.source
 
     // Smart initialization based on type
     if (resp.spec.type === 'bool') {
-      editBuffer.value = String(resp.value ?? resp.spec.default)
+      editBuffer.value = String(valueToEdit ?? resp.spec.default)
     } else if (resp.spec.type === 'int' || resp.spec.type === 'float' || resp.spec.type === 'string') {
-      editBuffer.value = String(resp.value ?? resp.spec.default)
+      editBuffer.value = String(valueToEdit ?? resp.spec.default)
     } else {
-      editBuffer.value = JSON.stringify(resp.value ?? resp.spec.default, null, 2)
+      editBuffer.value = JSON.stringify(valueToEdit ?? resp.spec.default, null, 2)
     }
   } catch (e: any) {
     error.value = e.message || s('detail.errors.loadDetailFailed')
@@ -310,14 +344,24 @@ const filteredCount = computed(() => items.value.length)
           <!-- Enum type with known options: Select -->
           <div v-else-if="selectedKey === 'compression.mode'" class="editor-select">
             <select v-model="editBuffer" class="select-input">
-              <option value="0">{{ s('compression.selectLabels.off') }}</option>
-              <option value="1">{{ s('compression.selectLabels.auto') }}</option>
-              <option value="2">{{ s('compression.selectLabels.on4xx') }}</option>
+              <option value="off">{{ s('compression.selectLabels.off') }}</option>
+              <option value="auto_threshold">{{ s('compression.selectLabels.auto') }}</option>
+              <option value="on_4xx">{{ s('compression.selectLabels.on4xx') }}</option>
+              <option value="delta_only">{{ s('compression.selectLabels.deltaOnly') }}</option>
+              <option value="smart">{{ s('compression.selectLabels.smart') }}</option>
+              <option value="aggressive">{{ s('compression.selectLabels.aggressive') }}</option>
+              <option value="headroom">{{ s('compression.selectLabels.headroom') }}</option>
+              <option value="headroom_aggressive">{{ s('compression.selectLabels.headroomAggressive') }}</option>
             </select>
             <div class="select-hint">
-              <div v-if="editBuffer === '0'" class="hint-item">{{ s('compression.hint.off') }}</div>
-              <div v-else-if="editBuffer === '1'" class="hint-item">{{ s('compression.hint.auto') }}</div>
-              <div v-else-if="editBuffer === '2'" class="hint-item">{{ s('compression.hint.on4xx') }}</div>
+              <div v-if="editBuffer === 'off'" class="hint-item">{{ s('compression.hint.off') }}</div>
+              <div v-else-if="editBuffer === 'auto_threshold'" class="hint-item">{{ s('compression.hint.auto') }}</div>
+              <div v-else-if="editBuffer === 'on_4xx'" class="hint-item">{{ s('compression.hint.on4xx') }}</div>
+              <div v-else-if="editBuffer === 'delta_only'" class="hint-item">{{ s('compression.hint.deltaOnly') }}</div>
+              <div v-else-if="editBuffer === 'smart'" class="hint-item">{{ s('compression.hint.smart') }}</div>
+              <div v-else-if="editBuffer === 'aggressive'" class="hint-item">{{ s('compression.hint.aggressive') }}</div>
+              <div v-else-if="editBuffer === 'headroom'" class="hint-item">{{ s('compression.hint.headroom') }}</div>
+              <div v-else-if="editBuffer === 'headroom_aggressive'" class="hint-item">{{ s('compression.hint.headroomAggressive') }}</div>
             </div>
           </div>
 

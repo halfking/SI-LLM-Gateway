@@ -234,8 +234,8 @@ onMounted(load)
           <tr>
             <th>时间</th>
             <th>类型</th>
-            <th style="text-align:right">变动</th>
-            <th style="text-align:right">余额</th>
+            <th class="num-th">变动</th>
+            <th class="num-th">余额</th>
             <th>关联</th>
             <th>备注</th>
           </tr>
@@ -429,6 +429,9 @@ onMounted(load)
   text-align: right;
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 13px;
+}
+.num-th {
+  text-align: end;
 }
 .amount-neg { color: #f87171; }
 .amount-pos { color: #4ade80; }

@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getAvailableModels,
   type AvailableVersion,
   type AvailableModelsResponse,
   type PopularModel,
 } from '../api'
+
+const { t } = useI18n()
 
 type Mode = 'single' | 'multi'
 
@@ -19,10 +22,10 @@ const props = withDefaults(defineProps<{
   title?: string
 }>(), {
   mode: 'single',
-  placeholder: '选择模型…',
+  placeholder: undefined,
   disabled: false,
   vendorPreviewLimit: 8,
-  title: '选择模型',
+  title: undefined,
 })
 
 const emit = defineEmits<{
@@ -63,7 +66,7 @@ const multiValues = computed<string[]>(() =>
 const triggerLabel = computed(() => {
   if (isMulti.value) {
     if (!multiValues.value.length) return ''
-    return `已选 ${multiValues.value.length} 个模型`
+    return t('modelPicker.selectedCount', { count: multiValues.value.length })
   }
   return singleValue.value
 })
@@ -88,7 +91,7 @@ function dedupeVersions(versions: AvailableVersion[]): AvailableVersion[] {
 function buildVendorGroups(families: AvailableModelsResponse['families']) {
   const map = new Map<string, AvailableVersion[]>()
   for (const fam of families || []) {
-    const vendor = fam.vendor || fam.display_name || '其他'
+    const vendor = fam.vendor || fam.display_name || t('modelPicker.other')
     const cur = map.get(vendor) || []
     cur.push(...(fam.versions || []))
     map.set(vendor, cur)
@@ -111,7 +114,7 @@ async function refreshModels(force = false) {
     popular.value = data.popular || []
     vendorGroups.value = buildVendorGroups(data.families)
   } catch (e: unknown) {
-    loadErr.value = e instanceof Error ? e.message : '加载模型失败'
+    loadErr.value = e instanceof Error ? e.message : t('modelPicker.loadFailed')
   } finally {
     loading.value = false
   }
@@ -227,9 +230,9 @@ watch(() => props.modelValue, () => {
             <button type="button" class="mp-chip-x" :disabled="disabled" @click.stop="removeMultiChip(v)">×</button>
           </span>
         </div>
-        <span v-else class="mp-placeholder">{{ placeholder }}</span>
+        <span v-else class="mp-placeholder">{{ placeholder || t('modelPicker.placeholderSelect') }}</span>
         <button type="button" class="mp-open-btn" :disabled="disabled" @click.stop="openMain">
-          {{ multiValues.length ? '编辑' : '选择' }}
+          {{ multiValues.length ? t('modelPicker.editButton') : t('modelPicker.selectButton') }}
         </button>
       </div>
     </template>
@@ -237,14 +240,14 @@ watch(() => props.modelValue, () => {
     <template v-else>
       <button type="button" class="mp-trigger" :disabled="disabled" @click="openMain">
         <span v-if="triggerLabel" class="mp-value">{{ triggerLabel }}</span>
-        <span v-else class="mp-placeholder">{{ placeholder }}</span>
+        <span v-else class="mp-placeholder">{{ placeholder || t('modelPicker.placeholderSelect') }}</span>
         <span class="mp-actions">
           <button
             v-if="singleValue"
             type="button"
             class="mp-clear"
             :disabled="disabled"
-            title="清空"
+            :title="t('modelPicker.clearTitle')"
             @click.stop="clearSingle"
           >×</button>
           <span class="mp-caret">▾</span>
@@ -255,18 +258,18 @@ watch(() => props.modelValue, () => {
     <!-- 主图层 -->
     <Teleport to="body">
       <div v-if="mainOpen" class="mp-overlay" @click.self="isMulti ? cancelMulti() : closeMain()">
-        <div class="mp-dialog" role="dialog" :aria-label="title" @click.stop>
+        <div class="mp-dialog" role="dialog" :aria-label="title || t('modelPicker.titleSelect')" @click.stop>
           <header class="mp-header">
-            <h3 class="mp-title">{{ title }}</h3>
-            <button type="button" class="mp-close" aria-label="关闭" @click="isMulti ? cancelMulti() : closeMain()">×</button>
+            <h3 class="mp-title">{{ title || t('modelPicker.titleSelect') }}</h3>
+            <button type="button" class="mp-close" :aria-label="t('modelPicker.closeLabel')" @click="isMulti ? cancelMulti() : closeMain()">×</button>
           </header>
 
           <div class="mp-body">
-            <div v-if="loading" class="mp-status">加载中…</div>
+            <div v-if="loading" class="mp-status">{{ t('modelPicker.loading') }}</div>
             <div v-else-if="loadErr" class="mp-status mp-err">{{ loadErr }}</div>
             <template v-else>
               <section v-if="popular.length" class="mp-section">
-                <h4 class="mp-section-title">热门模型</h4>
+                <h4 class="mp-section-title">{{ t('modelPicker.sectionPopular') }}</h4>
                 <div class="mp-grid">
                   <button
                     v-for="m in popular"
@@ -307,7 +310,7 @@ watch(() => props.modelValue, () => {
                     class="mp-model mp-more"
                     @click="openVendor(group)"
                   >
-                    更多… ({{ group.versions.length }})
+                    {{ t('modelPicker.moreButton', { count: group.versions.length }) }}
                   </button>
                 </div>
               </section>
@@ -315,10 +318,10 @@ watch(() => props.modelValue, () => {
           </div>
 
           <footer v-if="isMulti" class="mp-footer">
-            <span class="mp-footer-hint">已选 {{ draft.size }} 个</span>
+            <span class="mp-footer-hint">{{ t('modelPicker.footerHint', { count: draft.size }) }}</span>
             <div class="mp-footer-actions">
-              <button type="button" class="btn btn-ghost btn-sm" @click="cancelMulti">取消</button>
-              <button type="button" class="btn btn-primary btn-sm" @click="confirmMulti">确认</button>
+              <button type="button" class="btn btn-ghost btn-sm" @click="cancelMulti">{{ t('modelPicker.cancelButton') }}</button>
+              <button type="button" class="btn btn-primary btn-sm" @click="confirmMulti">{{ t('modelPicker.confirmButton') }}</button>
             </div>
           </footer>
         </div>
@@ -347,10 +350,10 @@ watch(() => props.modelValue, () => {
             </div>
           </div>
           <footer v-if="isMulti" class="mp-footer mp-footer--compact">
-            <button type="button" class="btn btn-ghost btn-sm" @click="closeVendor">返回</button>
+            <button type="button" class="btn btn-ghost btn-sm" @click="closeVendor">{{ t('modelPicker.backButton') }}</button>
           </footer>
           <footer v-else class="mp-footer mp-footer--compact">
-            <button type="button" class="btn btn-ghost btn-sm" @click="closeVendor">返回</button>
+            <button type="button" class="btn btn-ghost btn-sm" @click="closeVendor">{{ t('modelPicker.backButton') }}</button>
           </footer>
         </div>
       </div>

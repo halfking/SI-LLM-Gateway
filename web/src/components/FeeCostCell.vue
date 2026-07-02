@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 withDefaults(
   defineProps<{
     credits?: number | null
@@ -14,9 +16,11 @@ withDefaults(
   },
 )
 
+const { t } = useI18n()
+
 function fmtCredits(n?: number | null) {
   if (n == null) return '—'
-  return n.toLocaleString('zh-CN') + ' 积分'
+  return n.toLocaleString('zh-CN') + ' ' + t('common.unit.credits')
 }
 
 function fmtCost(n?: number | null) {
@@ -28,7 +32,7 @@ function fmtCost(n?: number | null) {
 <template>
   <div class="fee-cost-cell" :class="{ 'fee-cost-cell--inline': inline }">
     <span class="fee-main">{{ fmtCredits(credits) }}</span>
-    <span v-if="showCost && costUsd != null" class="fee-cost-sub">成本 {{ fmtCost(costUsd) }}</span>
+    <span v-if="showCost && costUsd != null" class="fee-cost-sub">{{ t('common.feeCostCell.costLabel') }} {{ fmtCost(costUsd) }}</span>
   </div>
 </template>
 
