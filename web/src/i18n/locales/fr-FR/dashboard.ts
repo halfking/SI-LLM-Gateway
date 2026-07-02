@@ -1,0 +1,88 @@
+// Auto-translated draft (fr-FR) · 2026-07-02 · please review
+// dashboard.ts — Dashboard page chrome, statistics, warnings, tables, empty states.
+//
+// Variable interpolation strings use {name} (vue-i18n legacy mode) and are
+// substituted at render time. For dynamic lists (e.g. feature items),
+// use a nested object tree so vue-i18n's `t('dashboard.stat.X')` works.
+export default {
+  title: 'Tableau de bord',
+  refresh: 'Actualiser',
+  range: {
+    today: 'Aujourd\'hui',
+    last7d: '7 derniers jours',
+    last30d: '30 derniers jours',
+    last90d: '90 derniers jours',
+  },
+  tenantLabel: {
+    default: 'Données du site entier',
+    super: 'Locataire par défaut',
+    tenant: 'Locataire : {tenantId}',
+  },
+  loadError: 'Échec du chargement',
+  proxyWarning: {
+    title: '⚠ Proxy sortant injoignable',
+    detail: 'Le proxy configuré {proxy} n\'a pas pu être contacté — la passerelle est automatiquement passée en mode direct. Les modèles étrangers (Anthropic / OpenAI / OpenRouter / GitHub Copilot, etc.) peuvent échouer.',
+    detailHealthy: 'Le proxy {proxy} est de nouveau en ligne.',
+    hint: 'Le système se réactivera automatiquement une fois le proxy rétabli.',
+  },
+  backgroundTasks: {
+    title: 'Tâches en arrière-plan en cours',
+    running: 'Découverte de modèles ({trigger})',
+    startedAt: 'Démarré {time}',
+    heartbeat: 'Battement {time}',
+    slow: 'Les pages d\'admin peuvent ralentir',
+    detailsLink: 'Voir les détails',
+  },
+  discovery: {
+    latest: 'Dernière découverte de modèles : ',
+    failuresTitle: 'Découverte de modèles · échecs au cours des 6 dernières heures',
+    failuresTally: '{n} échecs · {m} modèles',
+    summary: 'Voir la liste des échecs',
+    meta: '{n} fois · {m} identifiants concernés · dernier {date} · erreur {code}',
+  },
+  stat: {
+    totalRequests: 'Total des requêtes',
+    inLastDays: 'Au cours des {days} derniers jours',
+    totalTokens: 'Utilisation totale de tokens',
+    prompt: 'Prompt {n}',
+    completion: 'Complétion {n}',
+    totalCost: 'Coût total',
+    costUnit: 'USD',
+    successRate: 'Taux de réussite',
+    avgLatency: 'Latence moyenne {n} ms',
+    apiKeys: 'Clés API intégrées',
+    enabledActive: 'Activées {enabled} · actives {active}',
+    models: 'Modèles',
+    activeInDays: 'Au cours des {days} derniers jours, {n} actifs',
+    providers: 'Fournisseurs / identifiants',
+    enabledCredentials: 'Activés {enabled} · identifiants {total}',
+    offline: 'Ressources hors ligne',
+    modelsCredentials: 'Modèles {models} · identifiants {creds}',
+  },
+  table: {
+    hotKeysTitle: 'Classement des clés API à forte utilisation',
+    byModelTitle: 'Par modèle',
+    colKey: 'Clé',
+    colApplication: 'Application',
+    colOwner: 'Propriétaire',
+    colRequests: 'Requêtes',
+    colTokens: 'Utilisation de tokens',
+    colCost: 'Coût (USD)',
+    colLastUsed: 'Dernière utilisation',
+    colModel: 'Modèle',
+    colProvider: 'Fournisseur',
+  },
+  compression: {
+    title: '🤖 Compression de session',
+    delta: 'Delta',
+    sliding: 'Glissante',
+    outboundTokens: '≈ {n} tokens sortants',
+  },
+  empty: {
+    firstUse: '🚀 Aucune donnée de requête pour l\'instant. Après avoir configuré les fournisseurs, envoyez un appel via /v1/chat/completions pour voir les données ici.',
+  },
+  loading: 'Chargement…',
+  noData: 'Aucune donnée pour cette période',
+  costSuffix: 'USD',
+  viewFailedRequests: 'Voir les requêtes échouées',
+}

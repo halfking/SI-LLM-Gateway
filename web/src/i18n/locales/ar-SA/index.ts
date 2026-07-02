@@ -1,7 +1,69 @@
-// ar-SA/index.ts — العربية (PLACEHOLDER, RTL).
-// TODO(i18n): translate from en-US and verify RTL layout (see plan §IV Stage 4).
-// Until ready, vue-i18n falls back to en-US, but <html dir="rtl"> is still
-// applied so RTL layout can be tested independently of text translation.
-// To enable text, create common.ts / nav.ts / login.ts / app.ts / errors.ts
-// under locales/ar-SA/ and aggregate them here.
-export default {}
+// Auto-translated draft (ar-SA) · 2026-07-02 · please review
+// ar-SA/index.ts — تجميع جميع الوحدات العربية.
+import common from './common'
+import nav from './nav'
+import login from './login'
+import app from './app'
+import errors from './errors'
+import users from './users'
+import keys from './keys'
+import requests from './requests'
+import credentialMonitor from './credentialMonitor'
+import providers from './providers'
+import landing from './landing'
+import dashboard from './dashboard'
+import providerDetail from './providerDetail'
+import providerDetailPage from './providerDetailPage'
+import tenants from './tenants'
+import forbidden from './forbidden'
+import settings from './settings'
+import workTypes from './workTypes'
+import decisions from './decisions'
+import auditLog from './auditLog'
+import freePool from './freePool'
+import models from './models'
+import pricingManagement from './pricingManagement'
+import standardModelPricing from './standardModelPricing'
+import routing from './routing'
+import chat from './chat'
+import sessions from './sessions'
+import compression from './compression'
+import examples from './examples'
+import dataLifecycle from './dataLifecycle'
+import tuning from './tuning'
+import correlations from './correlations'
+
+export default {
+  common,
+  nav,
+  login,
+  app,
+  errors,
+  users,
+  keys,
+  requests,
+  credentialMonitor,
+  providers,
+  landing,
+  dashboard,
+  providerDetail,
+  providerDetailPage,
+  tenants,
+  forbidden,
+  settings,
+  workTypes,
+  decisions,
+  auditLog,
+  freePool,
+  models,
+  pricingManagement,
+  standardModelPricing,
+  routing,
+  chat,
+  sessions,
+  compression,
+  examples,
+  dataLifecycle,
+  tuning,
+  correlations,
+}
