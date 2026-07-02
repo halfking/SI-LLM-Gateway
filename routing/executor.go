@@ -1541,6 +1541,11 @@ func (e *Executor) restoreCredentialState(ctx context.Context, credentialID int,
 	}
 	if err := e.State.RestoreOnSuccess(ctx, credentialID, rawModel); err != nil {
 		slog.Debug("credential state restore failed", "credential_id", credentialID, "raw_model", rawModel, "error", err)
+	} else {
+		// 2026-07-03 fix (P1-2): Invalidate candidate cache immediately after
+		// successful restoration so the next request sees the updated state
+		// within <1s instead of waiting up to 5s (TTL).
+		provider.InvalidateAllCandidateCache()
 	}
 }
 
@@ -1960,6 +1965,23 @@ func (e *Executor) clearSessionPreferenceOnNodeDisable(params *ExecParams, crede
 			"credential_id", credentialID,
 			"model", model,
 		)
+	}
+
+	// 2026-07-03 fix (P1-5): Also clear sticky session if it points to
+	// the disabled credential. Without this, the next request will fall
+	// through to prioritizeSticky and still prefer the disabled credential
+	// (which will then be rejected by filterAvailable/IsUsable, but causes
+	// unnecessary delay and bad UX).
+	if e.Router.Sticky != nil && params.StickyKey != "" {
+		boundID, _, ok := e.Router.Sticky.GetEntry(params.StickyKey)
+		if ok && boundID == credentialID {
+			e.Router.Sticky.Delete(params.StickyKey)
+			slog.Info("cleared sticky session after node disable",
+				"sticky_key", params.StickyKey,
+				"credential_id", credentialID,
+				"model", model,
+			)
+		}
 	}
 }
 
