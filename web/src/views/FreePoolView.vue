@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getFreePoolStatus,
   getFreePoolMethods,
@@ -25,6 +26,10 @@ import {
   type SignupHubResponse,
   type SignupPlatformEntry,
 } from '../api'
+
+const { t } = useI18n()
+const fp = (k: string, params?: Record<string, unknown>): string =>
+  t(`freePool.${k}` as never, params as never)
 
 const poolData  = ref<FreePoolStatusResponse | null>(null)
 const poolKeys  = ref<FreePoolKeyEntry[]>([])
@@ -132,7 +137,7 @@ async function load() {
     poolKeys.value = keysRes.keys
     signupHub.value = hub
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : fp('error.loadFailed')
   } finally {
     loading.value = false
   }
@@ -146,10 +151,10 @@ async function runBootstrap() {
     const res = await bootstrapFreePool()
     const mirror = (res.mirror as { registered?: number })?.registered ?? 0
     const discover = (res.discover as { registered?: number })?.registered ?? 0
-    message.value = `一键建设完成：镜像 ${mirror} 个 Provider，发现/更新 ${discover} 个`
+    message.value = fp('error.bootstrapDone', { mirrors: mirror, discovered: discover })
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '一键建设失败'
+    error.value = e instanceof Error ? e.message : fp('error.bootstrapFailed')
   } finally {
     syncing.value = false
   }
@@ -161,10 +166,10 @@ async function runBridgeOAuth() {
   message.value = ''
   try {
     const res = await bridgeFreePoolOAuth()
-    message.value = `OAuth 桥接：${res.registered ?? 0} 个 OAuth 凭证已注入池子`
+    message.value = fp('error.oauthBridgeDone', { n: res.registered ?? 0 })
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : 'OAuth 桥接失败'
+    error.value = e instanceof Error ? e.message : fp('error.oauthBridgeFailed')
   } finally {
     syncing.value = false
   }
@@ -176,10 +181,10 @@ async function runDiscover() {
   message.value = ''
   try {
     const res = await discoverFreePool()
-    message.value = `自动学习完成：本轮注册/更新 ${res.registered ?? 0} 个 Provider`
+    message.value = fp('error.discoverDone', { n: res.registered ?? 0 })
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '自动学习失败'
+    error.value = e instanceof Error ? e.message : fp('error.discoverFailed')
   } finally {
     syncing.value = false
   }
@@ -191,10 +196,10 @@ async function runImportEnv() {
   message.value = ''
   try {
     const res = await importFreePoolEnv()
-    message.value = `环境变量导入：${res.registered ?? 0} 个 Key 已注入池子`
+    message.value = fp('error.importEnvDone', { n: res.registered ?? 0 })
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '环境变量导入失败'
+    error.value = e instanceof Error ? e.message : fp('error.importEnvFailed')
   } finally {
     syncing.value = false
   }
@@ -225,7 +230,7 @@ function openUrl(url: string) {
 
 async function runQuickProbe() {
   if (!quickEntry.value.base_url.trim()) {
-    error.value = '请填写 Base URL'
+    error.value = fp('error.baseUrlRequired')
     return
   }
   quickProbing.value = true
@@ -238,10 +243,10 @@ async function runQuickProbe() {
     })
     probeResult.value = res.probe
     message.value = res.probe?.ok
-      ? `探活通过 · HTTP ${res.probe.status_code} · 模型 ${res.probe.model_count ?? 0} 个`
-      : `探活未通过：${res.probe?.reason || res.probe?.error || 'unknown'}`
+      ? fp('error.probePassed', { status: res.probe.status_code, n: res.probe.model_count ?? 0 })
+      : fp('error.probeFailed', { reason: res.probe?.reason || res.probe?.error || fp('error.probeFailedReason') })
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '探活失败'
+    error.value = e instanceof Error ? e.message : fp('error.probeFailed', { reason: fp('error.probeFailedReason') })
   } finally {
     quickProbing.value = false
   }
@@ -249,7 +254,7 @@ async function runQuickProbe() {
 
 async function runQuickSave(probeFirst = true) {
   if (!quickEntry.value.base_url.trim()) {
-    error.value = '请填写 Base URL'
+    error.value = fp('error.baseUrlRequired')
     return
   }
   quickSaving.value = true
@@ -270,14 +275,17 @@ async function runQuickSave(probeFirst = true) {
     })
     probeResult.value = res.probe ?? null
     if (res.status === 'ok') {
-      message.value = `凭据已入库 · catalog=${res.catalog_code} · credential #${res.credential_id ?? '—'}`
+      message.value = fp('error.credentialSaved', {
+        code: res.catalog_code,
+        id: res.credential_id ?? fp('error.credentialSavedPlaceholder'),
+      })
       quickEntry.value.api_key = ''
       await load()
     } else {
-      error.value = res.error || `入库失败 (${res.status})`
+      error.value = res.error || `${fp('error.saveFailed')} (${res.status})`
     }
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '入库失败'
+    error.value = e instanceof Error ? e.message : fp('error.saveFailed')
   } finally {
     quickSaving.value = false
   }
@@ -289,7 +297,7 @@ async function generateTempEmail() {
   try {
     const res = await createFreePoolTempEmail()
     if (!res.ok || !res.address) {
-      error.value = res.error || '临时邮箱创建失败'
+      error.value = res.error || fp('error.tempEmailFailed')
       return
     }
     tempEmail.value = {
@@ -299,9 +307,9 @@ async function generateTempEmail() {
       web_url: res.web_url || 'https://mail.tm/en/',
     }
     tempInbox.value = []
-    message.value = `临时邮箱已生成：${res.address}`
+    message.value = fp('error.tempEmailCreated', { address: res.address })
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '临时邮箱创建失败'
+    error.value = e instanceof Error ? e.message : fp('error.tempEmailFailed')
   } finally {
     tempEmailLoading.value = false
   }
@@ -314,12 +322,12 @@ async function pollTempInbox() {
     const res = await pollFreePoolTempEmail(tempEmail.value.token)
     if (res.ok && res.messages) {
       tempInbox.value = res.messages
-      message.value = `收件箱 ${res.total ?? res.messages.length} 封`
+      message.value = fp('error.inboxCount', { n: res.total ?? res.messages.length })
     } else {
-      error.value = res.error || '拉取邮件失败'
+      error.value = res.error || fp('error.fetchInboxFailed')
     }
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '拉取邮件失败'
+    error.value = e instanceof Error ? e.message : fp('error.fetchInboxFailed')
   } finally {
     tempPolling.value = false
   }
@@ -328,15 +336,15 @@ async function pollTempInbox() {
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
-    message.value = '已复制到剪贴板'
+    message.value = fp('error.copySuccess')
   } catch {
-    error.value = '复制失败，请手动选择复制'
+    error.value = fp('error.copyFailed')
   }
 }
 
 async function submitKey() {
   if (!newKey.value.catalog_code || (!newKey.value.api_key && newKey.value.source !== 'no_key')) {
-    error.value = '请填写 catalog_code 和 api_key'
+    error.value = fp('error.catalogAndApiKeyRequired')
     return
   }
   keySubmitting.value = true
@@ -350,12 +358,12 @@ async function submitKey() {
       source_detail: newKey.value.source_detail || undefined,
       label: newKey.value.label || undefined,
     })
-    message.value = '凭据已加密写入数据库'
+    message.value = fp('error.encryptedWriteSuccess')
     showKeyForm.value = false
     newKey.value = { catalog_code: 'openrouter-free', api_key: '', source: 'signup', source_detail: '', label: '' }
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '写入失败'
+    error.value = e instanceof Error ? e.message : fp('error.writeFailed')
   } finally {
     keySubmitting.value = false
   }
@@ -363,7 +371,7 @@ async function submitKey() {
 
 async function submitNew() {
   if (!newProvider.value.catalog_code || !newProvider.value.base_url) {
-    error.value = '请填写 Catalog Code 和 Base URL'
+    error.value = fp('error.catalogAndBaseUrlRequired')
     return
   }
   submitting.value = true
@@ -383,7 +391,7 @@ async function submitNew() {
       api_key: newProvider.value.api_key || undefined,
       models: models.length > 0 ? models : undefined,
     })
-    message.value = `Provider 注册成功 (ID: ${res.provider_id})`
+    message.value = fp('error.providerRegistered', { id: res.provider_id })
     showAddForm.value = false
     newProvider.value = {
       catalog_code: '',
@@ -395,7 +403,7 @@ async function submitNew() {
     }
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '注册失败'
+    error.value = e instanceof Error ? e.message : fp('error.registerFailed')
   } finally {
     submitting.value = false
   }
@@ -411,19 +419,19 @@ function statusBadgeClass(entry: FreePoolEntry | FreePoolModelEntry): string {
 }
 
 function statusLabel(entry: FreePoolEntry): string {
-  if (entry.credential_status !== 'active') return '已禁用'
-  if (entry.availability_state === 'rate_limited') return '限流'
-  if (entry.availability_state === 'cooling') return '冷却'
-  if (entry.availability_state === 'unreachable') return '不可达'
-  if (entry.quota_state === 'exhausted') return '配额用尽'
-  return '可用'
+  if (entry.credential_status !== 'active') return fp('status.disabled')
+  if (entry.availability_state === 'rate_limited') return fp('status.rateLimited')
+  if (entry.availability_state === 'cooling') return fp('status.cooling')
+  if (entry.availability_state === 'unreachable') return fp('status.unreachable')
+  if (entry.quota_state === 'exhausted') return fp('status.quotaExhausted')
+  return fp('status.available')
 }
 
 function modelStatusLabel(m: FreePoolModelEntry): string {
-  if (m.credential_status !== 'active') return '已禁用'
-  if (!m.available) return '已关闭'
-  if (!m.routable) return '不可路由'
-  return '可路由'
+  if (m.credential_status !== 'active') return fp('status.disabled')
+  if (!m.available) return fp('status.modelClosed')
+  if (!m.routable) return fp('status.notRoutable')
+  return fp('status.routable')
 }
 
 function riskClass(risk: string): string {
@@ -434,13 +442,13 @@ function riskClass(risk: string): string {
 
 function acquisitionLabel(mode: string): string {
   const map: Record<string, string> = {
-    signup: '注册 Key',
-    env: '环境变量',
-    no_key: '无需 Key',
-    oauth: 'OAuth',
-    mirrored: '镜像',
-    manual: '手动',
-    discovered: '自动发现',
+    signup: fp('acquisition.signup'),
+    env: fp('acquisition.env'),
+    no_key: fp('acquisition.noKey'),
+    oauth: fp('acquisition.oauth'),
+    mirrored: fp('acquisition.mirrored'),
+    manual: fp('acquisition.manual'),
+    discovered: fp('acquisition.discovered'),
   }
   return map[mode] || mode
 }
@@ -456,71 +464,66 @@ onMounted(load)
 <template>
   <div>
     <div class="page-header">
-      <h2>免费资源池</h2>
+      <h2>{{ fp('page.title') }}</h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-ghost" @click="load" :disabled="loading || syncing">刷新</button>
+        <button class="btn btn-ghost" @click="load" :disabled="loading || syncing">{{ fp('header.refresh') }}</button>
         <button class="btn btn-ghost" @click="runBootstrap" :disabled="loading || syncing">
-          {{ syncing ? '处理中…' : '一键建设' }}
+          {{ syncing ? fp('header.bootstrapSyncing') : fp('header.bootstrap') }}
         </button>
         <button class="btn btn-ghost" @click="runBridgeOAuth" :disabled="loading || syncing">
-          OAuth 桥接
+          {{ fp('header.bridgeOAuth') }}
         </button>
         <button class="btn btn-ghost" @click="runImportEnv" :disabled="loading || syncing">
-          导入环境变量 Key
+          {{ fp('header.importEnv') }}
         </button>
         <button class="btn btn-ghost" @click="runDiscover" :disabled="loading || syncing">
-          自动学习并注册
+          {{ fp('header.discover') }}
         </button>
         <button class="btn btn-primary" @click="activeTab = 'assistant'; showKeyForm = false; showAddForm = false">
-          快速录入
+          {{ fp('header.quickEntry') }}
         </button>
         <button class="btn btn-primary" @click="showKeyForm = !showKeyForm">
-          {{ showKeyForm ? '取消' : '写入 DB 凭据' }}
+          {{ showKeyForm ? fp('header.hideKeyForm') : fp('header.showKeyForm') }}
         </button>
         <button class="btn btn-primary" @click="showAddForm = !showAddForm">
-          {{ showAddForm ? '取消' : '添加 Provider' }}
+          {{ showAddForm ? fp('header.hideAddForm') : fp('header.showAddForm') }}
         </button>
       </div>
     </div>
-    <p style="color:var(--muted);margin-bottom:20px">
-      管理免费模型资源池。已注册模型路由优先级最高（routing_tier = 9，composite_score = 0）。
-      下方「免费模型清单」展示当前池内全部可用模型；「模板目录」展示已知免费 Provider 及其预期模型。
-    </p>
+    <p style="color:var(--muted);margin-bottom:20px" v-html="fp('page.desc')" />
 
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
     <div v-if="message" class="alert alert-success">{{ message }}</div>
 
     <div v-if="poolData" class="stat-row" style="margin-bottom:20px">
       <div class="stat-inline">
-        <span class="stat-label">可路由模型</span>
+        <span class="stat-label">{{ fp('stats.routableModels') }}</span>
         <span class="stat-value stat-ok">{{ poolData.stats.routable_models }}</span>
-        <span class="stat-sub">/ {{ poolData.stats.free_models }} offer</span>
+        <span class="stat-sub">/ {{ poolData.stats.free_models }} {{ fp('stats.offerUnit') }}</span>
       </div>
       <div class="stat-inline">
-        <span class="stat-label">可用 Provider</span>
+        <span class="stat-label">{{ fp('stats.availableProviders') }}</span>
         <span class="stat-value stat-ok">{{ poolData.stats.available_providers }}</span>
         <span class="stat-sub">/ {{ poolData.stats.total_providers }}</span>
       </div>
       <div class="stat-inline">
-        <span class="stat-label">模板已接入</span>
+        <span class="stat-label">{{ fp('stats.templatesLinked') }}</span>
         <span class="stat-value">{{ poolData.stats.catalog_registered }}</span>
-        <span class="stat-sub">/ {{ poolData.stats.catalog_templates }} 模板</span>
+        <span class="stat-sub">/ {{ poolData.stats.catalog_templates }} {{ fp('stats.templatesUnit') }}</span>
       </div>
       <div class="stat-inline">
-        <span class="stat-label">模板模型</span>
+        <span class="stat-label">{{ fp('stats.templateModels') }}</span>
         <span class="stat-value">{{ catalogSummary.templateModels }}</span>
-        <span class="stat-sub">目录已知</span>
+        <span class="stat-sub">{{ fp('stats.catalogKnown') }}</span>
       </div>
     </div>
 
     <div v-if="showKeyForm" class="card" style="margin-bottom:20px">
-      <h3 style="margin-top:0">写入免费池凭据（加密存 DB）</h3>
-      <p class="cell-muted" style="margin:0 0 12px">
-        Key 写入 <code class="model-code">credentials.secret_ciphertext</code>，来源写入 <code class="model-code">acquisition_source / acquisition_detail</code>。
-      </p>
+      <h3 style="margin-top:0">{{ fp('keyForm.title') }}</h3>
+      <p class="cell-muted" style="margin:0 0 12px" v-html="fp('keyForm.desc')" />
       <div class="form-grid">
         <div class="form-item">
-          <label>Catalog Code *</label>
+          <label>{{ fp('keyForm.catalogCode') }}</label>
           <select v-model="newKey.catalog_code" class="input">
             <option v-for="tpl in catalog" :key="tpl.catalog_code" :value="tpl.catalog_code">
               {{ tpl.display_name }} ({{ tpl.catalog_code }})
@@ -528,7 +531,7 @@ onMounted(load)
           </select>
         </div>
         <div class="form-item">
-          <label>来源类型</label>
+          <label>{{ fp('keyForm.source') }}</label>
           <select v-model="newKey.source" class="input">
             <option value="signup">signup（官方注册）</option>
             <option value="env">env（环境变量导入）</option>
@@ -538,43 +541,43 @@ onMounted(load)
           </select>
         </div>
         <div class="form-item" style="grid-column:1/-1">
-          <label>API Key *</label>
+          <label>{{ fp('keyForm.apiKey') }}</label>
           <input v-model="newKey.api_key" class="input" type="password" placeholder="sk-..." />
         </div>
         <div class="form-item">
-          <label>来源说明</label>
-          <input v-model="newKey.source_detail" class="input" placeholder="如 OpenRouter void / AIGoCode dev" />
+          <label>{{ fp('keyForm.sourceDetail') }}</label>
+          <input v-model="newKey.source_detail" class="input" :placeholder="fp('keyForm.sourceDetailPlaceholder')" />
         </div>
         <div class="form-item">
-          <label>凭据标签</label>
-          <input v-model="newKey.label" class="input" placeholder="可选，默认自动生成" />
+          <label>{{ fp('keyForm.label') }}</label>
+          <input v-model="newKey.label" class="input" :placeholder="fp('keyForm.labelPlaceholder')" />
         </div>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px">
         <button class="btn btn-primary" :disabled="keySubmitting" @click="submitKey">
-          {{ keySubmitting ? '写入中…' : '加密写入数据库' }}
+          {{ keySubmitting ? fp('keyForm.submitting') : fp('keyForm.submit') }}
         </button>
-        <button class="btn btn-ghost" @click="showKeyForm = false">取消</button>
+        <button class="btn btn-ghost" @click="showKeyForm = false">{{ fp('keyForm.cancel') }}</button>
       </div>
     </div>
 
     <div v-if="showAddForm" class="card" style="margin-bottom:20px">
-      <h3 style="margin-top:0">添加免费 Provider</h3>
+      <h3 style="margin-top:0">{{ fp('providerForm.title') }}</h3>
       <div class="form-grid">
         <div class="form-item">
-          <label>Catalog Code *</label>
-          <input v-model="newProvider.catalog_code" class="input" placeholder="例如: zhipu-free" />
+          <label>{{ fp('providerForm.catalogCode') }}</label>
+          <input v-model="newProvider.catalog_code" class="input" :placeholder="fp('providerForm.catalogCodePlaceholder')" />
         </div>
         <div class="form-item">
-          <label>显示名称</label>
-          <input v-model="newProvider.display_name" class="input" placeholder="例如: Zhipu GLM Free" />
+          <label>{{ fp('providerForm.displayName') }}</label>
+          <input v-model="newProvider.display_name" class="input" :placeholder="fp('providerForm.displayNamePlaceholder')" />
         </div>
         <div class="form-item" style="grid-column: 1 / -1">
-          <label>Base URL *</label>
-          <input v-model="newProvider.base_url" class="input" placeholder="https://api.example.com/v1" />
+          <label>{{ fp('providerForm.baseUrl') }}</label>
+          <input v-model="newProvider.base_url" class="input" :placeholder="fp('providerForm.baseUrlPlaceholder')" />
         </div>
         <div class="form-item">
-          <label>协议</label>
+          <label>{{ fp('providerForm.protocol') }}</label>
           <select v-model="newProvider.protocol" class="input">
             <option value="openai-completions">openai-completions</option>
             <option value="openai-responses">openai-responses</option>
@@ -582,17 +585,17 @@ onMounted(load)
           </select>
         </div>
         <div class="form-item">
-          <label>API Key</label>
-          <input v-model="newProvider.api_key" class="input" type="password" placeholder="可选" />
+          <label>{{ fp('providerForm.apiKey') }}</label>
+          <input v-model="newProvider.api_key" class="input" type="password" :placeholder="fp('providerForm.apiKeyPlaceholder')" />
         </div>
         <div class="form-item" style="grid-column: 1 / -1">
-          <label>模型列表 (逗号分隔)</label>
-          <input v-model="newProvider.models" class="input" placeholder="例如: gpt-4o-mini, gpt-3.5-turbo" />
+          <label>{{ fp('providerForm.models') }}</label>
+          <input v-model="newProvider.models" class="input" :placeholder="fp('providerForm.modelsPlaceholder')" />
         </div>
       </div>
 
       <div style="margin-top:16px">
-        <h4 style="font-size:13px;margin-bottom:8px;color:var(--muted)">已知免费 Provider 模板：</h4>
+        <h4 style="font-size:13px;margin-bottom:8px;color:var(--muted)">{{ fp('providerForm.templatesTitle') }}</h4>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button
             v-for="tpl in catalog"
@@ -600,7 +603,7 @@ onMounted(load)
             class="btn btn-ghost btn-sm"
             @click="useTemplate(tpl)"
             style="font-size:12px"
-            :title="tpl.pool_registered ? '已接入池子' : (tpl.env_configured ? '环境变量已配置' : (tpl.needs_key ? '需注册或配置环境变量' : '无需 Key'))"
+            :title="tpl.pool_registered ? fp('providerForm.templateInPool') : (tpl.env_configured ? fp('providerForm.templateEnvConfigured') : (tpl.needs_key ? fp('providerForm.templateNeedsKey') : fp('providerForm.templateNoKey')))"
           >
             {{ tpl.display_name }}{{ tpl.pool_registered ? ' ✓' : (tpl.env_configured ? ' 🔑' : '') }}
           </button>
@@ -609,66 +612,66 @@ onMounted(load)
 
       <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
         <button class="btn btn-primary" @click="submitNew" :disabled="submitting">
-          {{ submitting ? '注册中…' : '注册 Provider' }}
+          {{ submitting ? fp('providerForm.submitting') : fp('providerForm.submit') }}
         </button>
-        <button class="btn btn-ghost" @click="showAddForm = false" :disabled="submitting">取消</button>
+        <button class="btn btn-ghost" @click="showAddForm = false" :disabled="submitting">{{ fp('providerForm.cancel') }}</button>
       </div>
     </div>
 
-    <div v-if="loading" class="empty">加载中…</div>
+    <div v-if="loading" class="empty">{{ t('common.feedback.loading') }}</div>
 
     <template v-else-if="poolData">
       <div class="tab-bar" style="margin-bottom:16px">
         <button class="tab-btn" :class="{ active: activeTab === 'assistant' }" @click="activeTab = 'assistant'">
-          注册助手
+          {{ fp('tab.assistant') }}
         </button>
         <button class="tab-btn" :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">
-          免费模型清单 ({{ liveModels.length }})
+          {{ fp('tab.models', { n: liveModels.length }) }}
         </button>
         <button class="tab-btn" :class="{ active: activeTab === 'providers' }" @click="activeTab = 'providers'">
-          Provider ({{ poolData.pool.length }})
+          {{ fp('tab.providers', { n: poolData.pool.length }) }}
         </button>
         <button class="tab-btn" :class="{ active: activeTab === 'catalog' }" @click="activeTab = 'catalog'">
-          模板目录 ({{ catalog.length }})
+          {{ fp('tab.catalog', { n: catalog.length }) }}
         </button>
         <button class="tab-btn" :class="{ active: activeTab === 'keys' }" @click="activeTab = 'keys'">
-          凭据来源 ({{ poolKeys.length }})
+          {{ fp('tab.keys', { n: poolKeys.length }) }}
         </button>
         <button class="tab-btn" :class="{ active: activeTab === 'guide' }" @click="activeTab = 'guide'">
-          获取方式与审计
+          {{ fp('tab.guide') }}
         </button>
       </div>
 
       <!-- Assistant tab -->
       <div v-if="activeTab === 'assistant'" class="assistant-layout">
         <div class="card quick-entry-card">
-          <h3 style="margin-top:0">快速录入凭据</h3>
+          <h3 style="margin-top:0">{{ fp('assistant.title') }}</h3>
           <p class="cell-muted" style="margin:0 0 12px">
-            粘贴注册页、Base URL 与 API Key → 探活验证 → 加密写入数据库。也可从下方平台卡片一键填入。
+            {{ fp('assistant.desc') }}
           </p>
           <div class="form-grid">
             <div class="form-item" style="grid-column:1/-1">
-              <label>注册 / 文档页 URL</label>
-              <input v-model="quickEntry.signup_url" class="input" placeholder="https://openrouter.ai/signup" />
+              <label>{{ fp('assistant.signupUrl') }}</label>
+              <input v-model="quickEntry.signup_url" class="input" :placeholder="fp('assistant.signupUrlPlaceholder')" />
             </div>
             <div class="form-item" style="grid-column:1/-1">
-              <label>Base URL *</label>
-              <input v-model="quickEntry.base_url" class="input" placeholder="https://openrouter.ai/api/v1" />
+              <label>{{ fp('assistant.baseUrl') }}</label>
+              <input v-model="quickEntry.base_url" class="input" :placeholder="fp('assistant.baseUrlPlaceholder')" />
             </div>
             <div class="form-item">
-              <label>Catalog Code</label>
-              <input v-model="quickEntry.catalog_code" class="input" placeholder="留空则自动生成" />
+              <label>{{ fp('assistant.catalogCode') }}</label>
+              <input v-model="quickEntry.catalog_code" class="input" :placeholder="fp('assistant.catalogCodePlaceholder')" />
             </div>
             <div class="form-item">
-              <label>显示名称</label>
-              <input v-model="quickEntry.display_name" class="input" placeholder="Provider 显示名" />
+              <label>{{ fp('assistant.displayName') }}</label>
+              <input v-model="quickEntry.display_name" class="input" :placeholder="fp('assistant.displayNamePlaceholder')" />
             </div>
             <div class="form-item" style="grid-column:1/-1">
-              <label>API Key</label>
+              <label>{{ fp('assistant.apiKey') }}</label>
               <input v-model="quickEntry.api_key" class="input" type="password" placeholder="sk-..." />
             </div>
             <div class="form-item">
-              <label>来源类型</label>
+              <label>{{ fp('assistant.source') }}</label>
               <select v-model="quickEntry.source" class="input">
                 <option value="signup">signup（官方注册）</option>
                 <option value="manual">manual（中转/手动）</option>
@@ -677,66 +680,66 @@ onMounted(load)
               </select>
             </div>
             <div class="form-item">
-              <label>来源说明</label>
-              <input v-model="quickEntry.source_detail" class="input" placeholder="如 AIGoCode VS Code 插件" />
+              <label>{{ fp('assistant.sourceDetail') }}</label>
+              <input v-model="quickEntry.source_detail" class="input" :placeholder="fp('assistant.sourceDetailPlaceholder')" />
             </div>
           </div>
           <div v-if="probeResult" class="probe-box">
-            <strong>探活结果</strong>
+            <strong>{{ fp('assistant.probeResult') }}</strong>
             <pre>{{ JSON.stringify(probeResult, null, 2) }}</pre>
           </div>
           <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-ghost" :disabled="quickProbing || quickSaving" @click="runQuickProbe">
-              {{ quickProbing ? '探活中…' : '仅探活验证' }}
+              {{ quickProbing ? fp('assistant.probeOnlyLoading') : fp('assistant.probeOnly') }}
             </button>
             <button class="btn btn-primary" :disabled="quickProbing || quickSaving" @click="runQuickSave(true)">
-              {{ quickSaving ? '入库中…' : '探活并入库' }}
+              {{ quickSaving ? fp('assistant.probeAndSaveLoading') : fp('assistant.probeAndSave') }}
             </button>
             <button
               v-if="quickEntry.signup_url"
               class="btn btn-ghost"
               @click="openUrl(quickEntry.signup_url)"
-            >打开注册页</button>
+            >{{ fp('assistant.openSignup') }}</button>
           </div>
         </div>
 
         <div class="card">
-          <h3 style="margin-top:0">临时邮箱（注册用）</h3>
+          <h3 style="margin-top:0">{{ fp('assistant.tempEmailTitle') }}</h3>
           <p class="cell-muted" style="margin:0 0 12px">
-            一键生成 mail.tm 邮箱收验证码。注册完成后请尽快复制 Key 并入库。
+            {{ fp('assistant.tempEmailDesc') }}
           </p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
             <button class="btn btn-primary" :disabled="tempEmailLoading" @click="generateTempEmail">
-              {{ tempEmailLoading ? '生成中…' : '生成临时邮箱' }}
+              {{ tempEmailLoading ? fp('assistant.generateTempEmailLoading') : fp('assistant.generateTempEmail') }}
             </button>
             <button
               v-if="tempEmail"
               class="btn btn-ghost"
               :disabled="tempPolling"
               @click="pollTempInbox"
-            >{{ tempPolling ? '刷新中…' : '刷新收件箱' }}</button>
-            <button v-if="tempEmail" class="btn btn-ghost" @click="openUrl(tempEmail.web_url)">打开 mail.tm</button>
+            >{{ tempPolling ? fp('assistant.refreshInboxLoading') : fp('assistant.refreshInbox') }}</button>
+            <button v-if="tempEmail" class="btn btn-ghost" @click="openUrl(tempEmail.web_url)">{{ fp('assistant.openMailTm') }}</button>
           </div>
           <div v-if="tempEmail" class="temp-email-box">
             <div class="temp-row">
-              <span class="cell-muted">地址</span>
+              <span class="cell-muted">{{ fp('assistant.address') }}</span>
               <code>{{ tempEmail.address }}</code>
-              <button class="btn btn-ghost btn-sm" @click="copyText(tempEmail.address)">复制</button>
+              <button class="btn btn-ghost btn-sm" @click="copyText(tempEmail.address)">{{ fp('assistant.copy') }}</button>
             </div>
             <div class="temp-row">
-              <span class="cell-muted">密码</span>
+              <span class="cell-muted">{{ fp('assistant.password') }}</span>
               <code>{{ tempEmail.password }}</code>
-              <button class="btn btn-ghost btn-sm" @click="copyText(tempEmail.password)">复制</button>
+              <button class="btn btn-ghost btn-sm" @click="copyText(tempEmail.password)">{{ fp('assistant.copy') }}</button>
             </div>
           </div>
           <ul v-if="tempInbox.length" class="inbox-list">
             <li v-for="m in tempInbox" :key="m.id">
-              <strong>{{ m.subject || '(无主题)' }}</strong>
+              <strong>{{ m.subject || fp('assistant.noSubject') }}</strong>
               <div class="cell-muted">{{ m.from }} · {{ m.intro }}</div>
             </li>
           </ul>
           <div v-if="signupHub" class="tool-links" style="margin-top:16px">
-            <span class="cell-muted">其他邮箱工具：</span>
+            <span class="cell-muted">{{ fp('assistant.otherTools') }}</span>
             <button
               v-for="t in signupHub.tools.filter(x => x.tool_type === 'temp_email' && !x.builtin)"
               :key="t.id"
@@ -749,17 +752,17 @@ onMounted(load)
         <div class="card platform-hub">
           <div class="section-header">
             <div>
-              <h3 style="margin:0">免费 Token 平台导航</h3>
-              <p class="cell-muted" style="margin:4px 0 0">官方免费层 + 中转平台 + 社区端点 · 点击打开注册或填入快速录入</p>
+              <h3 style="margin:0">{{ fp('assistant.hubTitle') }}</h3>
+              <p class="cell-muted" style="margin:4px 0 0">{{ fp('assistant.hubDesc') }}</p>
             </div>
-            <input v-model="hubQuery" class="input search-input" placeholder="搜索平台…" />
+            <input v-model="hubQuery" class="input search-input" :placeholder="fp('assistant.searchPlaceholder')" />
           </div>
           <div class="hub-filters">
             <button
               class="tab-btn btn-sm"
               :class="{ active: hubCategory === 'all' }"
               @click="hubCategory = 'all'"
-            >全部</button>
+            >{{ fp('assistant.filterAll') }}</button>
             <button
               v-for="cat in hubCategories"
               :key="cat.id"
@@ -773,29 +776,29 @@ onMounted(load)
               <div class="platform-head">
                 <strong>{{ p.name }}</strong>
                 <span class="badge" :class="p.pool_registered ? 'badge-green' : 'badge-gray'">
-                  {{ p.pool_registered ? '已接入' : '未接入' }}
+                  {{ p.pool_registered ? fp('assistant.registered') : fp('assistant.notRegistered') }}
                 </span>
               </div>
               <div class="cell-muted">{{ categoryLabel(p.category) }} · {{ p.difficulty }}</div>
               <code class="model-code" style="display:block;margin:6px 0">{{ p.base_url }}</code>
               <p v-if="p.notes" class="cell-muted" style="margin:0 0 8px">{{ p.notes }}</p>
-              <div v-if="p.models_hint" class="cell-muted">模型：{{ p.models_hint }}</div>
+              <div v-if="p.models_hint" class="cell-muted">{{ fp('assistant.modelsLabel') }}{{ p.models_hint }}</div>
               <div v-if="p.tags && p.tags.length" class="tag-row">
                 <span v-for="tag in p.tags" :key="tag" class="model-tag template">{{ tag }}</span>
               </div>
               <div class="platform-actions">
-                <button class="btn btn-primary btn-sm" @click="fillFromPlatform(p)">填入录入</button>
-                <button class="btn btn-ghost btn-sm" @click="openUrl(p.signup_url)">打开注册</button>
+                <button class="btn btn-primary btn-sm" @click="fillFromPlatform(p)">{{ fp('assistant.fillForm') }}</button>
+                <button class="btn btn-ghost btn-sm" @click="openUrl(p.signup_url)">{{ fp('assistant.openSignup2') }}</button>
                 <button
                   v-if="p.api_key_url && p.api_key_url !== p.signup_url"
                   class="btn btn-ghost btn-sm"
                   @click="openUrl(p.api_key_url)"
-                >获取 Key</button>
+                >{{ fp('assistant.getKey') }}</button>
               </div>
             </div>
           </div>
           <div v-if="signupHub?.workflow?.length" style="margin-top:20px">
-            <h4 style="margin-bottom:8px">推荐工作流</h4>
+            <h4 style="margin-bottom:8px">{{ fp('assistant.recommendedWorkflow') }}</h4>
             <ol class="guide-steps">
               <li v-for="step in signupHub.workflow" :key="step.step">
                 <strong>{{ step.title }}</strong> — {{ step.detail }}
@@ -809,24 +812,24 @@ onMounted(load)
       <div v-if="activeTab === 'models'" class="card">
         <div class="section-header">
           <div>
-            <h3 style="margin:0">当前池内免费模型</h3>
+            <h3 style="margin:0">{{ fp('models.title') }}</h3>
             <p class="cell-muted" style="margin:4px 0 0">
-              可路由 {{ routableModels.length }} 个 · 调用时使用 raw_model_name
+              {{ fp('models.desc', { n: routableModels.length }) }}
             </p>
           </div>
-          <input v-model="modelQuery" class="input search-input" placeholder="搜索模型 / Provider / catalog…" />
+          <input v-model="modelQuery" class="input search-input" :placeholder="fp('models.searchPlaceholder')" />
         </div>
 
-        <div v-if="filteredModels.length === 0" class="empty">暂无匹配的免费模型</div>
+        <div v-if="filteredModels.length === 0" class="empty">{{ fp('models.empty') }}</div>
         <table v-else>
           <thead>
             <tr>
-              <th>模型名称</th>
-              <th>Provider</th>
-              <th>Catalog</th>
-              <th>Tier</th>
-              <th>状态</th>
-              <th>凭据</th>
+              <th>{{ fp('models.colName') }}</th>
+              <th>{{ fp('models.colProvider') }}</th>
+              <th>{{ fp('models.colCatalog') }}</th>
+              <th>{{ fp('models.colTier') }}</th>
+              <th>{{ fp('models.colStatus') }}</th>
+              <th>{{ fp('models.colCredential') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -834,7 +837,7 @@ onMounted(load)
               <td>
                 <code class="model-code">{{ m.raw_model_name }}</code>
                 <div v-if="m.standardized_name && m.standardized_name !== m.raw_model_name" class="cell-muted">
-                  标准名: {{ m.standardized_name }}
+                  {{ fp('models.standardName') }}{{ m.standardized_name }}
                 </div>
               </td>
               <td>{{ m.provider_name }}</td>
@@ -854,15 +857,15 @@ onMounted(load)
 
       <!-- Providers tab -->
       <div v-if="activeTab === 'providers'" class="card">
-        <h3 style="margin-top:0">Provider 列表</h3>
-        <div v-if="poolData.pool.length === 0" class="empty">暂无免费 Provider</div>
+        <h3 style="margin-top:0">{{ fp('providers.title') }}</h3>
+        <div v-if="poolData.pool.length === 0" class="empty">{{ fp('providers.empty') }}</div>
         <table v-else>
           <thead>
             <tr>
-              <th>Catalog / 名称</th>
-              <th>凭据</th>
-              <th>状态</th>
-              <th>模型列表</th>
+              <th>{{ fp('providers.colCatalogName') }}</th>
+              <th>{{ fp('providers.colCredential') }}</th>
+              <th>{{ fp('providers.colStatus') }}</th>
+              <th>{{ fp('providers.colModels') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -873,7 +876,7 @@ onMounted(load)
               </td>
               <td>
                 <div>{{ entry.credential_label }}</div>
-                <div class="cell-muted">#{{ entry.credential_id }} · {{ entry.availability_state || 'ready' }}</div>
+                <div class="cell-muted">#{{ entry.credential_id }} · {{ entry.availability_state || fp('providers.ready') }}</div>
               </td>
               <td>
                 <span class="badge" :class="statusBadgeClass(entry)">{{ statusLabel(entry) }}</span>
@@ -885,11 +888,11 @@ onMounted(load)
                     :key="m.offer_id"
                     class="model-tag"
                     :class="{ routable: m.routable, dim: !m.available }"
-                    :title="m.routable ? '可路由' : '不可路由'"
+                    :title="m.routable ? fp('providers.routable') : fp('providers.notRoutable')"
                   >{{ m.raw_model_name }}</span>
                 </div>
-                <div v-else class="cell-muted">无模型 offer</div>
-                <div class="cell-muted">免费 {{ entry.free_offers }} / 可用 {{ entry.available_offers }}</div>
+                <div v-else class="cell-muted">{{ fp('providers.noModels') }}</div>
+                <div class="cell-muted">{{ fp('providers.freeUnit') }} {{ entry.free_offers }} / {{ fp('providers.availableUnit') }} {{ entry.available_offers }}</div>
               </td>
             </tr>
           </tbody>
@@ -898,19 +901,19 @@ onMounted(load)
 
       <!-- Catalog tab -->
       <div v-if="activeTab === 'catalog'" class="card">
-        <h3 style="margin-top:0">已知免费 Provider 模板</h3>
+        <h3 style="margin-top:0">{{ fp('catalog.title') }}</h3>
         <p class="cell-muted" style="margin-top:0;margin-bottom:16px">
-          模板列出的模型为官方/社区免费层预期模型；「已接入」表示当前池子中有 active 凭据。
+          {{ fp('catalog.desc') }}
         </p>
         <table>
           <thead>
             <tr>
-              <th>Provider</th>
-              <th>接入</th>
-              <th>获取方式</th>
-              <th>模板模型</th>
-              <th>池内 live 模型</th>
-              <th>操作</th>
+              <th>{{ fp('catalog.colProvider') }}</th>
+              <th>{{ fp('catalog.colInPool') }}</th>
+              <th>{{ fp('catalog.colAcquisition') }}</th>
+              <th>{{ fp('catalog.colTemplateModels') }}</th>
+              <th>{{ fp('catalog.colLiveModels') }}</th>
+              <th>{{ fp('catalog.colActions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -922,16 +925,16 @@ onMounted(load)
               </td>
               <td>
                 <span class="badge" :class="tpl.pool_registered ? 'badge-green' : 'badge-gray'">
-                  {{ tpl.pool_registered ? '已接入' : '未接入' }}
+                  {{ tpl.pool_registered ? fp('catalog.registered') : fp('catalog.notRegistered') }}
                 </span>
-                <div v-if="tpl.env_configured" class="cell-muted">环境变量已配置</div>
+                <div v-if="tpl.env_configured" class="cell-muted">{{ fp('catalog.envConfigured') }}</div>
               </td>
               <td>
                 <span class="acq-pill">{{ acquisitionLabel(tpl.acquisition_mode) }}</span>
                 <div v-if="tpl.needs_key && tpl.env_vars && tpl.env_vars.length" class="cell-muted">
                   {{ tpl.env_vars.join(' / ') }}
                 </div>
-                <div v-if="tpl.rpm_limit" class="cell-muted">~{{ tpl.rpm_limit }} RPM</div>
+                <div v-if="tpl.rpm_limit" class="cell-muted">~{{ tpl.rpm_limit }} {{ fp('catalog.rpmUnit') }}</div>
               </td>
               <td>
                 <div class="model-tags">
@@ -945,8 +948,8 @@ onMounted(load)
                 <span v-else class="cell-muted">—</span>
               </td>
               <td>
-                <a v-if="tpl.signup_url" :href="tpl.signup_url" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">注册</a>
-                <button class="btn btn-ghost btn-sm" @click="useTemplate(tpl)">填入表单</button>
+                <a v-if="tpl.signup_url" :href="tpl.signup_url" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">{{ fp('catalog.signup') }}</a>
+                <button class="btn btn-ghost btn-sm" @click="useTemplate(tpl)">{{ fp('catalog.fillForm') }}</button>
               </td>
             </tr>
           </tbody>
@@ -955,18 +958,18 @@ onMounted(load)
 
       <!-- Keys tab -->
       <div v-if="activeTab === 'keys'" class="card">
-        <h3 style="margin-top:0">数据库中的免费池凭据</h3>
+        <h3 style="margin-top:0">{{ fp('keys.title') }}</h3>
         <p class="cell-muted" style="margin:0 0 12px">
-          所有 Key 以 AES 加密存储在 PostgreSQL；下方仅显示掩码。环境变量导入后也会同步到此表。
+          {{ fp('keys.desc') }}
         </p>
         <table v-if="poolKeys.length">
           <thead>
             <tr>
-              <th>Provider</th>
-              <th>Key（掩码）</th>
-              <th>来源</th>
-              <th>说明</th>
-              <th>状态</th>
+              <th>{{ fp('keys.colProvider') }}</th>
+              <th>{{ fp('keys.colKeyMasked') }}</th>
+              <th>{{ fp('keys.colSource') }}</th>
+              <th>{{ fp('keys.colDetail') }}</th>
+              <th>{{ fp('keys.colStatus') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -976,7 +979,7 @@ onMounted(load)
                 <code style="font-size:11px">{{ k.catalog_code }}</code>
                 <div class="cell-muted">#{{ k.credential_id }} · {{ k.credential_label }}</div>
               </td>
-              <td><code class="model-code">{{ k.key_masked || (k.has_secret ? '***' : '无 Key') }}</code></td>
+              <td><code class="model-code">{{ k.key_masked || (k.has_secret ? '***' : fp('keys.noKey')) }}</code></td>
               <td><span class="acq-pill">{{ acquisitionLabel(k.acquisition_source || 'manual') }}</span></td>
               <td class="cell-muted">{{ k.acquisition_detail || '—' }}</td>
               <td>
@@ -988,16 +991,13 @@ onMounted(load)
             </tr>
           </tbody>
         </table>
-        <div v-else class="empty">暂无凭据，点击「写入 DB 凭据」添加</div>
+        <div v-else class="empty">{{ fp('keys.empty') }}</div>
       </div>
 
       <!-- Guide tab -->
       <div v-if="activeTab === 'guide' && methodsData" class="card">
-        <h3 style="margin-top:0">获取方式与使用</h3>
-        <p class="cell-muted" style="margin-top:0;margin-bottom:16px">
-          定时任务每 {{ Math.round(methodsData.scheduler.interval_sec / 60) }} 分钟运行 discovery（env 导入 + no-key + OAuth + GitHub 列表学习）。
-          Key 写入 <code class="model-code">config/free-pool.env</code>，勿提交 Git。
-        </p>
+        <h3 style="margin-top:0">{{ fp('guide.title') }}</h3>
+        <p class="cell-muted" style="margin-top:0;margin-bottom:16px" v-html="fp('guide.desc', { n: Math.round(methodsData.scheduler.interval_sec / 60) })" />
         <div class="guide-grid">
           <div v-for="m in methodsData.methods" :key="m.mode" class="guide-card">
             <div class="guide-head">
@@ -1008,13 +1008,13 @@ onMounted(load)
             <ol class="guide-steps">
               <li v-for="(step, i) in m.steps" :key="i">{{ step }}</li>
             </ol>
-            <div class="cell-muted">{{ m.automated ? '✓ 可自动化' : '需人工' }} · 风险 {{ m.risk }}</div>
+            <div class="cell-muted">{{ m.automated ? fp('guide.automated') : fp('guide.manual') }} · {{ fp('guide.riskLabel') }} {{ m.risk }}</div>
           </div>
         </div>
-        <h4 style="margin:24px 0 12px">安全审计规则</h4>
+        <h4 style="margin:24px 0 12px">{{ fp('guide.auditTitle') }}</h4>
         <table>
           <thead>
-            <tr><th>规则</th><th>状态</th><th>说明</th></tr>
+            <tr><th>{{ fp('guide.auditColRule') }}</th><th>{{ fp('guide.auditColStatus') }}</th><th>{{ fp('guide.auditColDetail') }}</th></tr>
           </thead>
           <tbody>
             <tr v-for="rule in methodsData.audit_rules" :key="rule.id">
@@ -1025,7 +1025,7 @@ onMounted(load)
           </tbody>
         </table>
         <div v-if="methodsData.scheduler.last_result && Object.keys(methodsData.scheduler.last_result).length" style="margin-top:16px">
-          <h4 style="margin-bottom:8px">最近一次定时 discovery</h4>
+          <h4 style="margin-bottom:8px">{{ fp('guide.lastRunTitle') }}</h4>
           <pre class="discovery-log">{{ JSON.stringify(methodsData.scheduler.last_result, null, 2) }}</pre>
         </div>
       </div>

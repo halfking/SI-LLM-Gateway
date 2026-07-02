@@ -86,6 +86,7 @@ export default {
   unit: {
     credits: 'credits',
     requests: 'requests',
+    items: '',
   },
   error: {
     unknown: 'An unknown error occurred',

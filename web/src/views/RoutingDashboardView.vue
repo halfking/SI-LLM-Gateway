@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   getAutoRouteIndex, getAutoRouteDecisions, getAutoRouteAudit,
   getCustomerCost, getModelCost, refreshAutoRouteIndex, simulateAutoRoute,
@@ -28,6 +29,10 @@ import { computeSankeyCardHeight, SANKEY_DOM_LEGEND_H, SANKEY_SECTION_HEAD_H } f
 import ModelTaskIndexPanel from '../components/analytics/ModelTaskIndexPanel.vue'
 import DecisionDetail from '../components/analytics/DecisionDetail.vue'
 import CredentialFunnel from '../components/analytics/CredentialFunnel.vue'
+
+const { t } = useI18n()
+const rd = (k: string, params?: Record<string, unknown>): string =>
+  t(`routing.dashboard.${k}` as never, params as never)
 
 const RESOLVE_LOG_KEY = 'llmgw_resolve_log'
 const RESOLVE_LOG_MAX = 50
@@ -274,9 +279,9 @@ const profileScoreKey = computed(() => {
 })
 
 const profileLabel = computed(() => {
-  if (selectedProfile.value === 'speed_first') return 'Speed'
-  if (selectedProfile.value === 'cost_first') return 'Cost'
-  return 'Smart'
+  if (selectedProfile.value === 'speed_first') return rd('overview.profileSpeed')
+  if (selectedProfile.value === 'cost_first') return rd('overview.profileCost')
+  return rd('overview.profileSmart')
 })
 
 const sortedIndex = computed(() => {
@@ -327,12 +332,12 @@ const savingPolicy = ref(false)
 const policyMsg = ref('')
 
 const POLICY_FIELDS: { key: keyof RoutingPolicy; label: string; min?: number; max?: number; step?: number }[] = [
-  { key: 'algorithm_version',         label: '算法版本', min: 1, max: 2, step: 1 },
-  { key: 'retry_per_credential',      label: '同凭据重试', min: 0, max: 5, step: 1 },
-  { key: 'tier_fallback_max',         label: '跨级回退', min: 1, max: 20, step: 1 },
-  { key: 'circuit_open_seconds',      label: '熔断冷却(s)', min: 1, max: 3600, step: 1 },
-  { key: 'circuit_failure_threshold', label: '熔断失败次数', min: 1, max: 50, step: 1 },
-  { key: 'circuit_max_open_seconds',  label: '熔断上限(s)', min: 1, max: 86400, step: 1 },
+  { key: 'algorithm_version',         label: rd('policy.fields.algorithmVersion'), min: 1, max: 2, step: 1 },
+  { key: 'retry_per_credential',      label: rd('policy.fields.retryPerCredential'), min: 0, max: 5, step: 1 },
+  { key: 'tier_fallback_max',         label: rd('policy.fields.tierFallback'), min: 1, max: 20, step: 1 },
+  { key: 'circuit_open_seconds',      label: rd('policy.fields.circuitOpen'), min: 1, max: 3600, step: 1 },
+  { key: 'circuit_failure_threshold', label: rd('policy.fields.circuitThreshold'), min: 1, max: 50, step: 1 },
+  { key: 'circuit_max_open_seconds',  label: rd('policy.fields.circuitMaxOpen'), min: 1, max: 86400, step: 1 },
 ]
 
 async function loadPolicy() {
@@ -356,8 +361,8 @@ async function savePolicy() {
       policy.value = await patchPolicy(dirty)
       policyDraft.value = { ...policy.value }
     }
-    policyMsg.value = '策略已保存'
-  } catch (e) { policyMsg.value = '保存失败: ' + String(e) }
+    policyMsg.value = rd('policy.savedPolicy')
+  } catch (e) { policyMsg.value = rd('policy.saveFailed', { error: String(e) }) }
   finally { savingPolicy.value = false }
 }
 
@@ -367,8 +372,8 @@ async function saveWeights() {
   try {
     await updateScoringWeights(weightsDraft.value)
     weights.value = { ...weightsDraft.value }
-    policyMsg.value = '权重已保存'
-  } catch (e) { policyMsg.value = '保存失败: ' + String(e) }
+    policyMsg.value = rd('policy.savedWeights')
+  } catch (e) { policyMsg.value = rd('policy.saveFailed', { error: String(e) }) }
   finally { savingPolicy.value = false }
 }
 
@@ -503,7 +508,7 @@ async function doResolve() {
     resolved.value = true
     appendResolveLog(res, profile)
   } catch (e: unknown) {
-    resolveErr.value = e instanceof Error ? e.message : '查询失败'
+    resolveErr.value = e instanceof Error ? e.message : rd('resolve.queryFailed')
   } finally {
     resolving.value = false
   }
@@ -554,57 +559,69 @@ function taskLabel(key: string): string {
   return TASK_TYPES.find(t => t.key === key)?.label ?? key
 }
 
-const L1_STEPS = ['Prompt', '8类分类', '6维评分', 'Profile', '选模型']
-const L2_STEPS = ['模型解析', 'Tier回退', '计费轮次', 'P2C得分', '执行/熔断']
+const L1_STEPS = computed(() => [
+  rd('pipeline.l1Steps.0'),
+  rd('pipeline.l1Steps.1'),
+  rd('pipeline.l1Steps.2'),
+  rd('pipeline.l1Steps.3'),
+  rd('pipeline.l1Steps.4'),
+])
+const L2_STEPS = computed(() => [
+  rd('pipeline.l2Steps.0'),
+  rd('pipeline.l2Steps.1'),
+  rd('pipeline.l2Steps.2'),
+  rd('pipeline.l2Steps.3'),
+  rd('pipeline.l2Steps.4'),
+])
 
 const heroChips = computed(() => {
   if (activeTab.value === 'analytics') {
     const topTask = distEntries(audit.value.task_distribution)[0]
     const topModel = audit.value.top_chosen_models[0]
     const chips = [
-      { label: 'Auto', value: String(audit.value.total_auto_requests) },
-      { label: '成功率', value: fmt(audit.value.success_rate * 100, 1) + '%' },
-      { label: 'Top任务', value: topTask?.[0] || '-' },
-      { label: 'Top模型', value: topModel?.model || '-' },
+      { label: rd('hero.analytics.auto'), value: String(audit.value.total_auto_requests) },
+      { label: rd('hero.analytics.successRate'), value: fmt(audit.value.success_rate * 100, 1) + '%' },
+      { label: rd('hero.analytics.topTask'), value: topTask?.[0] || '-' },
+      { label: rd('hero.analytics.topModel'), value: topModel?.model || '-' },
     ]
     if (wtSyncMeta.value) {
-      chips.push({ label: '工作类型', value: String(wtSyncMeta.value.enabled_count) })
-      chips.push({ label: '映射', value: String(wtSyncMeta.value.route_count) })
+      chips.push({ label: rd('hero.analytics.workType'), value: String(wtSyncMeta.value.enabled_count) })
+      chips.push({ label: rd('hero.analytics.mappings'), value: String(wtSyncMeta.value.route_count) })
       if (wtSyncMeta.value.last_synced_at) {
         const d = new Date(wtSyncMeta.value.last_synced_at)
-        chips.push({ label: 'ACC同步', value: d.toLocaleString() })
+        chips.push({ label: rd('hero.analytics.accSync'), value: d.toLocaleString() })
       }
     }
     return chips
   }
   if (activeTab.value === 'overview') {
     return [
-      { label: '候选', value: String(indexData.value.length) },
-      { label: '24h', value: String(audit.value.total_auto_requests) },
-      { label: '成功率', value: fmt(audit.value.success_rate * 100, 1) + '%' },
+      { label: rd('hero.overview.candidates'), value: String(indexData.value.length) },
+      { label: rd('hero.overview.24h'), value: String(audit.value.total_auto_requests) },
+      { label: rd('hero.overview.successRate'), value: fmt(audit.value.success_rate * 100, 1) + '%' },
     ]
   }
   if (activeTab.value === 'live') {
     const topTask = distEntries(audit.value.task_distribution)[0]
     const topModel = audit.value.top_chosen_models[0]
     return [
-      { label: 'Auto', value: String(audit.value.total_auto_requests) },
-      { label: 'Top任务', value: topTask?.[0] || '-' },
-      { label: 'Top模型', value: topModel?.model || '-' },
+      { label: rd('hero.live.auto'), value: String(audit.value.total_auto_requests) },
+      { label: rd('hero.live.topTask'), value: topTask?.[0] || '-' },
+      { label: rd('hero.live.topModel'), value: topModel?.model || '-' },
     ]
   }
   if (activeTab.value === 'resolve') {
     const routable = resolveCandidates.value.filter(c => c.routable).length
     return [
-      { label: '可路由', value: resolved.value ? String(routable) : '-' },
-      { label: '候选', value: resolved.value ? String(resolveCandidates.value.length) : '-' },
-      { label: '记录', value: String(resolveLog.value.length) },
+      { label: rd('hero.resolve.routable'), value: resolved.value ? String(routable) : '-' },
+      { label: rd('hero.resolve.candidates'), value: resolved.value ? String(resolveCandidates.value.length) : '-' },
+      { label: rd('hero.resolve.records'), value: String(resolveLog.value.length) },
     ]
   }
   return [
-    { label: '算法', value: 'v' + (policy.value?.algorithm_version ?? '-') },
-    { label: 'Tier回退', value: String(policy.value?.tier_fallback_max ?? '-') },
-    { label: '熔断', value: (policy.value?.circuit_failure_threshold ?? '-') + '次' },
+    { label: rd('hero.policy.algorithm'), value: 'v' + (policy.value?.algorithm_version ?? '-') },
+    { label: rd('hero.policy.tierFallback'), value: String(policy.value?.tier_fallback_max ?? '-') },
+    { label: rd('hero.policy.circuit'), value: (policy.value?.circuit_failure_threshold ?? '-') + rd('hero.policy.circuitSuffix') },
   ]
 })
 
@@ -633,37 +650,37 @@ onUnmounted(() => stopPoll())
     <!-- Unified top: title + tabs + refresh -->
     <div class="top-bar">
       <div class="top-bar-head">
-        <h2>路由全景</h2>
+        <h2>{{ rd('topBar.title') }}</h2>
         <div class="seg-tabs">
-          <button class="seg-tab" :class="{ active: activeTab === 'analytics' }" @click="activeTab = 'analytics'">数据分析</button>
-          <button class="seg-tab" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">两层路由</button>
-          <button class="seg-tab" :class="{ active: activeTab === 'policy' }" @click="activeTab = 'policy'">策略配置</button>
-          <button class="seg-tab" :class="{ active: activeTab === 'live' }" @click="activeTab = 'live'">实时决策</button>
-          <button class="seg-tab" :class="{ active: activeTab === 'resolve' }" @click="activeTab = 'resolve'">凭据路由</button>
+          <button class="seg-tab" :class="{ active: activeTab === 'analytics' }" @click="activeTab = 'analytics'">{{ rd('topBar.tabAnalytics') }}</button>
+          <button class="seg-tab" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">{{ rd('topBar.tabOverview') }}</button>
+          <button class="seg-tab" :class="{ active: activeTab === 'policy' }" @click="activeTab = 'policy'">{{ rd('topBar.tabPolicy') }}</button>
+          <button class="seg-tab" :class="{ active: activeTab === 'live' }" @click="activeTab = 'live'">{{ rd('topBar.tabLive') }}</button>
+          <button class="seg-tab" :class="{ active: activeTab === 'resolve' }" @click="activeTab = 'resolve'">{{ rd('topBar.tabResolve') }}</button>
         </div>
         <div class="nav-chips">
           <router-link to="/routing-v2/work-types" class="nav-link-wt chip-link">
-            工作类型
+            {{ rd('topBar.workTypes') }}
             <template v-if="wtSyncMeta">
-              <span class="chip-inline">{{ wtSyncMeta.enabled_count }} 启用</span>
-              <span class="chip-inline">{{ wtSyncMeta.route_count }} 映射</span>
+              <span class="chip-inline">{{ wtSyncMeta.enabled_count }} {{ rd('topBar.enabled') }}</span>
+              <span class="chip-inline">{{ wtSyncMeta.route_count }} {{ rd('topBar.mappings') }}</span>
             </template>
           </router-link>
           <router-link to="/routing-overview" class="nav-link-wt chip-link">
-            模型路由全景
+            {{ rd('topBar.modelRouting') }}
           </router-link>
           <router-link to="/routing-policy" class="nav-link-wt chip-link">
-            路由策略
+            {{ rd('topBar.routingPolicy') }}
           </router-link>
         </div>
-        <button class="btn btn-sm btn-ghost refresh-btn" @click="loadIndex(); loadAudit(); activeTab === 'analytics' && loadAnalytics(); activeTab === 'policy' && loadPolicy()" title="刷新">↻</button>
+        <button class="btn btn-sm btn-ghost refresh-btn" @click="loadIndex(); loadAudit(); activeTab === 'analytics' && loadAnalytics(); activeTab === 'policy' && loadPolicy()" :title="rd('topBar.refresh')">↻</button>
       </div>
 
       <!-- L1 / L2 pipeline -->
       <div class="pipeline">
         <div class="pipe-row l1-row">
           <span class="layer-tag l1">L1</span>
-          <span class="pipe-title">选模型</span>
+          <span class="pipe-title">{{ rd('pipeline.chooseModel') }}</span>
           <div class="pipe-steps">
             <template v-for="(s, i) in L1_STEPS" :key="'l1-' + s">
               <span class="pipe-step">{{ s }}</span>
@@ -674,7 +691,7 @@ onUnmounted(() => stopPoll())
         <div class="pipe-bridge">↓</div>
         <div class="pipe-row l2-row">
           <span class="layer-tag l2">L2</span>
-          <span class="pipe-title">选凭据</span>
+          <span class="pipe-title">{{ rd('pipeline.chooseCredential') }}</span>
           <div class="pipe-steps">
             <template v-for="(s, i) in L2_STEPS" :key="'l2-' + s">
               <span class="pipe-step">{{ s }}</span>
@@ -691,7 +708,7 @@ onUnmounted(() => stopPoll())
 
     <!-- ═══ Tab: Analytics ═══ -->
     <div v-if="activeTab === 'analytics'" class="tab-content">
-      <p class="analytics-hint text-muted">{{ analyticsRowDim === 'work_type' ? '工作类型' : '任务' }}×模型匹配统计 · 点击单元格查看决策明细与 L2 漏斗</p>
+      <p class="analytics-hint text-muted">{{ analyticsRowDim === 'work_type' ? rd('analytics.workType') : rd('analytics.task') }}×{{ rd('analytics.modelMatchStats') }} · {{ rd('analytics.clickHint') }}</p>
       <div v-if="!analyticsEmpty" class="card compact-card flat-card">
         <AnalyticsKpiBar :audit="audit" />
       </div>
@@ -699,16 +716,16 @@ onUnmounted(() => stopPoll())
         <div class="card compact-card chart-card" :style="{ minHeight: heatmapCardHeight + 'px' }">
           <div class="card-toolbar">
             <div class="toolbar-left">
-              <span class="toolbar-title">{{ analyticsRowDim === 'work_type' ? '工作类型' : '任务' }} × 模型热力图</span>
+              <span class="toolbar-title">{{ analyticsRowDim === 'work_type' ? rd('analytics.workType') : rd('analytics.task') }} × {{ rd('analytics.heatmapTitle') }}</span>
             </div>
             <div class="toolbar-filters">
               <button
-                v-for="rd in (['task_type', 'work_type'] as AnalyticsRowDim[])"
-                :key="rd"
+                v-for="rd2 in (['task_type', 'work_type'] as AnalyticsRowDim[])"
+                :key="rd2"
                 class="profile-pill"
-                :class="{ active: analyticsRowDim === rd }"
-                @click="analyticsRowDim = rd"
-              >{{ rd === 'task_type' ? 'L1任务' : '工作类型' }}</button>
+                :class="{ active: analyticsRowDim === rd2 }"
+                @click="analyticsRowDim = rd2"
+              >{{ rd2 === 'task_type' ? rd('analytics.l1Task') : rd('analytics.workType') }}</button>
               <span class="toolbar-divider" />
               <button
                 v-for="w in (['7d', '24h'] as AnalyticsWindow[])"
@@ -724,7 +741,7 @@ onUnmounted(() => stopPoll())
                 class="profile-pill"
                 :class="{ active: analyticsMetric === m }"
                 @click="analyticsMetric = m"
-              >{{ m === 'count' ? '请求' : m === 'success_rate' ? '成功率' : m === 'p95_ms' ? 'P95' : '费用' }}</button>
+              >{{ m === 'count' ? rd('analytics.metricCount') : m === 'success_rate' ? rd('analytics.metricSuccessRate') : m === 'p95_ms' ? rd('analytics.metricP95') : rd('analytics.metricCost') }}</button>
             </div>
           </div>
           <HeatmapMatrix
@@ -737,7 +754,7 @@ onUnmounted(() => stopPoll())
           />
         </div>
         <div class="card compact-card chart-card" :style="{ minHeight: sankeyCardHeight + 'px' }">
-          <div class="section-head tight"><h3>路由流向</h3><span class="text-muted">任务 → 模型 → 供应商</span></div>
+          <div class="section-head tight"><h3>{{ rd('analytics.routeFlow') }}</h3><span class="text-muted">{{ rd('analytics.flowHint') }}</span></div>
           <RouteFlowSankey :data="flowData" :loading="analyticsLoading" :min-height="sankeySvgMinHeight" />
         </div>
       </div>
@@ -745,7 +762,7 @@ onUnmounted(() => stopPoll())
       <div v-if="selectedHeatmapTask" class="card compact-card collapsible">
         <div class="card-toolbar clickable" @click="showModelTaskIndex = !showModelTaskIndex">
           <div class="toolbar-left">
-            <span class="toolbar-title">模型任务指数</span>
+            <span class="toolbar-title">{{ rd('analytics.modelTaskIndex') }}</span>
             <span class="text-muted">{{ selectedHeatmapTask }}</span>
           </div>
           <span class="expand-icon">{{ showModelTaskIndex ? '▼' : '▶' }}</span>
@@ -755,7 +772,7 @@ onUnmounted(() => stopPoll())
 
       <div v-if="selectedHeatmapModel" class="card compact-card">
         <div class="section-head tight">
-          <h3>L2 凭据漏斗</h3>
+          <h3>{{ rd('analytics.l2FunnelTitle') }}</h3>
           <span class="text-muted">{{ selectedHeatmapModel }} · {{ analyticsWindow }}</span>
         </div>
         <CredentialFunnel
@@ -775,11 +792,11 @@ onUnmounted(() => stopPoll())
           <div class="card-toolbar">
             <div class="toolbar-left">
               <span class="toolbar-title">{{ cellPopup.row }} × {{ displayTaskKey(cellPopup.col) }}</span>
-              <span class="text-muted">最近决策</span>
+              <span class="text-muted">{{ rd('analytics.recentDecisions') }}</span>
             </div>
-            <button class="btn btn-ghost btn-sm" @click="closeCellModal">关闭</button>
+            <button class="btn btn-ghost btn-sm" @click="closeCellModal">{{ rd('modal.close') }}</button>
           </div>
-          <div v-if="cellLoading" class="loading-hint">加载…</div>
+          <div v-if="cellLoading" class="loading-hint">{{ rd('analytics.loading') }}</div>
           <template v-else>
             <div v-if="cellDecisions.length" class="compact-decisions">
               <div
@@ -802,7 +819,7 @@ onUnmounted(() => stopPoll())
                 <span v-if="d.latency_ms" class="text-muted">{{ fmtMs(d.latency_ms) }}</span>
               </div>
             </div>
-            <div v-else class="text-muted">该组合暂无最近决策</div>
+            <div v-else class="text-muted">{{ rd('analytics.noDecisionsForCombo') }}</div>
             <DecisionDetail
               v-if="modalDecisionId"
               :request-id="modalDecisionId"
@@ -822,7 +839,7 @@ onUnmounted(() => stopPoll())
         <div class="card-toolbar">
           <div class="toolbar-left">
             <span class="layer-tag l1">L1</span>
-            <span class="toolbar-title">模型推荐</span>
+            <span class="toolbar-title">{{ rd('overview.title') }}</span>
             <span v-if="selectedTask" class="task-hint">{{ taskLabel(selectedTask) }}</span>
           </div>
           <div class="toolbar-filters">
@@ -835,17 +852,17 @@ onUnmounted(() => stopPoll())
               @click="selectedTask = selectedTask === t.key ? '' : t.key"
             >{{ t.icon }}</button>
             <span class="toolbar-divider" />
-            <button class="profile-pill" :class="{ active: selectedProfile === 'smart' }" @click="selectedProfile = 'smart'">智能</button>
-            <button class="profile-pill" :class="{ active: selectedProfile === 'speed_first' }" @click="selectedProfile = 'speed_first'">速度</button>
-            <button class="profile-pill" :class="{ active: selectedProfile === 'cost_first' }" @click="selectedProfile = 'cost_first'">成本</button>
+            <button class="profile-pill" :class="{ active: selectedProfile === 'smart' }" @click="selectedProfile = 'smart'">{{ rd('overview.profileSmart') }}</button>
+            <button class="profile-pill" :class="{ active: selectedProfile === 'speed_first' }" @click="selectedProfile = 'speed_first'">{{ rd('overview.profileSpeed') }}</button>
+            <button class="profile-pill" :class="{ active: selectedProfile === 'cost_first' }" @click="selectedProfile = 'cost_first'">{{ rd('overview.profileCost') }}</button>
           </div>
         </div>
-        <div v-if="indexLoading" class="loading-hint">加载索引…</div>
+        <div v-if="indexLoading" class="loading-hint">{{ rd('overview.loadingIndex') }}</div>
         <div v-else class="table-wrap">
           <table class="dense-table">
             <thead>
               <tr>
-                <th>#</th><th>模型</th><th>{{ profileLabel }}</th><th>P95</th><th>成功率</th><th>入/出 $/1M</th><th>压力</th><th></th>
+                <th>#</th><th>{{ rd('overview.colModel') }}</th><th>{{ profileLabel }}</th><th>P95</th><th>{{ rd('overview.colSuccessRate') }}</th><th>{{ rd('overview.colPrice') }}</th><th>{{ rd('overview.colPressure') }}</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -881,10 +898,10 @@ onUnmounted(() => stopPoll())
                       <div class="layer-panel l2-accent">
                         <div class="section-head sm">
                           <span class="layer-tag l2">L2</span>
-                          <span>凭据调度</span>
-                          <span class="section-hint">Tier 1→2→3→9 · plan 优先 PAYG · P2C</span>
+                          <span>{{ rd('overview.credScheduling') }}</span>
+                          <span class="section-hint">{{ rd('overview.schedulingHint') }}</span>
                         </div>
-                        <div v-if="layer2Loading === (m.canonical_name || m.raw_model)" class="text-muted">加载…</div>
+                        <div v-if="layer2Loading === (m.canonical_name || m.raw_model)" class="text-muted">{{ rd('overview.loading') }}</div>
                         <template v-else-if="layer2Cache[m.canonical_name || m.raw_model]">
                           <div class="l2-meta mono">{{ layer2Cache[m.canonical_name || m.raw_model]!.resolution_path }}</div>
                           <div class="l2-creds">
@@ -901,10 +918,10 @@ onUnmounted(() => stopPoll())
                             </div>
                           </div>
                         </template>
-                        <div v-else class="text-muted">无凭据</div>
+                        <div v-else class="text-muted">{{ rd('overview.noCreds') }}</div>
                       </div>
                       <div class="layer-panel l1-accent">
-                        <div class="section-head sm"><span class="layer-tag l1">L1</span><span>6维评分</span></div>
+                        <div class="section-head sm"><span class="layer-tag l1">L1</span><span>{{ rd('overview.sixDimScore') }}</span></div>
                         <SixDimScoreBar compact :scores="{
                           price_score: m.score_smart,
                           speed_score: m.score_speed_first,
@@ -923,7 +940,7 @@ onUnmounted(() => stopPoll())
         </div>
       </div>
       <div v-else-if="!indexLoading" class="card compact-card empty-hint">
-        索引暂无数据 — 点击 ↻ 刷新
+        {{ rd('overview.emptyHint') }}
       </div>
     </div>
 
@@ -931,10 +948,10 @@ onUnmounted(() => stopPoll())
     <div v-if="activeTab === 'policy'" class="tab-content">
       <!-- Profile weights — flat 3-col -->
       <div class="card compact-card flat-card">
-        <div class="section-head tight"><span class="layer-tag l1">L1</span><h3>Profile 权重矩阵</h3></div>
+        <div class="section-head tight"><span class="layer-tag l1">L1</span><h3>{{ rd('policy.profileWeightsTitle') }}</h3></div>
         <div class="profile-grid flat">
           <div v-for="(w, name) in DEFAULT_PROFILE_WEIGHTS" :key="name" class="profile-col">
-            <div class="profile-col-head">{{ name === 'smart' ? '智能' : name === 'speed_first' ? '速度' : '成本' }}</div>
+            <div class="profile-col-head">{{ name === 'smart' ? rd('overview.profileSmart') : name === 'speed_first' ? rd('overview.profileSpeed') : rd('overview.profileCost') }}</div>
             <SixDimScoreBar compact :scores="{
               price_score: (w as ProfileWeights).Price / maxDimValue(w as ProfileWeights) * 100,
               speed_score: (w as ProfileWeights).Speed / maxDimValue(w as ProfileWeights) * 100,
@@ -949,36 +966,36 @@ onUnmounted(() => stopPoll())
 
       <!-- L2 policy + weights — single card, inline -->
       <div class="card compact-card flat-card">
-        <div class="section-head tight"><span class="layer-tag l2">L2</span><h3>路由算法与得分系数</h3></div>
+        <div class="section-head tight"><span class="layer-tag l2">L2</span><h3>{{ rd('policy.l2PolicyTitle') }}</h3></div>
         <div class="policy-inline">
           <div class="policy-block">
-            <div class="block-label">算法参数</div>
+            <div class="block-label">{{ rd('policy.algoParams') }}</div>
             <div class="inline-fields">
               <label v-for="f in POLICY_FIELDS" :key="f.key" class="inline-field">
                 <span>{{ f.label }}</span>
                 <input type="number" :min="f.min" :max="f.max" :step="f.step" v-model.number="policyDraft[f.key]" />
               </label>
             </div>
-            <button class="btn btn-primary btn-sm" :disabled="savingPolicy" @click="savePolicy">保存策略</button>
+            <button class="btn btn-primary btn-sm" :disabled="savingPolicy" @click="savePolicy">{{ rd('policy.savePolicy') }}</button>
           </div>
           <div class="policy-divider" />
           <div class="policy-block">
-            <div class="block-label">P2C 综合得分</div>
+            <div class="block-label">{{ rd('policy.p2cScore') }}</div>
             <div class="inline-fields">
               <label class="inline-field">
-                <span>价格权重</span>
+                <span>{{ rd('policy.priceWeight') }}</span>
                 <input type="number" min="0" max="100" v-model.number="weightsDraft.price" />
               </label>
               <label class="inline-field">
-                <span>会话负载</span>
+                <span>{{ rd('policy.sessionLoad') }}</span>
                 <input type="number" min="0" max="100" v-model.number="weightsDraft.session_load" />
               </label>
               <label class="inline-field">
-                <span>错误惩罚</span>
+                <span>{{ rd('policy.errorPenalty') }}</span>
                 <input type="number" min="0" max="100" v-model.number="weightsDraft.failure_penalty" />
               </label>
             </div>
-            <button class="btn btn-primary btn-sm" :disabled="savingPolicy" @click="saveWeights">保存权重</button>
+            <button class="btn btn-primary btn-sm" :disabled="savingPolicy" @click="saveWeights">{{ rd('policy.saveWeights') }}</button>
           </div>
         </div>
         <div v-if="policyMsg" class="policy-msg">{{ policyMsg }}</div>
@@ -987,7 +1004,7 @@ onUnmounted(() => stopPoll())
       <!-- Cost tables -->
       <div class="cost-grid">
         <div class="card compact-card">
-          <div class="section-head"><h3>客户成本</h3></div>
+          <div class="section-head"><h3>{{ rd('policy.customerCostTitle') }}</h3></div>
           <table v-if="customerCost.length" class="dense-table">
             <thead><tr><th>Key</th><th>24h</th><th>7d</th><th>Auto</th></tr></thead>
             <tbody>
@@ -999,12 +1016,12 @@ onUnmounted(() => stopPoll())
               </tr>
             </tbody>
           </table>
-          <div v-else class="text-muted">暂无</div>
+          <div v-else class="text-muted">{{ rd('policy.empty') }}</div>
         </div>
         <div class="card compact-card">
-          <div class="section-head"><h3>模型成本</h3></div>
+          <div class="section-head"><h3>{{ rd('policy.modelCostTitle') }}</h3></div>
           <table v-if="modelCost.length" class="dense-table">
-            <thead><tr><th>模型</th><th>费用</th><th>成功率</th><th>请求</th></tr></thead>
+            <thead><tr><th>{{ rd('overview.colModel') }}</th><th>{{ rd('policy.colCost') }}</th><th>{{ rd('overview.colSuccessRate') }}</th><th>{{ rd('policy.colRequests') }}</th></tr></thead>
             <tbody>
               <tr v-for="m in modelCost" :key="m.raw_model">
                 <td class="model-name">{{ m.raw_model }}</td>
@@ -1014,7 +1031,7 @@ onUnmounted(() => stopPoll())
               </tr>
             </tbody>
           </table>
-          <div v-else class="text-muted">暂无</div>
+          <div v-else class="text-muted">{{ rd('policy.empty') }}</div>
         </div>
       </div>
     </div>
@@ -1024,14 +1041,14 @@ onUnmounted(() => stopPoll())
       <div class="card compact-card flat-card">
         <div class="section-head tight">
           <span class="layer-tag l2">L2</span>
-          <h3>凭据路由解析</h3>
+          <h3>{{ rd('resolve.title') }}</h3>
         </div>
         <div class="resolve-row">
           <div class="resolve-picker">
             <ModelPicker
               v-model="modelInput"
-              placeholder="选择模型…"
-              title="凭据路由模型"
+              :placeholder="rd('resolve.modelPickerPlaceholder')"
+              :title="rd('resolve.modelPickerTitle')"
               @update:model-value="onModelPicked"
             />
           </div>
@@ -1042,21 +1059,21 @@ onUnmounted(() => stopPoll())
             title="cursor / roocode / cline"
           />
           <button class="btn btn-primary btn-sm" :disabled="resolving || !modelInput.trim()" @click="doResolve">
-            {{ resolving ? '查询中…' : '查询路由' }}
+            {{ resolving ? rd('resolve.resolving') : rd('resolve.resolve') }}
           </button>
         </div>
         <div v-if="resolveErr" class="alert alert-danger compact-alert">{{ resolveErr }}</div>
       </div>
 
       <div v-if="resolution" class="card compact-card">
-        <div class="section-head tight"><h3>模型解析</h3></div>
+        <div class="section-head tight"><h3>{{ rd('resolve.modelParse') }}</h3></div>
         <div class="resolve-meta">
-          <span><span class="text-muted">客户端：</span><code>{{ resolution.client_model }}</code></span>
-          <span><span class="text-muted">路径：</span>{{ resolution.resolution_path }}</span>
-          <span v-if="resolution.canonical_name"><span class="text-muted">Canonical：</span>{{ resolution.canonical_name }}</span>
+          <span><span class="text-muted">{{ rd('resolve.clientLabel') }}</span><code>{{ resolution.client_model }}</code></span>
+          <span><span class="text-muted">{{ rd('resolve.pathLabel') }}</span>{{ resolution.resolution_path }}</span>
+          <span v-if="resolution.canonical_name"><span class="text-muted">{{ rd('resolve.canonicalLabel') }}</span>{{ resolution.canonical_name }}</span>
         </div>
         <div v-if="resolution.plan_order.length" class="plan-order">
-          执行顺序（P2C+粘性）：
+          {{ rd('resolve.planOrder') }}
           <span v-for="(p, i) in resolution.plan_order" :key="p.credential_id">
             {{ i > 0 ? ' → ' : '' }}#{{ p.credential_id }} ({{ p.raw_model }})
           </span>
@@ -1067,22 +1084,22 @@ onUnmounted(() => stopPoll())
         <div class="card-toolbar">
           <div class="toolbar-left">
             <span class="layer-tag l2">L2</span>
-            <span class="toolbar-title">路由候选 — {{ modelInput }}</span>
+            <span class="toolbar-title">{{ rd('resolve.candidates') }} — {{ modelInput }}</span>
           </div>
           <label v-if="resolveUnavailableCount > 0" class="show-unavail">
             <input type="checkbox" v-model="showUnavailable" />
-            不可用（{{ resolveUnavailableCount }}）
+            {{ rd('resolve.unavailable', { n: resolveUnavailableCount }) }}
           </label>
         </div>
-        <div v-if="resolveCandidates.length === 0" class="empty-hint">该模型暂无凭据配置</div>
+        <div v-if="resolveCandidates.length === 0" class="empty-hint">{{ rd('resolve.emptyForModel') }}</div>
         <div v-else-if="filteredResolveCandidates.length === 0" class="empty-hint">
-          暂无可用凭据 — {{ resolveUnavailableCount }} 个不可用
+          {{ rd('resolve.noRoutableCreds', { n: resolveUnavailableCount }) }}
         </div>
         <div v-else class="table-wrap">
           <table class="dense-table">
             <thead>
               <tr>
-                <th>得分</th><th>供应商</th><th>凭据</th><th>上游</th><th>Tier</th><th>计费</th><th>状态</th>
+                <th>{{ rd('resolve.colScore') }}</th><th>{{ rd('resolve.colProvider') }}</th><th>{{ rd('resolve.colCredential') }}</th><th>{{ rd('resolve.colUpstream') }}</th><th>Tier</th><th>{{ rd('resolve.colBilling') }}</th><th>{{ rd('resolve.colStatus') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -1102,7 +1119,7 @@ onUnmounted(() => stopPoll())
                 <td>{{ c.billing_mode || 'token' }}<span v-if="c.billing_round === 2" class="text-muted"> R2</span></td>
                 <td>
                   <span class="badge" :class="c.routable ? 'badge-green' : 'badge-red'">
-                    {{ c.routable ? '可路由' : '不可用' }}
+                    {{ c.routable ? rd('resolve.routable') : rd('resolve.unroutable') }}
                   </span>
                 </td>
               </tr>
@@ -1112,19 +1129,19 @@ onUnmounted(() => stopPoll())
       </div>
 
       <div v-if="resolved && resolveCandidates.length" class="card compact-card">
-        <div class="section-head tight"><h3>本次 L2 漏斗</h3></div>
+        <div class="section-head tight"><h3>{{ rd('resolve.l2Funnel') }}</h3></div>
         <CredentialFunnel :stages="resolveFunnelStages" :model="modelInput" />
       </div>
 
       <div v-if="resolveLog.length" class="card compact-card">
         <div class="card-toolbar">
-          <div class="toolbar-left"><span class="toolbar-title">运行记录</span></div>
-          <button class="btn btn-ghost btn-sm" @click="clearResolveLog">清空</button>
+          <div class="toolbar-left"><span class="toolbar-title">{{ rd('resolve.runLogTitle') }}</span></div>
+          <button class="btn btn-ghost btn-sm" @click="clearResolveLog">{{ rd('resolve.clear') }}</button>
         </div>
         <div class="table-wrap">
           <table class="dense-table">
             <thead>
-              <tr><th>时间</th><th>模型</th><th>Profile</th><th>路径</th><th>可路由</th><th>Top凭据</th><th></th></tr>
+              <tr><th>{{ rd('resolve.colTime') }}</th><th>{{ rd('overview.colModel') }}</th><th>Profile</th><th>{{ rd('resolve.colPath') }}</th><th>{{ rd('resolve.colRoutable') }}</th><th>{{ rd('resolve.colTopCred') }}</th><th></th></tr>
             </thead>
             <tbody>
               <tr v-for="(e, i) in resolveLog" :key="i">
@@ -1134,7 +1151,7 @@ onUnmounted(() => stopPoll())
                 <td class="mono-sm text-muted">{{ e.path }}</td>
                 <td>{{ e.routable }}/{{ e.total }}</td>
                 <td>{{ e.top_cred != null ? '#' + e.top_cred : '—' }}</td>
-                <td><button class="btn btn-ghost btn-sm" @click="replayFromLog(e)">重查</button></td>
+                <td><button class="btn btn-ghost btn-sm" @click="replayFromLog(e)">{{ rd('resolve.replay') }}</button></td>
               </tr>
             </tbody>
           </table>
@@ -1148,15 +1165,15 @@ onUnmounted(() => stopPoll())
       <div class="card compact-card flat-card">
         <div class="live-grid">
           <div class="live-sim">
-            <div class="section-head tight"><h3>路由模拟</h3></div>
+            <div class="section-head tight"><h3>{{ rd('live.simulatorTitle') }}</h3></div>
             <div class="sim-row">
-              <input v-model="simPrompt" placeholder="输入 prompt 测试 L1→L2…" class="sim-input" />
+              <input v-model="simPrompt" :placeholder="rd('live.simulatorPlaceholder')" class="sim-input" />
               <select v-model="simProfile" class="sim-select">
-                <option value="smart">智能</option>
-                <option value="speed_first">速度</option>
-                <option value="cost_first">成本</option>
+                <option value="smart">{{ rd('overview.profileSmart') }}</option>
+                <option value="speed_first">{{ rd('overview.profileSpeed') }}</option>
+                <option value="cost_first">{{ rd('overview.profileCost') }}</option>
               </select>
-              <button class="btn btn-primary btn-sm" :disabled="simLoading" @click="runSim">{{ simLoading ? '…' : '模拟' }}</button>
+              <button class="btn btn-primary btn-sm" :disabled="simLoading" @click="runSim">{{ simLoading ? '…' : rd('live.simulate') }}</button>
             </div>
             <div v-if="simResult" class="sim-out">
               <div v-if="simResult.error" class="alert alert-danger compact-alert">{{ simResult.error }}</div>
@@ -1173,7 +1190,7 @@ onUnmounted(() => stopPoll())
           <div class="live-dist">
             <div class="dist-mini">
               <div class="dist-col">
-                <h4>任务</h4>
+                <h4>{{ rd('live.distTask') }}</h4>
                 <div v-for="[task, count] in distEntries(audit.task_distribution).slice(0, 5)" :key="task" class="dist-row">
                   <span class="dist-label">{{ task }}</span>
                   <div class="dist-bar-bg"><div class="dist-bar-fill" :style="{ width: (count / distMax(audit.task_distribution) * 100) + '%' }" /></div>
@@ -1196,12 +1213,12 @@ onUnmounted(() => stopPoll())
       <!-- Decisions -->
       <div class="card compact-card">
         <div class="section-head">
-          <h3>最近决策</h3>
+          <h3>{{ rd('live.recentDecisionsTitle') }}</h3>
           <label class="auto-toggle"><input type="checkbox" v-model="autoRefresh" /> 5s</label>
         </div>
         <div class="table-wrap">
           <table v-if="decisions.length" class="dense-table">
-            <thead><tr><th>时间</th><th>任务</th><th>Profile</th><th>模型</th><th>置信</th><th>状态</th><th></th></tr></thead>
+            <thead><tr><th>{{ rd('resolve.colTime') }}</th><th>{{ rd('live.colTask') }}</th><th>Profile</th><th>{{ rd('overview.colModel') }}</th><th>{{ rd('live.colConfidence') }}</th><th>{{ rd('resolve.colStatus') }}</th><th></th></tr></thead>
             <tbody>
               <template v-for="d in decisions" :key="d.request_id">
                 <tr
@@ -1237,7 +1254,7 @@ onUnmounted(() => stopPoll())
               </template>
             </tbody>
           </table>
-          <div v-else class="text-muted">暂无最近决策</div>
+          <div v-else class="text-muted">{{ rd('live.noDecisions') }}</div>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getAdminMaasModelRates,
   updateAdminMaasSettings,
@@ -12,6 +13,10 @@ import {
 } from '../api'
 import ModelCatalogFilterBar from '../components/ModelCatalogFilterBar.vue'
 import { useModelCatalogFilters } from '../composables/useModelCatalogFilters'
+
+const { t } = useI18n()
+const smp = (k: string, params?: Record<string, unknown>): string =>
+  t(`standardModelPricing.${k}` as never, params as never)
 
 type RateField = 'in' | 'out' | 'cache_in' | 'cache_out'
 
@@ -41,7 +46,7 @@ const {
   clearFilters: clearCatalogFilters,
 } = useModelCatalogFilters<AdminMaasModelRate>({
   items: models,
-  getVendor: (m) => m.vendor?.trim() || '其他',
+  getVendor: (m) => m.vendor?.trim() || smp('filter.otherVendor'),
   getCanonicalName: (m) => m.canonical_name,
   getDisplayName: (m) => m.display_name,
   matchExtra: (m, mode) => {
@@ -128,7 +133,7 @@ async function load() {
       global_discount: rates.settings.global_discount ?? 1,
     }
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : smp('error.loadFailed')
   } finally {
     loading.value = false
   }
@@ -149,10 +154,10 @@ async function saveSettings() {
       global_discount: settings.value.global_discount ?? 1,
       currency_display: settings.value.currency_display,
     })
-    settingsMsg.value = '全局基准已保存（仅影响未手工定价的维度）'
+    settingsMsg.value = smp('settings.saved')
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '保存失败'
+    error.value = e instanceof Error ? e.message : smp('error.saveFailed')
   } finally {
     savingSettings.value = false
   }
@@ -179,7 +184,7 @@ function closeEdit() {
 async function saveEdit() {
   if (!editRow.value) return
   if (!editForm.value.manual_in && !editForm.value.manual_out && !editForm.value.manual_cache_in && !editForm.value.manual_cache_out) {
-    error.value = '请至少勾选一个「手工定价」维度'
+    error.value = smp('editModal.needOneManual')
     return
   }
   savingRow.value = true
@@ -189,7 +194,7 @@ async function saveEdit() {
     closeEdit()
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '保存失败'
+    error.value = e instanceof Error ? e.message : smp('error.saveFailed')
   } finally {
     savingRow.value = false
   }
@@ -197,13 +202,13 @@ async function saveEdit() {
 
 async function resetAll(row: AdminMaasModelRate) {
   if (!row.is_custom) return
-  if (!confirm(`恢复 ${row.canonical_name} 全部维度为全局基准？`)) return
+  if (!confirm(smp('editModal.resetConfirm', { name: row.canonical_name }))) return
   error.value = ''
   try {
     await deleteAdminMaasModelRate(row.canonical_id)
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '恢复失败'
+    error.value = e instanceof Error ? e.message : smp('error.resetFailed')
   }
 }
 
@@ -214,7 +219,7 @@ async function resetField(row: AdminMaasModelRate, field: RateField) {
     if (editRow.value?.canonical_id === row.canonical_id) closeEdit()
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '恢复失败'
+    error.value = e instanceof Error ? e.message : smp('error.resetFailed')
   }
 }
 
@@ -225,11 +230,11 @@ function fillGlobalToEdit() {
   editForm.value.credits_per_1m_cache_out = effectiveGlobal('cache_out')
 }
 
-const rateFields: { key: RateField; label: string; formKey: keyof MaasModelRateUpsert; manualKey: keyof MaasModelRateUpsert; valueKey: keyof AdminMaasModelRate; manualFlag: keyof AdminMaasModelRate }[] = [
-  { key: 'in', label: '输入', formKey: 'credits_per_1m_in', manualKey: 'manual_in', valueKey: 'credits_per_1m_in', manualFlag: 'manual_in' },
-  { key: 'out', label: '输出', formKey: 'credits_per_1m_out', manualKey: 'manual_out', valueKey: 'credits_per_1m_out', manualFlag: 'manual_out' },
-  { key: 'cache_in', label: '缓存读', formKey: 'credits_per_1m_cache_in', manualKey: 'manual_cache_in', valueKey: 'credits_per_1m_cache_in', manualFlag: 'manual_cache_in' },
-  { key: 'cache_out', label: '缓存写', formKey: 'credits_per_1m_cache_out', manualKey: 'manual_cache_out', valueKey: 'credits_per_1m_cache_out', manualFlag: 'manual_cache_out' },
+const rateFields: { key: RateField; formKey: keyof MaasModelRateUpsert; manualKey: keyof MaasModelRateUpsert; valueKey: keyof AdminMaasModelRate; manualFlag: keyof AdminMaasModelRate }[] = [
+  { key: 'in', formKey: 'credits_per_1m_in', manualKey: 'manual_in', valueKey: 'credits_per_1m_in', manualFlag: 'manual_in' },
+  { key: 'out', formKey: 'credits_per_1m_out', manualKey: 'manual_out', valueKey: 'credits_per_1m_out', manualFlag: 'manual_out' },
+  { key: 'cache_in', formKey: 'credits_per_1m_cache_in', manualKey: 'manual_cache_in', valueKey: 'credits_per_1m_cache_in', manualFlag: 'manual_cache_in' },
+  { key: 'cache_out', formKey: 'credits_per_1m_cache_out', manualKey: 'manual_cache_out', valueKey: 'credits_per_1m_cache_out', manualFlag: 'manual_cache_out' },
 ]
 
 onMounted(load)
@@ -238,57 +243,54 @@ onMounted(load)
 <template>
   <div class="pricing-page">
     <div class="page-header">
-      <h2>定价管理</h2>
+      <h2>{{ smp('page.title') }}</h2>
       <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
-        {{ loading ? '加载中…' : '刷新' }}
+        {{ loading ? smp('page.refreshLoading') : smp('page.refresh') }}
       </button>
     </div>
 
-    <p class="page-desc">
-      租户侧销售定价（积分/1M Token）。全局基准 × 折扣系数应用于<strong>未手工定价</strong>的维度；
-      已勾选「手工」的字段不受全局变更影响。
-    </p>
+    <p class="page-desc" v-html="smp('desc')" />
 
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
     <div v-if="settingsMsg" class="alert alert-success">{{ settingsMsg }}</div>
 
     <div v-if="settings" class="card settings-card">
-      <h3 class="section-title">全局基准（积分 / 1M Token）</h3>
+      <h3 class="section-title">{{ smp('settings.title') }}</h3>
       <div class="settings-grid">
         <label class="field">
-          <span class="field-label">输入 Token</span>
+          <span class="field-label">{{ smp('settings.inputToken') }}</span>
           <input v-model.number="settings.base_credits_per_1m_in" type="number" min="1" class="input compact" />
-          <span class="field-hint">生效 ≈ {{ fmtCredits(effectiveGlobal('in')) }}（含折扣）</span>
+          <span class="field-hint">{{ smp('settings.effective', { value: fmtCredits(effectiveGlobal('in')) }) }}</span>
         </label>
         <label class="field">
-          <span class="field-label">输出 Token</span>
+          <span class="field-label">{{ smp('settings.outputToken') }}</span>
           <input v-model.number="settings.base_credits_per_1m_out" type="number" min="1" class="input compact" />
-          <span class="field-hint">生效 ≈ {{ fmtCredits(effectiveGlobal('out')) }}</span>
+          <span class="field-hint">{{ smp('settings.effective', { value: fmtCredits(effectiveGlobal('out')) }) }}</span>
         </label>
         <label class="field">
-          <span class="field-label">缓存读 Token</span>
+          <span class="field-label">{{ smp('settings.cacheReadToken') }}</span>
           <input v-model.number="settings.base_credits_per_1m_cache_in" type="number" min="1" class="input compact" />
-          <span class="field-hint">生效 ≈ {{ fmtCredits(effectiveGlobal('cache_in')) }}</span>
+          <span class="field-hint">{{ smp('settings.effective', { value: fmtCredits(effectiveGlobal('cache_in')) }) }}</span>
         </label>
         <label class="field">
-          <span class="field-label">缓存写 Token</span>
+          <span class="field-label">{{ smp('settings.cacheWriteToken') }}</span>
           <input v-model.number="settings.base_credits_per_1m_cache_out" type="number" min="1" class="input compact" />
-          <span class="field-hint">生效 ≈ {{ fmtCredits(effectiveGlobal('cache_out')) }}</span>
+          <span class="field-hint">{{ smp('settings.effective', { value: fmtCredits(effectiveGlobal('cache_out')) }) }}</span>
         </label>
         <label class="field">
-          <span class="field-label">整体折扣</span>
+          <span class="field-label">{{ smp('settings.discount') }}</span>
           <div class="discount-row">
             <input v-model.number="discountPercent" type="range" min="10" max="100" step="1" class="discount-slider" />
             <span class="discount-val">{{ discountPercent }}%</span>
           </div>
-          <span class="field-hint">对所有非手工维度统一打折</span>
+          <span class="field-hint">{{ smp('settings.discountHint') }}</span>
         </label>
         <label class="field">
-          <span class="field-label">积分单价（分/积分）</span>
+          <span class="field-label">{{ smp('settings.centsPerCredit') }}</span>
           <input v-model.number="settings.cents_per_credit" type="number" min="0.0001" step="0.0001" class="input compact" />
         </label>
         <label class="field">
-          <span class="field-label">展示币种</span>
+          <span class="field-label">{{ smp('settings.currencyDisplay') }}</span>
           <select v-model="settings.currency_display" class="input compact">
             <option value="CNY">CNY</option>
             <option value="USD">USD</option>
@@ -297,10 +299,10 @@ onMounted(load)
       </div>
       <div class="settings-actions">
         <button class="btn btn-primary btn-sm" :disabled="savingSettings" @click="saveSettings">
-          {{ savingSettings ? '保存中…' : '保存全局设置' }}
+          {{ savingSettings ? smp('settings.saving') : smp('settings.save') }}
         </button>
         <span class="cf-meta">
-          手工 {{ customCount }} · 全局 {{ defaultCount }} / {{ models.length }}
+          {{ smp('filter.summary', { custom: customCount, defaults: defaultCount, total: models.length }) }}
         </span>
       </div>
     </div>
@@ -311,9 +313,9 @@ onMounted(load)
       v-model:extra-filter="filterMode"
       :vendor-options="vendorOptions"
       :count="filtered.length"
-      picker-title="定价管理 · 模型筛选"
-      picker-placeholder="搜索标准模型…"
-      status-label="全部定价"
+      :picker-title="smp('filter.title')"
+      :picker-placeholder="smp('filter.placeholder')"
+      :status-label="smp('filter.allPricing')"
       :status-options="pricingStatusOptions"
       @clear="clearCatalogFilters"
     />
@@ -322,16 +324,16 @@ onMounted(load)
       <table class="data-table pricing-table">
         <thead>
           <tr>
-            <th>标准模型</th>
-            <th>厂家</th>
-            <th v-for="f in rateFields" :key="f.key" class="num">{{ f.label }}</th>
-            <th>状态</th>
-            <th></th>
+            <th>{{ smp('table.colModel') }}</th>
+            <th>{{ smp('table.colVendor') }}</th>
+            <th v-for="f in rateFields" :key="f.key" class="num">{{ smp(`field.${f.key}`) }}</th>
+            <th>{{ smp('table.colStatus') }}</th>
+            <th>{{ smp('table.colActions') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!loading && filtered.length === 0">
-            <td :colspan="4 + rateFields.length" class="empty-cell">暂无模型</td>
+            <td :colspan="4 + rateFields.length" class="empty-cell">{{ smp('table.empty') }}</td>
           </tr>
           <tr v-for="row in filtered" :key="row.canonical_id">
             <td>
@@ -341,16 +343,16 @@ onMounted(load)
             <td class="cell-muted">{{ row.vendor || '—' }}</td>
             <td v-for="f in rateFields" :key="f.key" class="num rate-cell">
               <span>{{ fmtCredits(row[f.valueKey] as number) }}</span>
-              <span v-if="row[f.manualFlag]" class="manual-tag" title="手工定价">手</span>
+              <span v-if="row[f.manualFlag]" class="manual-tag" :title="smp('table.manualTagTitle')">{{ smp('table.manualTag') }}</span>
             </td>
             <td>
-              <span v-if="!row.is_custom" class="badge badge-gray">全局</span>
-              <span v-else-if="isFullyManual(row)" class="badge badge-blue">全手工</span>
-              <span v-else class="badge badge-yellow">{{ manualCount(row) }}/4 手工</span>
+              <span v-if="!row.is_custom" class="badge badge-gray">{{ smp('table.statusDefault') }}</span>
+              <span v-else-if="isFullyManual(row)" class="badge badge-blue">{{ smp('table.statusFullCustom') }}</span>
+              <span v-else class="badge badge-yellow">{{ smp('table.statusPartialCustom', { n: manualCount(row) }) }}</span>
             </td>
             <td class="actions">
-              <button class="btn btn-ghost btn-sm" @click="openEdit(row)">定价</button>
-              <button v-if="row.is_custom" class="btn btn-ghost btn-sm" @click="resetAll(row)">恢复</button>
+              <button class="btn btn-ghost btn-sm" @click="openEdit(row)">{{ smp('table.edit') }}</button>
+              <button v-if="row.is_custom" class="btn btn-ghost btn-sm" @click="resetAll(row)">{{ smp('table.reset') }}</button>
             </td>
           </tr>
         </tbody>
@@ -359,20 +361,20 @@ onMounted(load)
 
     <div v-if="editRow" class="modal-backdrop" @click.self="closeEdit">
       <div class="modal card">
-        <h3 class="section-title">手工定价 · {{ editRow.display_name }}</h3>
+        <h3 class="section-title">{{ smp('editModal.title', { name: editRow.display_name }) }}</h3>
         <code class="mono-sm modal-code">{{ editRow.canonical_name }}</code>
-        <p class="modal-hint">勾选「手工」并填写积分；未勾选维度继续跟随全局基准 × 折扣。</p>
+        <p class="modal-hint">{{ smp('editModal.hint') }}</p>
         <div class="edit-grid">
           <div v-for="f in rateFields" :key="f.key" class="edit-field">
             <label class="edit-head">
               <input v-model="editForm[f.manualKey]" type="checkbox" />
-              <span>{{ f.label }} · 手工定价</span>
+              <span>{{ smp(`field.${f.key}`) }}{{ smp('editModal.fieldSuffix') }}</span>
               <button
                 v-if="editRow[f.manualFlag]"
                 type="button"
                 class="link-sm"
                 @click="resetField(editRow, f.key)"
-              >恢复基准</button>
+              >{{ smp('editModal.resetBase') }}</button>
             </label>
             <input
               v-model.number="editForm[f.formKey]"
@@ -381,15 +383,15 @@ onMounted(load)
               class="input compact"
               :disabled="!editForm[f.manualKey]"
             />
-            <span class="field-hint">全局 ≈ {{ fmtCredits(effectiveGlobal(f.key)) }}</span>
+            <span class="field-hint">{{ smp('editModal.globalApprox', { value: fmtCredits(effectiveGlobal(f.key)) }) }}</span>
           </div>
         </div>
         <div class="modal-actions">
           <button class="btn btn-primary btn-sm" :disabled="savingRow" @click="saveEdit">
-            {{ savingRow ? '保存中…' : '保存' }}
+            {{ savingRow ? smp('editModal.saving') : smp('editModal.save') }}
           </button>
-          <button class="btn btn-ghost btn-sm" type="button" @click="fillGlobalToEdit">填入当前全局</button>
-          <button class="btn btn-ghost btn-sm" type="button" @click="closeEdit">取消</button>
+          <button class="btn btn-ghost btn-sm" type="button" @click="fillGlobalToEdit">{{ smp('editModal.fillGlobal') }}</button>
+          <button class="btn btn-ghost btn-sm" type="button" @click="closeEdit">{{ smp('editModal.cancel') }}</button>
         </div>
       </div>
     </div>

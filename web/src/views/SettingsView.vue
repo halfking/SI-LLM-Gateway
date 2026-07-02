@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   listSettings,
   getSetting,
@@ -8,6 +9,11 @@ import {
   type SettingItem,
   type SettingSpec,
 } from '../api'
+
+const { t } = useI18n()
+// Short alias for the settings locale namespace.
+const s = (k: string, params?: Record<string, unknown>): string =>
+  t(`settings.${k}` as never, params as never)
 
 const items = ref<SettingItem[]>([])
 const loading = ref(false)
@@ -21,19 +27,24 @@ const editBuffer = ref<string>('') // JSON text editor
 const filterCategory = ref<string>('')
 
 const categories = [
-  { key: '',                   label: '全部',  icon: '📋' },
-  { key: 'compression',        label: '压缩',  icon: '🗜'  },
-  { key: 'rate_limit',         label: '限流',  icon: '🚦'  },
-  { key: 'timeout',            label: '超时',  icon: '⏱'  },
-  { key: 'routing',            label: '路由',  icon: '🔀'  },
-  { key: 'session',            label: '会话',  icon: '💬'  },
-  { key: 'security',           label: '安全',  icon: '🔐'  },
-  { key: 'circuit_breaker',    label: '熔断',  icon: '⚡'  },
-  { key: 'general',            label: '其他',  icon: '⚙️' },
+  { key: '',                   labelKey: 'category.all',         icon: '📋' },
+  { key: 'compression',        labelKey: 'category.compression',  icon: '🗜'  },
+  { key: 'rate_limit',         labelKey: 'category.rateLimit',    icon: '🚦'  },
+  { key: 'timeout',            labelKey: 'category.timeout',      icon: '⏱'  },
+  { key: 'routing',            labelKey: 'category.routing',      icon: '🔀'  },
+  { key: 'session',            labelKey: 'category.session',      icon: '💬'  },
+  { key: 'security',           labelKey: 'category.security',     icon: '🔐'  },
+  { key: 'circuit_breaker',    labelKey: 'category.circuitBreaker', icon: '⚡'  },
+  { key: 'general',            labelKey: 'category.general',      icon: '⚙️' },
 ]
 
 function dangerLabel(level: number): string {
-  return ['', '🟡 注意', '🟠 警告', '🔴 危险'][level] || ''
+  const map: Record<number, string> = {
+    1: s('dangerLevel.note'),
+    2: s('dangerLevel.warn'),
+    3: s('dangerLevel.danger'),
+  }
+  return map[level] || ''
 }
 
 async function loadList() {
@@ -43,7 +54,7 @@ async function loadList() {
     const r = await listSettings({ category: filterCategory.value || undefined })
     items.value = r.items
   } catch (e: any) {
-    error.value = e.message || '加载失败'
+    error.value = e.message || s('detail.errors.loadListFailed')
   } finally {
     loading.value = false
   }
@@ -56,7 +67,7 @@ async function selectKey(key: string) {
     selected.value = resp.spec
     currentValue.value = resp.value
     currentSource.value = resp.source
-    
+
     // Smart initialization based on type
     if (resp.spec.type === 'bool') {
       editBuffer.value = String(resp.value ?? resp.spec.default)
@@ -66,7 +77,7 @@ async function selectKey(key: string) {
       editBuffer.value = JSON.stringify(resp.value ?? resp.spec.default, null, 2)
     }
   } catch (e: any) {
-    error.value = e.message || '加载详情失败'
+    error.value = e.message || s('detail.errors.loadDetailFailed')
   }
 }
 
@@ -82,7 +93,7 @@ async function save() {
     } else if (selected.value.type === 'int' || selected.value.type === 'float') {
       parsed = Number(editBuffer.value)
       if (isNaN(parsed)) {
-        throw new Error('请输入有效的数字')
+        throw new Error(s('detail.errors.invalidNumber'))
       }
     } else if (selected.value.type === 'string') {
       parsed = String(editBuffer.value)
@@ -90,12 +101,12 @@ async function save() {
       // Fallback to JSON parsing
       parsed = JSON.parse(editBuffer.value)
     }
-    
+
     await updateSetting(selectedKey.value, { value: parsed })
     await loadList()
     await selectKey(selectedKey.value)
   } catch (e: any) {
-    error.value = e.message || '保存失败'
+    error.value = e.message || s('detail.errors.saveFailed')
   } finally {
     saving.value = false
   }
@@ -105,14 +116,14 @@ async function save() {
 function getEnumLabel(key: string, value: any): string {
   const labels: Record<string, Record<string, string>> = {
     'compression.mode': {
-      '0': '0 - 关闭 (off)',
-      '1': '1 - 自动阈值 (auto_threshold)',
-      '2': '2 - 4xx时压缩 (on_4xx)',
+      '0': s('compression.enumLabels.off'),
+      '1': s('compression.enumLabels.auto'),
+      '2': s('compression.enumLabels.on4xx'),
     },
     'compression.strategy': {
-      'naive': 'naive - 朴素压缩',
-      'smart': 'smart - 智能压缩',
-      'adaptive': 'adaptive - 自适应压缩',
+      'naive': s('compression.strategyEnum.naive'),
+      'smart': s('compression.strategyEnum.smart'),
+      'adaptive': s('compression.strategyEnum.adaptive'),
     },
   }
   return labels[key]?.[String(value)] || String(value)
@@ -122,9 +133,9 @@ function getEnumLabel(key: string, value: any): string {
 function getEnumDescription(key: string, value: string): string {
   const descriptions: Record<string, Record<string, string>> = {
     'compression.mode': {
-      '0': '完全关闭消息压缩功能',
-      '1': '当消息长度超过context window阈值时自动压缩',
-      '2': '收到4xx错误（如context_length_exceeded）时触发压缩',
+      '0': s('compression.enumDescriptions.off'),
+      '1': s('compression.enumDescriptions.auto'),
+      '2': s('compression.enumDescriptions.on4xx'),
     },
   }
   return descriptions[key]?.[value] || ''
@@ -132,69 +143,42 @@ function getEnumDescription(key: string, value: string): string {
 
 // Get detailed documentation for settings
 function getSettingDocs(key: string): { title: string; content: string } | null {
-  const docs: Record<string, { title: string; content: string }> = {
+  const docs: Record<string, { titleKey: string; contentKey: string }> = {
     'compression.mode': {
-      title: '📖 压缩模式详解',
-      content: `<p><strong>压缩模式</strong>控制系统如何处理超长对话上下文：</p>
-<ul>
-  <li><code>0 (off)</code> - 关闭压缩，当上下文超限时直接返回错误</li>
-  <li><code>1 (auto_threshold)</code> - 预判模式，当消息长度接近模型的context window时主动压缩</li>
-  <li><code>2 (on_4xx)</code> - 响应式模式，收到4xx错误后压缩并重试【推荐】</li>
-</ul>
-<p class="docs-note">💡 <strong>推荐使用模式2</strong>：仅在必要时压缩，避免不必要的性能开销</p>`
+      titleKey: 'docs.compressionModeTitle',
+      contentKey: 'docs.compressionModeContent',
     },
     'cache.enabled': {
-      title: '📖 会话缓存详解',
-      content: `<p><strong>会话缓存</strong>控制是否启用L1/L2/L3三级缓存：</p>
-<ul>
-  <li><strong>L1</strong> - 内存缓存（最快）</li>
-  <li><strong>L2</strong> - Redis缓存（中等）</li>
-  <li><strong>L3</strong> - 数据库缓存（最慢）</li>
-</ul>
-<p class="docs-note">⚠️ 关闭后所有会话状态将不被保存，影响上下文连续性</p>`
+      titleKey: 'docs.cacheEnabledTitle',
+      contentKey: 'docs.cacheEnabledContent',
     },
     'format_conversion.enabled': {
-      title: '📖 格式转换详解',
-      content: `<p><strong>格式转换</strong>允许不同协议之间的请求格式自动转换：</p>
-<ul>
-  <li><strong>Q2路径</strong>：Anthropic格式 → OpenAI模型</li>
-  <li><strong>Q3路径</strong>：OpenAI格式 → Anthropic模型</li>
-</ul>
-<p class="docs-note">💡 支持Provider级别覆盖，可针对特定供应商禁用转换</p>`
+      titleKey: 'docs.formatConversionTitle',
+      contentKey: 'docs.formatConversionContent',
     },
     'rate_limit_rpm': {
-      title: '📖 RPM限流详解',
-      content: `<p><strong>RPM (Requests Per Minute)</strong> 限制每个租户每分钟的请求次数：</p>
-<ul>
-  <li>适用于粗粒度的流量控制</li>
-  <li>基于滑动窗口算法，精确到秒级</li>
-  <li>超限后返回429状态码</li>
-</ul>
-<p class="docs-note">⚠️ <strong>租户级配置</strong>：此设置需要指定tenant_id，在租户管理页面设置</p>`
+      titleKey: 'docs.rateLimitRpmTitle',
+      contentKey: 'docs.rateLimitRpmContent',
     },
     'rate_limit_concurrent': {
-      title: '📖 并发限流详解',
-      content: `<p><strong>并发限流</strong>限制每个租户同时处理的请求数量：</p>
-<ul>
-  <li>适用于保护系统资源，防止单个租户占用过多连接</li>
-  <li>基于计数器实现，响应速度快</li>
-  <li>超限后排队或返回429</li>
-</ul>
-<p class="docs-note">⚠️ <strong>租户级配置</strong>：此设置需要指定tenant_id，在租户管理页面设置</p>`
+      titleKey: 'docs.rateLimitConcurrentTitle',
+      contentKey: 'docs.rateLimitConcurrentContent',
     },
   }
-  return docs[key] || null
+  const e = docs[key]
+  if (!e) return null
+  return { title: s(e.titleKey), content: s(e.contentKey) }
 }
 
 async function rollback() {
   if (!selectedKey.value) return
-  if (!confirm(`确认回滚 ${selectedKey.value} 到上次的值？`)) return
+  if (!confirm(s('detail.errors.confirmRollback', { key: selectedKey.value }))) return
   try {
     await rollbackSetting(selectedKey.value)
     await loadList()
     await selectKey(selectedKey.value)
   } catch (e: any) {
-    error.value = e.message || '回滚失败'
+    error.value = e.message || s('detail.errors.rollbackFailed')
   }
 }
 
@@ -217,23 +201,23 @@ const filteredCount = computed(() => items.value.length)
           @click="switchCategory(c.key)"
         >
           <span class="cat-icon">{{ c.icon }}</span>
-          <span class="cat-label">{{ c.label }}</span>
+          <span class="cat-label">{{ s(c.labelKey) }}</span>
         </button>
       </aside>
 
       <section class="list-pane">
         <div class="list-header">
-          <span>共 {{ filteredCount }} 个设置</span>
+          <span>{{ s('list.total', { n: filteredCount }) }}</span>
         </div>
-        <div v-if="loading" class="loading">加载中…</div>
-        <div v-else-if="!items.length" class="empty">该类别暂无设置</div>
+        <div v-if="loading" class="loading">{{ s('list.loading') }}</div>
+        <div v-else-if="!items.length" class="empty">{{ s('list.empty') }}</div>
         <table v-else class="settings-table">
           <thead>
             <tr>
-              <th>设置</th>
-              <th>当前值</th>
-              <th>来源</th>
-              <th>危险</th>
+              <th>{{ s('list.table.setting') }}</th>
+              <th>{{ s('list.table.currentValue') }}</th>
+              <th>{{ s('list.table.source') }}</th>
+              <th>{{ s('list.table.danger') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -263,16 +247,16 @@ const filteredCount = computed(() => items.value.length)
           <code>{{ selectedKey }}</code>
         </h3>
         <p class="detail-desc">{{ selected.description }}</p>
-        
+
         <!-- Tenant-scoped warning -->
         <div v-if="selected.scope === 'tenant'" class="tenant-warning">
           <div class="warning-icon">⚠️</div>
           <div class="warning-content">
-            <strong>租户级配置</strong>
-            <p>此设置作用于单个租户，无法在系统级设置。请前往<strong>租户管理</strong>页面为特定租户配置此项。</p>
+            <strong>{{ s('detail.tenantWarningTitle') }}</strong>
+            <p v-html="s('detail.tenantWarningBody')"></p>
           </div>
         </div>
-        
+
         <!-- Detailed documentation -->
         <div v-if="getSettingDocs(selectedKey)" class="detail-docs">
           <div class="docs-title" v-html="getSettingDocs(selectedKey)!.title"></div>
@@ -280,24 +264,24 @@ const filteredCount = computed(() => items.value.length)
         </div>
 
         <dl class="meta">
-          <dt>类型</dt><dd>{{ selected.type }}</dd>
-          <dt>当前值</dt>
+          <dt>{{ s('detail.type') }}</dt><dd>{{ selected.type }}</dd>
+          <dt>{{ s('detail.currentValue') }}</dt>
           <dd>
             <code class="current-value">{{ JSON.stringify(currentValue) }}</code>
             <span class="src-badge" :class="'src-' + currentSource">{{ currentSource }}</span>
           </dd>
-          <dt>默认值</dt><dd><code>{{ JSON.stringify(selected.default) }}</code></dd>
-          <dt v-if="selected.options">选项</dt>
+          <dt>{{ s('detail.defaultValue') }}</dt><dd><code>{{ JSON.stringify(selected.default) }}</code></dd>
+          <dt v-if="selected.options">{{ s('detail.options') }}</dt>
           <dd v-if="selected.options">
             <code v-for="o in selected.options" :key="o" class="opt-chip">{{ o }}</code>
           </dd>
-          <dt>危险级别</dt><dd>{{ dangerLabel(selected.danger_level) }}</dd>
-          <dt>热重载</dt>
+          <dt>{{ s('detail.dangerLevel') }}</dt><dd>{{ dangerLabel(selected.danger_level) }}</dd>
+          <dt>{{ s('detail.hotReload') }}</dt>
           <dd>
-            <span v-if="selected.hot_reload" class="src-badge src-db">是</span>
-            <span v-else class="src-badge src-default">否（需重启）</span>
+            <span v-if="selected.hot_reload" class="src-badge src-db">{{ s('detail.hotReloadYes') }}</span>
+            <span v-else class="src-badge src-default">{{ s('detail.hotReloadNo') }}</span>
           </dd>
-          <dt v-if="selected.observability">观察点</dt>
+          <dt v-if="selected.observability">{{ s('detail.observability') }}</dt>
           <dd v-if="selected.observability">
             <a :href="selected.observability" target="_blank" rel="noopener">
               <code>{{ selected.observability }}</code>
@@ -306,57 +290,57 @@ const filteredCount = computed(() => items.value.length)
         </dl>
 
         <div v-if="selected.scope !== 'tenant'" class="editor">
-          <label class="editor-label">新值</label>
-          
+          <label class="editor-label">{{ s('editor.newValueLabel') }}</label>
+
           <!-- Boolean type: Switch -->
           <div v-if="selected.type === 'bool'" class="editor-boolean">
             <label class="switch-label">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 v-model="editBuffer"
                 :true-value="'true'"
                 :false-value="'false'"
                 class="switch-input"
               />
               <span class="switch-track"></span>
-              <span class="switch-text">{{ editBuffer === 'true' ? '启用' : '禁用' }}</span>
+              <span class="switch-text">{{ editBuffer === 'true' ? s('editor.enabledText') : s('editor.disabledText') }}</span>
             </label>
           </div>
-          
+
           <!-- Enum type with known options: Select -->
           <div v-else-if="selectedKey === 'compression.mode'" class="editor-select">
             <select v-model="editBuffer" class="select-input">
-              <option value="0">0 - 关闭 (off)</option>
-              <option value="1">1 - 自动阈值 (auto_threshold)</option>
-              <option value="2">2 - 4xx时压缩 (on_4xx) 【推荐】</option>
+              <option value="0">{{ s('compression.selectLabels.off') }}</option>
+              <option value="1">{{ s('compression.selectLabels.auto') }}</option>
+              <option value="2">{{ s('compression.selectLabels.on4xx') }}</option>
             </select>
             <div class="select-hint">
-              <div v-if="editBuffer === '0'" class="hint-item">完全关闭消息压缩功能</div>
-              <div v-else-if="editBuffer === '1'" class="hint-item">当消息长度超过context window阈值时自动压缩</div>
-              <div v-else-if="editBuffer === '2'" class="hint-item">收到4xx错误（如context_length_exceeded）时触发压缩并重试</div>
+              <div v-if="editBuffer === '0'" class="hint-item">{{ s('compression.hint.off') }}</div>
+              <div v-else-if="editBuffer === '1'" class="hint-item">{{ s('compression.hint.auto') }}</div>
+              <div v-else-if="editBuffer === '2'" class="hint-item">{{ s('compression.hint.on4xx') }}</div>
             </div>
           </div>
-          
+
           <!-- Number type: Number input -->
           <div v-else-if="selected.type === 'int' || selected.type === 'float'" class="editor-number">
-            <input 
+            <input
               type="number"
               v-model="editBuffer"
               class="number-input"
               :step="selected.type === 'float' ? '0.01' : '1'"
             />
           </div>
-          
+
           <!-- String type: Text input -->
           <div v-else-if="selected.type === 'string'" class="editor-string">
-            <input 
+            <input
               type="text"
               v-model="editBuffer"
               class="text-input"
-              placeholder="输入字符串值"
+              :placeholder="s('editor.stringPlaceholder')"
             />
           </div>
-          
+
           <!-- Fallback: JSON textarea -->
           <div v-else class="editor-json">
             <textarea
@@ -364,22 +348,22 @@ const filteredCount = computed(() => items.value.length)
               rows="4"
               class="editor-textarea"
               spellcheck="false"
-              placeholder="输入JSON格式的值"
+              :placeholder="s('editor.jsonPlaceholder')"
             />
-            <div class="json-hint">复杂类型请使用JSON格式</div>
+            <div class="json-hint">{{ s('editor.jsonHint') }}</div>
           </div>
-          
+
           <div class="editor-actions">
             <button class="btn btn-primary" :disabled="saving" @click="save">
-              {{ saving ? '保存中…' : '保存' }}
+              {{ saving ? s('editor.saving') : s('editor.save') }}
             </button>
-            <button class="btn btn-ghost" @click="rollback">回滚</button>
+            <button class="btn btn-ghost" @click="rollback">{{ s('editor.rollback') }}</button>
           </div>
         </div>
       </aside>
 
       <div v-else class="detail-pane empty-detail">
-        <p>← 从左侧选择一个设置查看详情</p>
+        <p>{{ s('detail.selectPrompt') }}</p>
       </div>
     </div>
   </div>

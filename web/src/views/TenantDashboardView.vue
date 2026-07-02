@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   getMaasUsageSummary,
   getMaasWallet,
@@ -10,6 +11,7 @@ import {
   type RequestLogRow,
 } from '../api'
 import { getCurrentTenantId } from '../store'
+import { useFormat } from '../i18n/useFormat'
 
 const days = ref(7)
 const summary = ref<MaasUsageSummary | null>(null)
@@ -23,17 +25,21 @@ const detailRows = ref<RequestLogRow[]>([])
 const detailLoading = ref(false)
 const detailTitle = ref('')
 
-const tenantLabel = computed(() => `租户: ${getCurrentTenantId()}`)
+const { t: td } = useI18n()
+const tdash = (k: string, params?: Record<string, unknown>): string => td(`tenants.dashboard.${k}` as never, params as never)
+const { fmtNumber, fmtDate, fmtDateTime } = useFormat()
+
+const tenantLabel = computed(() => tdash('tenantLabel', { id: getCurrentTenantId() }))
 
 const activeSubscription = computed(() => wallet.value?.subscription ?? null)
 
-function fmtDate(s: string | undefined) {
+function fmtDateHuman(s: string | undefined) {
   if (!s) return '—'
-  return new Date(s).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })
+  return fmtDate(s)
 }
 
 function subscriptionPeriod(sub: NonNullable<MaasWallet['subscription']>) {
-  return `${fmtDate(sub.period_start)} — ${fmtDate(sub.period_end)}`
+  return `${fmtDateHuman(sub.period_start)} — ${fmtDateHuman(sub.period_end)}`
 }
 
 const maxModelRequests = computed(() => {
@@ -51,19 +57,9 @@ const maxTrendRequests = computed(() => {
   return Math.max(1, ...rows.map((r) => r.requests))
 })
 
-function fmtNum(n: number | undefined) {
-  if (n === undefined || n === null) return '—'
-  return n.toLocaleString('zh-CN')
-}
-
-function fmtTime(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
-}
-
 function creditsDisplay(v: number | null | undefined) {
   if (v == null) return '—'
-  return v.toLocaleString('zh-CN')
+  return fmtNumber(v)
 }
 
 async function load() {
@@ -80,7 +76,7 @@ async function load() {
     summary.value = s
     wallet.value = w
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : tdash('loadFailed')
   } finally {
     loading.value = false
   }
@@ -101,7 +97,7 @@ async function showModelDetail(model: string) {
   }
   selectedModel.value = model
   selectedDate.value = null
-  detailTitle.value = `模型「${model}」请求明细`
+  detailTitle.value = tdash('detailTitleModel', { model })
   detailLoading.value = true
   try {
     const since = new Date()
@@ -115,7 +111,7 @@ async function showModelDetail(model: string) {
     detailRows.value = res.items ?? []
   } catch (e: unknown) {
     detailRows.value = []
-    error.value = e instanceof Error ? e.message : '明细加载失败'
+    error.value = e instanceof Error ? e.message : tdash('detailLoadFailed')
   } finally {
     detailLoading.value = false
   }
@@ -129,7 +125,7 @@ async function showDateDetail(day: string) {
   }
   selectedDate.value = day
   selectedModel.value = null
-  detailTitle.value = `${day} 请求明细`
+  detailTitle.value = tdash('detailTitleDay', { day })
   detailLoading.value = true
   try {
     const { from, to } = dateRangeForDay(day)
@@ -137,7 +133,7 @@ async function showDateDetail(day: string) {
     detailRows.value = res.items ?? []
   } catch (e: unknown) {
     detailRows.value = []
-    error.value = e instanceof Error ? e.message : '明细加载失败'
+    error.value = e instanceof Error ? e.message : tdash('detailLoadFailed')
   } finally {
     detailLoading.value = false
   }
@@ -150,16 +146,16 @@ onMounted(load)
   <div>
     <div class="page-header">
       <div class="page-header-title">
-        <h2>仪表盘</h2>
+        <h2>{{ tdash('title') }}</h2>
       </div>
       <div class="page-header-actions">
         <span class="tenant-badge">{{ tenantLabel }}</span>
         <select v-model.number="days" class="days-select" @change="load">
-          <option :value="1">今日</option>
-          <option :value="7">近 7 天</option>
-          <option :value="30">近 30 天</option>
+          <option :value="1">{{ tdash('range.today') }}</option>
+          <option :value="7">{{ tdash('range.last7d') }}</option>
+          <option :value="30">{{ tdash('range.last30d') }}</option>
         </select>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">刷新</button>
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">{{ tdash('refresh') }}</button>
       </div>
     </div>
 
@@ -167,51 +163,51 @@ onMounted(load)
 
     <div v-if="wallet" class="subscription-card card">
       <div class="subscription-head">
-        <div class="subscription-title">当前订阅</div>
-        <RouterLink to="/tenant/pricing" class="link-sm">套餐与充值 →</RouterLink>
+        <div class="subscription-title">{{ tdash('subscriptionTitle') }}</div>
+        <RouterLink to="/tenant/pricing" class="link-sm">{{ tdash('goPricing') }}</RouterLink>
       </div>
       <div v-if="activeSubscription" class="subscription-grid">
         <div class="sub-item">
-          <span class="sub-label">套餐</span>
+          <span class="sub-label">{{ tdash('labelPlan') }}</span>
           <span class="sub-value">{{ activeSubscription.plan_name }}</span>
         </div>
         <div class="sub-item">
-          <span class="sub-label">周期</span>
+          <span class="sub-label">{{ tdash('labelPeriod') }}</span>
           <span class="sub-value">{{ subscriptionPeriod(activeSubscription) }}</span>
         </div>
         <div class="sub-item">
-          <span class="sub-label">剩余订阅额度</span>
-          <span class="sub-value highlight">{{ fmtNum(wallet.quota_remaining) }} 积分</span>
+          <span class="sub-label">{{ tdash('labelQuotaRemaining') }}</span>
+          <span class="sub-value highlight">{{ fmtNumber(wallet.quota_remaining) }} {{ tdash('creditsUnit') }}</span>
         </div>
         <div class="sub-item">
-          <span class="sub-label">到期时间</span>
-          <span class="sub-value">{{ fmtDate(activeSubscription.period_end) }}</span>
+          <span class="sub-label">{{ tdash('labelExpiresAt') }}</span>
+          <span class="sub-value">{{ fmtDateHuman(activeSubscription.period_end) }}</span>
         </div>
       </div>
       <div v-else class="subscription-empty">
-        暂无有效订阅。
-        <RouterLink to="/tenant/pricing">前往套餐与充值</RouterLink>
-        开通月包后可优先消耗订阅额度。
+        {{ tdash('noSubscription') }}
+        <RouterLink to="/tenant/pricing">{{ tdash('goPricingLink') }}</RouterLink>
+        {{ tdash('noSubscriptionHint') }}
       </div>
     </div>
 
     <div class="stat-grid" v-if="summary && wallet">
       <div class="stat-card highlight">
-        <div class="label">积分消耗</div>
-        <div class="value">{{ fmtNum(summary.total_credits) }}</div>
+        <div class="label">{{ tdash('statCredits') }}</div>
+        <div class="value">{{ fmtNumber(summary.total_credits) }}</div>
         <div class="sub">近 {{ days }} 天</div>
       </div>
       <div class="stat-card">
-        <div class="label">请求次数</div>
-        <div class="value">{{ fmtNum(summary.total_requests) }}</div>
+        <div class="label">{{ tdash('statRequests') }}</div>
+        <div class="value">{{ fmtNumber(summary.total_requests) }}</div>
         <div class="sub">近 {{ days }} 天</div>
       </div>
       <div class="stat-card">
-        <div class="label">可用积分</div>
-        <div class="value">{{ fmtNum(wallet.total_available) }}</div>
+        <div class="label">{{ tdash('statAvailable') }}</div>
+        <div class="value">{{ fmtNumber(wallet.total_available) }}</div>
         <div class="sub">
-          订阅 {{ fmtNum(wallet.quota_remaining) }} · 信用 {{ fmtNum(wallet.granted_balance) }} · 充值 {{ fmtNum(wallet.purchased_balance) }}
-          <RouterLink to="/tenant/account" class="link-sm">我的账户</RouterLink>
+          {{ tdash('statAvailableSub', { a: fmtNumber(wallet.quota_remaining), b: fmtNumber(wallet.granted_balance), c: fmtNumber(wallet.purchased_balance) }) }}
+          <RouterLink to="/tenant/account" class="link-sm">{{ tdash('myAccountLink') }}</RouterLink>
         </div>
       </div>
     </div>
@@ -220,8 +216,8 @@ onMounted(load)
     </div>
 
     <div class="card chart-card" v-if="summary">
-      <div class="card-title">模型请求排行 <span class="hint">点击柱子查看明细</span></div>
-      <div v-if="!summary.by_model.length" class="empty">暂无模型请求数据</div>
+      <div class="card-title">{{ tdash('chartModelTitle') }} <span class="hint">{{ tdash('chartModelHint') }}</span></div>
+      <div v-if="!summary.by_model.length" class="empty">{{ tdash('chartModelEmpty') }}</div>
       <div v-else class="bar-chart">
         <button
           v-for="row in summary.by_model"
@@ -238,17 +234,17 @@ onMounted(load)
               :style="{ width: (row.requests / maxModelRequests * 100) + '%' }"
             />
           </span>
-          <span class="bar-meta">{{ fmtNum(row.requests) }} 次</span>
+          <span class="bar-meta">{{ fmtNumber(row.requests) }} {{ tdash('chartModelUnit') }}</span>
         </button>
       </div>
     </div>
 
     <div class="card chart-card" v-if="summary">
-      <div class="card-title">使用趋势 <span class="hint">点击数据点查看当日明细</span></div>
-      <div v-if="!summary.trend.length" class="empty">暂无趋势数据</div>
+      <div class="card-title">{{ tdash('chartTrendTitle') }} <span class="hint">{{ tdash('chartTrendHint') }}</span></div>
+      <div v-if="!summary.trend.length" class="empty">{{ tdash('chartTrendEmpty') }}</div>
       <div v-else class="trend-grid">
         <div class="trend-section">
-          <div class="trend-label">积分消耗</div>
+          <div class="trend-label">{{ tdash('chartTrendCredits') }}</div>
           <div class="trend-bars">
             <button
               v-for="row in summary.trend"
@@ -256,7 +252,7 @@ onMounted(load)
               type="button"
               class="trend-col"
               :class="{ active: selectedDate === row.date }"
-              :title="`${row.date}: ${row.credits} 积分`"
+              :title="tdash('chartTrendCreditsTip', { date: row.date, n: row.credits })"
               @click="showDateDetail(row.date)"
             >
               <span
@@ -268,7 +264,7 @@ onMounted(load)
           </div>
         </div>
         <div class="trend-section">
-          <div class="trend-label">请求次数</div>
+          <div class="trend-label">{{ tdash('chartTrendRequests') }}</div>
           <div class="trend-bars">
             <button
               v-for="row in summary.trend"
@@ -276,7 +272,7 @@ onMounted(load)
               type="button"
               class="trend-col"
               :class="{ active: selectedDate === row.date }"
-              :title="`${row.date}: ${row.requests} 次`"
+              :title="tdash('chartTrendRequestsTip', { date: row.date, n: row.requests })"
               @click="showDateDetail(row.date)"
             >
               <span
@@ -291,13 +287,13 @@ onMounted(load)
     </div>
 
     <div class="card chart-card" v-if="summary">
-      <div class="card-title">各模型用量 <span class="hint">请求次数 + 积分消耗</span></div>
+      <div class="card-title">{{ tdash('tableModelUsage') }} <span class="hint">{{ tdash('tableModelUsageHint') }}</span></div>
       <table v-if="summary.by_model.length" class="model-table">
         <thead>
           <tr>
-            <th>模型</th>
-            <th style="text-align:right">请求次数</th>
-            <th style="text-align:right">消耗积分</th>
+            <th>{{ tdash('tableColModel') }}</th>
+            <th style="text-align:right">{{ tdash('tableColRequests') }}</th>
+            <th style="text-align:right">{{ tdash('tableColCredits') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -309,34 +305,34 @@ onMounted(load)
             @click="showModelDetail(row.model)"
           >
             <td><code>{{ row.model }}</code></td>
-            <td class="num">{{ fmtNum(row.requests) }}</td>
-            <td class="num credits">{{ fmtNum(row.credits) }}</td>
+            <td class="num">{{ fmtNumber(row.requests) }}</td>
+            <td class="num credits">{{ fmtNumber(row.credits) }}</td>
           </tr>
         </tbody>
       </table>
-      <div v-else class="empty">暂无数据</div>
+      <div v-else class="empty">{{ tdash('emptyTable') }}</div>
     </div>
 
     <div v-if="detailTitle" class="card detail-card">
       <div class="card-title">{{ detailTitle }}</div>
-      <div v-if="detailLoading" class="empty">加载明细…</div>
+      <div v-if="detailLoading" class="empty">{{ tdash('detailLoading') }}</div>
       <table v-else-if="detailRows.length" class="detail-table">
         <thead>
           <tr>
-            <th>时间</th>
-            <th>模型</th>
-            <th>状态</th>
-            <th style="text-align:right">积分</th>
-            <th>请求 ID</th>
+            <th>{{ tdash('detailColTime') }}</th>
+            <th>{{ tdash('detailColModel') }}</th>
+            <th>{{ tdash('detailColStatus') }}</th>
+            <th style="text-align:right">{{ tdash('detailColCredits') }}</th>
+            <th>{{ tdash('detailColRequestId') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="r in detailRows" :key="r.request_id">
-            <td class="mono">{{ fmtTime(r.ts) }}</td>
+            <td class="mono">{{ fmtDateTime(r.ts) }}</td>
             <td><code>{{ r.client_model || r.outbound_model || '—' }}</code></td>
             <td>
               <span class="badge" :class="r.success ? 'badge-green' : 'badge-red'">
-                {{ r.success ? '成功' : '失败' }}
+                {{ r.success ? tdash('statusOk') : tdash('statusFail') }}
               </span>
             </td>
             <td class="num credits">{{ creditsDisplay(r.credits_charged) }}</td>
@@ -348,10 +344,10 @@ onMounted(load)
           </tr>
         </tbody>
       </table>
-      <div v-else class="empty">该筛选条件下暂无请求记录</div>
+      <div v-else class="empty">{{ tdash('detailEmpty') }}</div>
       <div class="detail-footer">
-        <RouterLink :to="'/request-logs'" class="link-sm">查看全部请求日志 →</RouterLink>
-        <RouterLink :to="'/tenant/usage'" class="link-sm">我的消耗 →</RouterLink>
+        <RouterLink :to="'/request-logs'" class="link-sm">{{ tdash('detailFooterLogs') }}</RouterLink>
+        <RouterLink :to="'/tenant/usage'" class="link-sm">{{ tdash('detailFooterUsage') }}</RouterLink>
       </div>
     </div>
 
@@ -359,11 +355,11 @@ onMounted(load)
       v-if="!loading && summary && summary.total_requests === 0"
       class="empty onboarding"
     >
-      暂无调用数据。前往
-      <RouterLink to="/tenant/models">标准模型</RouterLink>
-      查看可用模型，或到
-      <RouterLink to="/keys">API 密钥</RouterLink>
-      签发密钥后发起调用。
+      {{ tdash('onboarding') }}
+      <RouterLink to="/tenant/models">{{ tdash('onboardingModels') }}</RouterLink>
+      {{ tdash('onboardingModelsHint') }}
+      <RouterLink to="/keys">{{ tdash('onboardingKeys') }}</RouterLink>
+      {{ tdash('onboardingKeysHint') }}
     </div>
   </div>
 </template>

@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getUsers, createUser, updateUser, deleteUser, resetUserPassword, getTenantsAdmin } from '../api'
 import type { Tenant } from '../api'
 import { store, isReadOnlyMode } from '../store'
+import { useFormat } from '../i18n/useFormat'
+
+const { t } = useI18n()
+const u = (k: string, params?: Record<string, unknown>): string => t(`users.${k}` as never, params as never)
+const { fmtDateTime } = useFormat()
 
 const readOnly = computed(() => isReadOnlyMode())
 
@@ -48,7 +54,7 @@ async function load() {
       users.value = users.value.filter(u => u.tenant_id === filterTenant.value)
     }
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : u('error.loadFailed')
   } finally {
     loading.value = false
   }
@@ -56,7 +62,7 @@ async function load() {
 
 async function handleCreate() {
   if (!form.value.username || !form.value.password) {
-    error.value = '用户名和密码不能为空'
+    error.value = u('error.usernamePasswordRequired')
     return
   }
   try {
@@ -65,32 +71,32 @@ async function handleCreate() {
     form.value = { username: '', password: '', tenant_id: 'default', display_name: '', email: '', role: 'tenant_admin' }
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '创建失败'
+    error.value = e instanceof Error ? e.message : u('error.createFailed')
   }
 }
 
-async function handleToggle(u: User) {
+async function handleToggle(u_: User) {
   try {
-    await updateUser(u.id, { enabled: !u.enabled })
+    await updateUser(u_.id, { enabled: !u_.enabled })
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '操作失败'
+    error.value = e instanceof Error ? e.message : u('error.operationFailed')
   }
 }
 
-async function handleDelete(u: User) {
-  if (!confirm(`确认删除用户 ${u.username}？`)) return
+async function handleDelete(u_: User) {
+  if (!confirm(u('confirmDelete', { name: u_.username }))) return
   try {
-    await deleteUser(u.id)
+    await deleteUser(u_.id)
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '删除失败'
+    error.value = e instanceof Error ? e.message : u('error.deleteFailed')
   }
 }
 
 async function handleResetPwd() {
   if (!resetPwdUser.value || newPwd.value.length < 8) {
-    error.value = '密码至少8个字符'
+    error.value = u('error.passwordMinLength')
     return
   }
   try {
@@ -98,17 +104,17 @@ async function handleResetPwd() {
     resetPwdUser.value = null
     newPwd.value = ''
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '重置失败'
+    error.value = e instanceof Error ? e.message : u('error.resetFailed')
   }
 }
 
 function roleLabel(r: string) {
-  return r === 'super_admin' ? '超级管理员' : '租户管理员'
+  return r === 'super_admin' ? u('role.super_admin') : u('role.tenant_admin')
 }
 
 function fmtDate(s: string | null) {
   if (!s) return '-'
-  return new Date(s).toLocaleString('zh-CN')
+  return fmtDateTime(s)
 }
 
 async function loadTenants() {
@@ -122,62 +128,62 @@ onMounted(() => { load(); loadTenants() })
 <template>
   <div class="users-page">
     <div class="page-header">
-      <h1>👤 用户管理</h1>
-      <button v-if="!readOnly" class="btn btn-primary" @click="showCreate = true">+ 新建用户</button>
+      <h1>👤 {{ u('title') }}</h1>
+      <button v-if="!readOnly" class="btn btn-primary" @click="showCreate = true">+ {{ u('create') }}</button>
     </div>
 
     <div v-if="readOnly" class="alert alert-info" style="margin-bottom:12px">
-      📖 您是租户管理员，当前为只读模式。用户管理仅限查看，不能创建、编辑或删除用户。
+      {{ u('readOnlyNotice') }}
     </div>
 
     <div class="filters">
-      <label>按租户过滤:</label>
+      <label>{{ u('filter.byTenant') }}</label>
       <select v-model="filterTenant" @change="load">
-        <option value="">全部租户</option>
-        <option v-for="t in allTenants" :key="t.code" :value="t.code">
-          {{ t.name }} ({{ t.code }})
+        <option value="">{{ u('filter.allTenants') }}</option>
+        <option v-for="tnt in allTenants" :key="tnt.code" :value="tnt.code">
+          {{ tnt.name }} ({{ tnt.code }})
         </option>
       </select>
     </div>
 
     <div v-if="error" class="alert alert-danger" style="margin-bottom:12px">{{ error }}</div>
 
-    <div v-if="loading" class="loading">加载中…</div>
+    <div v-if="loading" class="loading">{{ u('loadingState') }}</div>
 
     <table v-else class="table" style="width:100%">
       <thead>
         <tr>
           <th>ID</th>
-          <th>用户名</th>
-          <th>显示名</th>
-          <th>邮箱</th>
-          <th>租户</th>
-          <th>角色</th>
-          <th>状态</th>
-          <th>最后登录</th>
-          <th>操作</th>
+          <th>{{ u('table.username') }}</th>
+          <th>{{ u('table.displayName') }}</th>
+          <th>{{ u('table.email') }}</th>
+          <th>{{ u('table.tenant') }}</th>
+          <th>{{ u('table.role') }}</th>
+          <th>{{ u('table.status') }}</th>
+          <th>{{ u('table.lastLogin') }}</th>
+          <th>{{ u('table.actions') }}</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="u in users" :key="u.id">
-          <td>{{ u.id }}</td>
-          <td><strong>{{ u.username }}</strong></td>
-          <td>{{ u.display_name || '-' }}</td>
-          <td>{{ u.email || '-' }}</td>
-          <td><code>{{ u.tenant_id }}</code></td>
-          <td><span class="badge" :class="u.role === 'super_admin' ? 'badge-purple' : 'badge-blue'">{{ roleLabel(u.role) }}</span></td>
+        <tr v-for="user in users" :key="user.id">
+          <td>{{ user.id }}</td>
+          <td><strong>{{ user.username }}</strong></td>
+          <td>{{ user.display_name || '-' }}</td>
+          <td>{{ user.email || '-' }}</td>
+          <td><code>{{ user.tenant_id }}</code></td>
+          <td><span class="badge" :class="user.role === 'super_admin' ? 'badge-purple' : 'badge-blue'">{{ roleLabel(user.role) }}</span></td>
           <td>
-            <span v-if="!readOnly" class="badge" :class="u.enabled ? 'badge-green' : 'badge-red'" style="cursor:pointer" @click="handleToggle(u)">
-              {{ u.enabled ? '启用' : '禁用' }}
+            <span v-if="!readOnly" class="badge" :class="user.enabled ? 'badge-green' : 'badge-red'" style="cursor:pointer" @click="handleToggle(user)">
+              {{ user.enabled ? u('status.enabled') : u('status.disabled') }}
             </span>
-            <span v-else class="badge" :class="u.enabled ? 'badge-green' : 'badge-red'">
-              {{ u.enabled ? '启用' : '禁用' }}
+            <span v-else class="badge" :class="user.enabled ? 'badge-green' : 'badge-red'">
+              {{ user.enabled ? u('status.enabled') : u('status.disabled') }}
             </span>
           </td>
-          <td>{{ fmtDate(u.last_login_at) }}</td>
+          <td>{{ fmtDate(user.last_login_at) }}</td>
           <td>
-            <button v-if="!readOnly" class="btn btn-ghost btn-sm" @click="resetPwdUser = u; newPwd = ''">重置密码</button>
-            <button v-if="!readOnly && u.id !== store.userInfo?.id" class="btn btn-ghost btn-sm" style="color:var(--danger)" @click="handleDelete(u)">删除</button>
+            <button v-if="!readOnly" class="btn btn-ghost btn-sm" @click="resetPwdUser = user; newPwd = ''">{{ u('action.resetPassword') }}</button>
+            <button v-if="!readOnly && user.id !== store.userInfo?.id" class="btn btn-ghost btn-sm" style="color:var(--danger)" @click="handleDelete(user)">{{ u('action.delete') }}</button>
             <span v-else-if="readOnly" class="text-muted" style="font-size:12px;color:var(--muted)">—</span>
           </td>
         </tr>
@@ -187,41 +193,41 @@ onMounted(() => { load(); loadTenants() })
     <!-- Create Modal -->
     <div v-if="showCreate" class="modal-backdrop" @click.self="showCreate = false">
       <div class="modal-card">
-        <h3>新建用户</h3>
+        <h3>{{ u('modal.create.title') }}</h3>
         <div class="form-group">
-          <label>用户名 *</label>
+          <label>{{ u('modal.create.username') }} *</label>
           <input v-model="form.username" placeholder="username" />
         </div>
         <div class="form-group">
-          <label>密码 *</label>
-          <input v-model="form.password" type="password" placeholder="至少8位" />
+          <label>{{ u('modal.create.password') }} *</label>
+          <input v-model="form.password" type="password" :placeholder="u('modal.create.passwordPlaceholder')" />
         </div>
         <div class="form-group">
-          <label>显示名</label>
+          <label>{{ u('modal.create.displayName') }}</label>
           <input v-model="form.display_name" />
         </div>
         <div class="form-group">
-          <label>邮箱</label>
+          <label>{{ u('modal.create.email') }}</label>
           <input v-model="form.email" type="email" />
         </div>
         <div class="form-group">
-          <label>租户 *</label>
+          <label>{{ u('modal.create.tenant') }} *</label>
           <select v-model="form.tenant_id" required>
-            <option v-for="t in allTenants" :key="t.code" :value="t.code">
-              {{ t.name }} ({{ t.code }}) - {{ t.status }}
+            <option v-for="tnt in allTenants" :key="tnt.code" :value="tnt.code">
+              {{ tnt.name }} ({{ tnt.code }}) - {{ tnt.status }}
             </option>
           </select>
         </div>
         <div class="form-group">
-          <label>角色</label>
+          <label>{{ u('modal.create.role') }}</label>
           <select v-model="form.role">
-            <option value="tenant_admin">租户管理员</option>
-            <option value="super_admin">超级管理员</option>
+            <option value="tenant_admin">{{ u('role.tenant_admin') }}</option>
+            <option value="super_admin">{{ u('role.super_admin') }}</option>
           </select>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-primary" @click="handleCreate">创建</button>
-          <button class="btn btn-ghost" @click="showCreate = false">取消</button>
+          <button class="btn btn-primary" @click="handleCreate">{{ u('modal.create.submit') }}</button>
+          <button class="btn btn-ghost" @click="showCreate = false">{{ u('modal.cancel') }}</button>
         </div>
       </div>
     </div>
@@ -229,14 +235,14 @@ onMounted(() => { load(); loadTenants() })
     <!-- Reset Password Modal -->
     <div v-if="resetPwdUser" class="modal-backdrop" @click.self="resetPwdUser = null">
       <div class="modal-card">
-        <h3>重置密码 — {{ resetPwdUser.username }}</h3>
+        <h3>{{ u('modal.reset.title', { name: resetPwdUser.username }) }}</h3>
         <div class="form-group">
-          <label>新密码</label>
-          <input v-model="newPwd" type="password" placeholder="至少8位" />
+          <label>{{ u('modal.reset.newPassword') }}</label>
+          <input v-model="newPwd" type="password" :placeholder="u('modal.reset.passwordPlaceholder')" />
         </div>
         <div class="modal-actions">
-          <button class="btn btn-primary" @click="handleResetPwd">确认</button>
-          <button class="btn btn-ghost" @click="resetPwdUser = null">取消</button>
+          <button class="btn btn-primary" @click="handleResetPwd">{{ u('modal.reset.submit') }}</button>
+          <button class="btn btn-ghost" @click="resetPwdUser = null">{{ u('modal.cancel') }}</button>
         </div>
       </div>
     </div>

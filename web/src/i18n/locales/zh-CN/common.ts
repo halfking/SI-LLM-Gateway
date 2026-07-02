@@ -86,6 +86,7 @@ export default {
   unit: {
     credits: '积分',
     requests: '请求',
+    items: '个',
   },
   error: {
     unknown: '发生未知错误',

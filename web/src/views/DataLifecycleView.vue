@@ -166,7 +166,7 @@
                   }"
                 ></div>
               </div>
-              <span class="media-type-meta">{{ m.count }} 个 · {{ m.size_human }}</span>
+              <span class="media-type-meta">{{ m.count }} {{ t('common.unit.items') }} · {{ m.size_human }}</span>
             </div>
           </div>
         </div>
@@ -267,7 +267,7 @@
         <div class="preview-item">
           <span class="preview-label">{{ dl('attachmentCleanup.affected') }}</span>
           <span class="preview-value">
-            {{ formatNumber(attachmentCleanupPreview.affected_files) }} 个
+            {{ formatNumber(attachmentCleanupPreview.affected_files) }} {{ t('common.unit.items') }}
             <span v-if="attachmentCleanupPreview.orphaned_files">
               {{ dl('attachmentCleanup.orphanedSuffix', { n: attachmentCleanupPreview.orphaned_files }) }}
             </span>
@@ -309,7 +309,7 @@
       <div v-if="logCleanupPreview" class="preview-result">
         <div class="preview-item">
           <span class="preview-label">{{ dl('logCleanup.affected') }}</span>
-          <span class="preview-value">{{ formatNumber(logCleanupPreview.affected_files) }} 个</span>
+          <span class="preview-value">{{ formatNumber(logCleanupPreview.affected_files) }} {{ t('common.unit.items') }}</span>
         </div>
         <div class="preview-item">
           <span class="preview-label">{{ dl('logCleanup.estimatedFreed') }}</span>

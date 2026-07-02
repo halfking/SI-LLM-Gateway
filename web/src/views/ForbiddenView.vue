@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { clearAll } from '../store'
 
 const router = useRouter()
+const { t: td } = useI18n()
+const fb = (k: string): string => td(`forbidden.${k}` as never)
 
 function goHome() {
   router.push('/')
@@ -18,11 +21,11 @@ function logout() {
   <div class="forbidden-page">
     <div class="forbidden-card">
       <div class="forbidden-icon">🔒</div>
-      <h1>403 - 访问被拒绝</h1>
-      <p class="subtitle">此页面仅限超级管理员访问。您的租户管理员账户没有访问权限。</p>
+      <h1>{{ fb('title') }}</h1>
+      <p class="subtitle">{{ fb('subtitle') }}</p>
       <div class="actions">
-        <button class="btn btn-primary" @click="goHome">返回仪表盘</button>
-        <button class="btn btn-ghost" @click="logout">切换账户</button>
+        <button class="btn btn-primary" @click="goHome">{{ fb('backToDashboard') }}</button>
+        <button class="btn btn-ghost" @click="logout">{{ fb('switchAccount') }}</button>
       </div>
     </div>
   </div>

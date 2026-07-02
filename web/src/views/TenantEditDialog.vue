@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { updateTenant, TENANT_STATUSES, TENANT_STATUS_LABELS } from '../api'
 import type { Tenant } from '../api'
 
@@ -8,6 +9,9 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'updated'): void
 }>()
+
+const { t: td } = useI18n()
+const tt = (k: string, params?: Record<string, unknown>): string => td(`tenants.${k}` as never, params as never)
 
 const form = ref({
   name: props.tenant.name,
@@ -29,7 +33,7 @@ watch(() => props.tenant, (t) => {
 
 async function handleSubmit() {
   if (!form.value.name) {
-    error.value = 'name 不能为空'
+    error.value = tt('edit.nameRequired')
     return
   }
   submitting.value = true
@@ -44,7 +48,7 @@ async function handleSubmit() {
     emit('updated')
     emit('close')
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '更新失败'
+    error.value = e instanceof Error ? e.message : tt('edit.updateFailed')
   } finally {
     submitting.value = false
   }
@@ -54,32 +58,32 @@ async function handleSubmit() {
 <template>
   <div class="modal-backdrop" @click.self="emit('close')">
     <div class="modal-card">
-      <h3>编辑租户 - {{ tenant.code }}</h3>
+      <h3>{{ tt('edit.title', { code: tenant.code }) }}</h3>
       <div v-if="error" class="alert alert-danger">{{ error }}</div>
       <form @submit.prevent="handleSubmit">
         <div class="form-group">
-          <label>租户名称 *</label>
+          <label>{{ tt('edit.nameLabel') }}</label>
           <input v-model="form.name" required />
         </div>
         <div class="form-group">
-          <label>状态</label>
+          <label>{{ tt('edit.statusLabel') }}</label>
           <select v-model="form.status">
             <option v-for="s in TENANT_STATUSES" :key="s" :value="s">{{ TENANT_STATUS_LABELS[s] }}</option>
           </select>
         </div>
         <div class="form-group">
-          <label>联系邮箱</label>
+          <label>{{ tt('edit.contactLabel') }}</label>
           <input v-model="form.contact_email" type="email" />
         </div>
         <div class="form-group">
-          <label>描述</label>
+          <label>{{ tt('edit.descLabel') }}</label>
           <textarea v-model="form.description" rows="3" />
         </div>
         <div class="modal-actions">
           <button type="submit" class="btn btn-primary" :disabled="submitting">
-            {{ submitting ? '保存中…' : '保存' }}
+            {{ submitting ? tt('edit.saving') : tt('edit.save') }}
           </button>
-          <button type="button" class="btn btn-ghost" @click="emit('close')">取消</button>
+          <button type="button" class="btn btn-ghost" @click="emit('close')">{{ tt('edit.cancel') }}</button>
         </div>
       </form>
     </div>

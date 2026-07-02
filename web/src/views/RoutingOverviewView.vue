@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   getRoutingModelTree,
   getFeaturedModelsDynamic,
@@ -10,6 +11,10 @@ import {
   type FeaturedModel,
 } from '../api'
 import { isReadOnlyMode, isSuperAdmin } from '../store'
+
+const { t } = useI18n()
+const ro = (k: string, params?: Record<string, unknown>): string =>
+  t(`routing.overview.${k}` as never, params as never)
 
 interface FlatVariant {
   id: string
@@ -106,10 +111,10 @@ const heroChips = computed(() => {
   const routable = flatVariants.value.filter(v => v.routableCount > 0).length
   const creds = flatVariants.value.reduce((s, v) => s + v.credentials.length, 0)
   return [
-    { label: '系列', value: String(seriesList.value.length) },
-    { label: '变体', value: String(total) },
-    { label: '可路由', value: String(routable) },
-    { label: '凭据', value: readOnly.value ? '—' : String(creds) },
+    { label: ro('heroChips.series'), value: String(seriesList.value.length) },
+    { label: ro('heroChips.variants'), value: String(total) },
+    { label: ro('heroChips.routable'), value: String(routable) },
+    { label: ro('heroChips.credentials'), value: readOnly.value ? '—' : String(creds) },
   ]
 })
 
@@ -126,22 +131,11 @@ function isCredentialRoutable(c: RoutingTreeCredential): boolean {
 }
 
 function reasonLabel(reason: string | null | undefined): string {
-  switch (reason) {
-    case 'circuit_open': return '熔断中'
-    case 'balance_exhausted': return '余额耗尽'
-    case 'quota_periodic_exhausted': return '周期额度耗尽'
-    case 'quota_balance_exhausted': return '额度耗尽'
-    case 'quota_permanently_exhausted': return '永久额度耗尽'
-    case 'availability_cooling': return '冷却中'
-    case 'availability_rate_limited': return '限流中'
-    case 'availability_unreachable': return '暂不可达'
-    case 'availability_auth_failed': return '鉴权失败'
-    case 'availability_suspended': return '已暂停'
-    case 'lifecycle_disabled': return '生命周期禁用'
-    case 'lifecycle_suspended': return '生命周期暂停'
-    case 'lifecycle_retired': return '生命周期退役'
-    default: return reason || '可路由'
-  }
+  if (!reason) return ro('reasons.default')
+  const key = `reasons.${reason}` as `reasons.${string}`
+  const translated = ro(key)
+  // Fall back to raw reason if translation is missing the key
+  return translated === key ? (reason || ro('reasons.default')) : translated
 }
 
 function latencyLabel(ms: number): string {
@@ -194,7 +188,7 @@ async function load() {
       selectedVariantId.value = ''
     }
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : ro('loadFailed')
   } finally {
     loading.value = false
   }
@@ -220,14 +214,14 @@ async function adoptRecommendedFeatured() {
     const resp = await getFeaturedModelsDynamic()
     const models: FeaturedModel[] = (resp?.models ?? []).filter(m => m.name)
     if (models.length === 0) {
-      recommendMessage.value = '没有可推荐的模型（最近 7 天无请求或策略已空）'
+      recommendMessage.value = ro('noModelsToRecommend')
       return
     }
     await patchFeatured(models.map(m => m.name))
-    recommendMessage.value = `已采用 ${models.length} 个推荐模型作为特色`
+    recommendMessage.value = ro('recommendAdopted', { n: models.length })
     await load()
   } catch (e: unknown) {
-    recommendMessage.value = e instanceof Error ? e.message : '采用推荐失败'
+    recommendMessage.value = e instanceof Error ? e.message : ro('adoptFailed')
   } finally {
     recommendLoading.value = false
   }
@@ -240,16 +234,16 @@ onMounted(load)
   <div class="routing-overview-view">
     <div class="top-bar">
       <div class="top-bar-head">
-        <router-link to="/routing-v2" class="back-link">← 路由全景</router-link>
-        <h2>模型路由全景</h2>
+        <router-link to="/routing-v2" class="back-link">{{ ro('backLink') }}</router-link>
+        <h2>{{ ro('title') }}</h2>
         <div class="toolbar-filters">
           <button
             class="profile-pill"
             :class="{ active: featuredOnly }"
             @click="toggleFeatured"
-          >{{ featuredOnly ? '★ 仅特色' : '☆ 仅特色' }}</button>
+          >{{ featuredOnly ? ro('featuredOnly') : ro('featuredOnlyOff') }}</button>
         </div>
-        <button class="btn btn-sm btn-ghost refresh-btn" :disabled="loading" @click="load" title="刷新">↻</button>
+        <button class="btn btn-sm btn-ghost refresh-btn" :disabled="loading" @click="load" :title="ro('refreshTitle')">↻</button>
       </div>
       <div class="hero-stats">
         <span v-for="c in heroChips" :key="c.label" class="chip">{{ c.label }} <strong>{{ c.value }}</strong></span>
@@ -257,7 +251,7 @@ onMounted(load)
     </div>
 
     <div v-if="readOnly" class="card compact-card alert-info-card">
-      📖 租户管理员视图：凭据详情（供应商、价格、状态）已隐藏。
+      {{ ro('readonlyBanner') }}
     </div>
 
     <div v-if="error" class="alert alert-danger compact-alert">{{ error }}</div>
@@ -267,15 +261,15 @@ onMounted(load)
       <div class="card-toolbar">
         <div class="toolbar-left">
           <span class="layer-tag l2">L2</span>
-          <span class="toolbar-title">模型选择</span>
+          <span class="toolbar-title">{{ ro('modelSelect') }}</span>
         </div>
-        <input v-model="search" class="search-input" placeholder="搜索系列、变体、供应商…" />
+        <input v-model="search" class="search-input" :placeholder="ro('searchPlaceholder')" />
       </div>
 
-      <div v-if="loading" class="loading-hint">加载中…</div>
+      <div v-if="loading" class="loading-hint">{{ ro('loading') }}</div>
       <template v-else>
         <div v-if="seriesList.length" class="pill-section">
-          <span class="pill-label">系列</span>
+          <span class="pill-label">{{ ro('seriesLabel') }}</span>
           <div class="pill-row">
             <button
               v-for="s in seriesList"
@@ -288,7 +282,7 @@ onMounted(load)
         </div>
 
         <div v-if="variantPills.length" class="pill-section">
-          <span class="pill-label">变体</span>
+          <span class="pill-label">{{ ro('variantsLabel') }}</span>
           <div class="pill-row">
             <button
               v-for="v in variantPills"
@@ -307,14 +301,14 @@ onMounted(load)
         <div v-else-if="showFeaturedEmptyState" class="featured-empty-card">
           <div class="featured-empty-head">
             <span class="featured-empty-icon">★</span>
-            <strong>尚未配置特色模型</strong>
+            <strong>{{ ro('featuredEmptyTitle') }}</strong>
           </div>
           <p class="featured-empty-desc">
             <span v-if="hasFeaturedConfigured">
-              已配置 {{ tree.featured.length }} 个特色模型，但当前没有任何变体可路由（可能全部处于熔断 / 限流 / 退役状态）。
+              {{ ro('featuredEmptyWithN', { n: tree.featured.length }) }}
             </span>
             <span v-else>
-              「仅特色」筛选依赖 <code>routing_policy.featured_models</code>，当前为空。
+              {{ ro('featuredEmptyWithout') }}
             </span>
           </p>
           <p v-if="recommendMessage" class="featured-empty-msg">{{ recommendMessage }}</p>
@@ -324,13 +318,13 @@ onMounted(load)
               class="btn btn-sm btn-primary"
               :disabled="recommendLoading"
               @click="adoptRecommendedFeatured"
-            >⚡ 一键采用最近 7 天 Top {{ recommendLoading ? '加载中…' : '推荐' }}</button>
+            >{{ ro('recommendButton', { state: recommendLoading ? ro('recommendLoading') : ro('recommendText') }) }}</button>
             <router-link to="/routing-policy" class="btn btn-sm btn-ghost">
-              ⚙ 前往路由策略手动配置
+              {{ ro('manualConfig') }}
             </router-link>
           </div>
         </div>
-        <div v-else class="text-muted empty-inline">暂无匹配模型</div>
+        <div v-else class="text-muted empty-inline">{{ ro('noMatch') }}</div>
       </template>
     </div>
 
@@ -348,16 +342,16 @@ onMounted(load)
 
         <div v-if="readOnly" class="readonly-summary">
           <span :class="selectedVariant.routableCount > 0 ? 'status-ok' : 'status-bad'">
-            {{ selectedVariant.routableCount > 0 ? '✓ 可路由' : '✗ 暂不可路由' }}
+            {{ selectedVariant.routableCount > 0 ? ro('readonlySummaryRoutable') : ro('readonlySummaryUnroutable') }}
           </span>
-          <span class="text-muted">凭据 {{ selectedVariant.credentials.length }} 条（详情已隐藏）</span>
+          <span class="text-muted">{{ ro('readonlyCredentialsHint', { n: selectedVariant.credentials.length }) }}</span>
         </div>
 
         <div v-else-if="selectedVariant.credentials.length" class="table-wrap">
           <table class="dense-table">
             <thead>
               <tr>
-                <th>供应商</th><th>凭据</th><th>Tier</th><th>状态</th><th>成功率</th><th>P95</th><th>入/出 $/1M</th><th>上游模型</th>
+                <th>{{ ro('tableHeaders.0') }}</th><th>{{ ro('tableHeaders.1') }}</th><th>{{ ro('tableHeaders.2') }}</th><th>{{ ro('tableHeaders.3') }}</th><th>{{ ro('tableHeaders.4') }}</th><th>{{ ro('tableHeaders.5') }}</th><th>{{ ro('tableHeaders.6') }}</th><th>{{ ro('tableHeaders.7') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -374,7 +368,7 @@ onMounted(load)
                 <td><span class="badge" :class="statusClass(cred)">T{{ cred.tier }} · w{{ cred.weight }}</span></td>
                 <td>
                   <span :class="cred.runtime_routable ? 'badge badge-green' : 'badge badge-red'">
-                    {{ cred.runtime_routable ? '可路由' : reasonLabel(cred.runtime_block_reason) }}
+                    {{ cred.runtime_routable ? ro('shared.routable') : reasonLabel(cred.runtime_block_reason) }}
                   </span>
                 </td>
                 <td>{{ rateLabel(cred.success_rate) }}</td>
@@ -385,12 +379,12 @@ onMounted(load)
             </tbody>
           </table>
         </div>
-        <div v-else class="text-muted">该变体暂无凭据配置</div>
+        <div v-else class="text-muted">{{ ro('noCred') }}</div>
       </div>
     </div>
 
     <div v-else-if="!loading && variantPills.length" class="card compact-card hint-card">
-      <p class="text-muted">点击上方变体按钮查看凭据路由详情</p>
+      <p class="text-muted">{{ ro('clickHint') }}</p>
     </div>
 
   </div>

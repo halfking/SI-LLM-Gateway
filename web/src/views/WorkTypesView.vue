@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   listWorkTypes, getWorkType, createWorkType, updateWorkType, deleteWorkType,
   putWorkTypeRoutes, getWorkTypeStats, syncWorkTypesFromACC,
@@ -13,11 +14,18 @@ import {
 } from '../api-autoroute'
 import { probeModel, type ProbeResult } from '../api'
 import ModelPicker from '../components/ModelPicker.vue'
+import { useFormat } from '../i18n/useFormat'
 
 const MAX_ROUTES = 3
 
 const route = useRoute()
 const router = useRouter()
+
+const { t } = useI18n()
+const { fmtDateTime } = useFormat()
+// Short alias for the workTypes locale namespace.
+const wt = (k: string, params?: Record<string, unknown>): string =>
+  t(`workTypes.${k}` as never, params as never)
 
 const activeTab = computed<'overview' | 'settings'>(() => {
   if (route.path.endsWith('/settings')) return 'settings'
@@ -204,7 +212,7 @@ async function saveDetailMeta() {
       sort_order: detailForm.value.sort_order,
     })
     syncDetailForm(detail.value)
-    detailMsg.value = '基本配置已保存'
+    detailMsg.value = wt('detail.savedOk')
     await loadSettings()
   } catch (e) {
     detailMsg.value = String(e)
@@ -216,8 +224,9 @@ async function saveDetailMeta() {
 async function toggleEnabled() {
   if (!detail.value || !detailKey.value) return
   const next = !detail.value.enabled
-  const msg = next ? '启用' : '禁用'
-  if (!next && !confirm(`确定${msg}工作类型「${detail.value.label}」？`)) return
+  const actionKey = next ? 'detail.errors.confirmEnable' : 'detail.errors.confirmDisable'
+  const actionLabel = wt(actionKey)
+  if (!next && !confirm(wt('detail.errors.toggleConfirm', { action: actionLabel, name: detail.value.label }))) return
   try {
     if (next) {
       await updateWorkType(detailKey.value, { enabled: true })
@@ -241,7 +250,7 @@ async function saveRoutes() {
     await putWorkTypeRoutes(detailKey.value, payload)
     detail.value = await getWorkType(detailKey.value)
     routesDraft.value = (detail.value.model_routes ?? []).slice(0, MAX_ROUTES).map(r => ({ ...r }))
-    routesMsg.value = '模型路由已保存'
+    routesMsg.value = wt('routes.savedOk')
     await loadSettings()
   } catch (e) {
     routesMsg.value = String(e)
@@ -267,7 +276,7 @@ async function testRoute(rt: ModelRoute) {
   try {
     testResults.value[name] = await probeModel(name, [{ role: 'user', content: 'ping' }], 8)
   } catch (e) {
-    testErrors.value[name] = e instanceof Error ? e.message : '测试失败'
+    testErrors.value[name] = e instanceof Error ? e.message : wt('routes.testFailedShort')
     delete testResults.value[name]
   } finally {
     if (testingModel.value === name) testingModel.value = null
@@ -323,19 +332,19 @@ watch(activeTab, (tab) => {
   <div class="work-types-view" :class="{ 'work-types-view--detail': isDetailView }">
     <div class="top-bar">
       <div class="top-bar-head">
-        <router-link to="/routing-v2" class="back-link">← 路由全景</router-link>
-        <h2>工作类型</h2>
+        <router-link to="/routing-v2" class="back-link">{{ wt('topBar.backToRouting') }}</router-link>
+        <h2>{{ wt('topBar.title') }}</h2>
         <div class="seg-tabs">
-          <button class="seg-tab" :class="{ active: activeTab === 'overview' }" @click="goTab('overview')">概览</button>
-          <button class="seg-tab" :class="{ active: activeTab === 'settings' }" @click="goTab('settings')">配置</button>
+          <button class="seg-tab" :class="{ active: activeTab === 'overview' }" @click="goTab('overview')">{{ wt('topBar.tabOverview') }}</button>
+          <button class="seg-tab" :class="{ active: activeTab === 'settings' }" @click="goTab('settings')">{{ wt('topBar.tabSettings') }}</button>
         </div>
-        <button class="btn btn-sm btn-ghost refresh-btn" @click="activeTab === 'overview' ? loadOverview() : loadSettings()" title="刷新">↻</button>
+        <button class="btn btn-sm btn-ghost refresh-btn" @click="activeTab === 'overview' ? loadOverview() : loadSettings()" :title="wt('topBar.refresh')">↻</button>
       </div>
       <div class="hero-stats">
-        <span class="chip">Auto 24h <strong>{{ stats?.total_auto ?? audit.total_auto_requests }}</strong></span>
-        <span class="chip">类型 <strong>{{ workTypes.length || wtStatsEntries.length }}</strong></span>
-        <span class="chip">成功率 <strong>{{ fmt(audit.success_rate * 100, 1) }}%</strong></span>
-        <span v-if="syncMeta?.last_synced_at" class="chip">上次同步 <strong>{{ new Date(syncMeta.last_synced_at).toLocaleString() }}</strong></span>
+        <span class="chip">{{ wt('topBar.chipAuto24h') }} <strong>{{ stats?.total_auto ?? audit.total_auto_requests }}</strong></span>
+        <span class="chip">{{ wt('topBar.chipType') }} <strong>{{ workTypes.length || wtStatsEntries.length }}</strong></span>
+        <span class="chip">{{ wt('topBar.chipSuccessRate') }} <strong>{{ fmt(audit.success_rate * 100, 1) }}%</strong></span>
+        <span v-if="syncMeta?.last_synced_at" class="chip">{{ wt('topBar.chipLastSync') }} <strong>{{ fmtDateTime(syncMeta.last_synced_at) }}</strong></span>
       </div>
     </div>
 
@@ -345,21 +354,21 @@ watch(activeTab, (tab) => {
         <div class="card compact-card">
           <div class="section-head tight">
             <span class="layer-tag l1">L1</span>
-            <h3>Auto 总统计</h3>
+            <h3>{{ wt('overview.autoStatsTitle') }}</h3>
           </div>
           <div class="stat-row">
             <div class="stat-block">
               <div class="stat-val">{{ audit.total_auto_requests }}</div>
-              <div class="stat-lbl">7d 请求</div>
+              <div class="stat-lbl">{{ wt('overview.req7d') }}</div>
             </div>
             <div class="stat-block">
               <div class="stat-val">{{ fmt(audit.success_rate * 100, 1) }}%</div>
-              <div class="stat-lbl">成功率</div>
+              <div class="stat-lbl">{{ wt('overview.successRate') }}</div>
             </div>
           </div>
           <div class="dist-mini">
             <div class="dist-col">
-              <h4>L1 任务</h4>
+              <h4>{{ wt('overview.l1TasksTitle') }}</h4>
               <div v-for="[task, count] in distEntries(audit.task_distribution).slice(0, 5)" :key="task" class="dist-row">
                 <span class="dist-label">{{ l1Label(task) }}</span>
                 <div class="dist-bar-bg"><div class="dist-bar-fill" :style="{ width: (count / distMax(audit.task_distribution) * 100) + '%' }" /></div>
@@ -372,9 +381,9 @@ watch(activeTab, (tab) => {
         <div class="card compact-card">
           <div class="section-head tight">
             <span class="layer-tag l1">WT</span>
-            <h3>工作类型分布 (24h)</h3>
+            <h3>{{ wt('overview.wtDistTitle') }}</h3>
           </div>
-          <div v-if="loading" class="loading-hint">加载…</div>
+          <div v-if="loading" class="loading-hint">{{ wt('loading') }}</div>
           <div v-else-if="wtStatsEntries.length" class="dist-col full">
             <div v-for="e in wtStatsEntries" :key="e.key" class="dist-row clickable" @click="router.push({ path: '/routing-v2', query: { tab: 'analytics', row: 'work_type', filter: e.key } })">
               <span class="dist-label" :title="e.key">{{ e.label }}</span>
@@ -382,13 +391,13 @@ watch(activeTab, (tab) => {
               <span class="dist-count">{{ e.count_24h }}</span>
             </div>
           </div>
-          <div v-else class="text-muted">暂无 24h 数据</div>
+          <div v-else class="text-muted">{{ wt('overview.wtNoData') }}</div>
         </div>
 
         <div class="card compact-card">
-          <div class="section-head tight"><h3>模型 Top (24h)</h3></div>
+          <div class="section-head tight"><h3>{{ wt('overview.modelTopTitle') }}</h3></div>
           <table v-if="stats?.top_models?.length" class="dense-table">
-            <thead><tr><th>模型</th><th>次数</th></tr></thead>
+            <thead><tr><th>{{ wt('overview.tableHeaders.model') }}</th><th>{{ wt('overview.tableHeaders.count') }}</th></tr></thead>
             <tbody>
               <tr v-for="m in stats.top_models.slice(0, 8)" :key="m.model">
                 <td class="model-name">{{ m.model }}</td>
@@ -396,17 +405,17 @@ watch(activeTab, (tab) => {
               </tr>
             </tbody>
           </table>
-          <div v-else class="text-muted">暂无</div>
+          <div v-else class="text-muted">{{ wt('overview.noDataText') }}</div>
         </div>
 
         <div class="card compact-card span-2">
-          <div class="section-head tight"><h3>最近路由决策</h3></div>
+          <div class="section-head tight"><h3>{{ wt('overview.recentDecisionsTitle') }}</h3></div>
           <div class="table-wrap">
             <table v-if="decisions.length" class="dense-table">
-              <thead><tr><th>时间</th><th>L1</th><th>Profile</th><th>模型</th><th>状态</th></tr></thead>
+              <thead><tr><th>{{ wt('overview.tableHeaders.time') }}</th><th>{{ wt('overview.tableHeaders.l1') }}</th><th>{{ wt('overview.tableHeaders.profile') }}</th><th>{{ wt('overview.tableHeaders.model') }}</th><th>{{ wt('overview.tableHeaders.status') }}</th></tr></thead>
               <tbody>
                 <tr v-for="d in decisions" :key="d.request_id">
-                  <td>{{ new Date(d.ts).toLocaleTimeString() }}</td>
+                  <td>{{ fmtDateTime(d.ts) }}</td>
                   <td><span class="badge badge-blue">{{ d.task_type || '-' }}</span></td>
                   <td>{{ d.auto_profile || '-' }}</td>
                   <td class="model-name">{{ d.outbound_model || d.auto_decision?.chosen_model || '-' }}</td>
@@ -414,7 +423,7 @@ watch(activeTab, (tab) => {
                 </tr>
               </tbody>
             </table>
-            <div v-else class="text-muted">暂无 auto 决策</div>
+            <div v-else class="text-muted">{{ wt('overview.noDecisionsText') }}</div>
           </div>
         </div>
       </div>
@@ -423,20 +432,20 @@ watch(activeTab, (tab) => {
     <!-- ═══ Settings — Detail ═══ -->
     <div v-if="isDetailView && detail" class="tab-content detail-layout">
       <div class="detail-header card">
-        <button class="btn btn-sm btn-ghost" @click="router.push('/routing-v2/work-types/settings')">← 返回列表</button>
+        <button class="btn btn-sm btn-ghost" @click="router.push('/routing-v2/work-types/settings')">{{ wt('detail.backToList') }}</button>
         <div class="detail-title-block">
           <h3>{{ detail.label }}</h3>
           <code class="key-code">{{ detail.key }}</code>
         </div>
         <span :class="detail.enabled ? 'badge badge-green' : 'badge badge-red'">
-          {{ detail.enabled ? '已启用' : '已禁用' }}
+          {{ detail.enabled ? wt('detail.enabled') : wt('detail.disabled') }}
         </span>
         <button
           class="btn btn-sm"
           :class="detail.enabled ? 'btn-ghost' : 'btn-primary'"
           @click="toggleEnabled"
         >
-          {{ detail.enabled ? '禁用' : '启用' }}
+          {{ detail.enabled ? wt('detail.disable') : wt('detail.enable') }}
         </button>
       </div>
 
@@ -444,53 +453,53 @@ watch(activeTab, (tab) => {
         <section class="card detail-section">
           <div class="section-head">
             <span class="layer-tag l1">WT</span>
-            <h3>基本配置</h3>
+            <h3>{{ wt('detail.basicTitle') }}</h3>
             <button class="btn btn-primary btn-sm" :disabled="detailSaving" @click="saveDetailMeta">
-              {{ detailSaving ? '保存中…' : '保存' }}
+              {{ detailSaving ? wt('detail.saving') : wt('detail.save') }}
             </button>
           </div>
           <div v-if="detailMsg" class="inline-msg">{{ detailMsg }}</div>
           <div class="detail-form">
-            <label>名称<input v-model="detailForm.label" class="input" /></label>
-            <label>分类
+            <label>{{ wt('detail.form.label') }}<input v-model="detailForm.label" class="input" /></label>
+            <label>{{ wt('detail.form.category') }}
               <select v-model="detailForm.category" class="input">
                 <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
               </select>
             </label>
-            <label>L1 任务
+            <label>{{ wt('detail.form.l1Task') }}
               <select v-model="detailForm.l1_task_type" class="input">
                 <option v-for="t in L1_TASK_TYPES" :key="t.key" :value="t.key">{{ t.label }}</option>
               </select>
             </label>
-            <label>Profile
+            <label>{{ wt('detail.form.profile') }}
               <select v-model="detailForm.default_profile" class="input">
                 <option v-for="p in PROFILES" :key="p.key" :value="p.key">{{ p.label }}</option>
               </select>
             </label>
-            <label>排序<input v-model.number="detailForm.sort_order" type="number" class="input" /></label>
-            <label class="span-2">Tags（逗号分隔）<input v-model="detailForm.tags" class="input" /></label>
-            <label class="span-2">Prompt 关键词<input v-model="detailForm.prompt_keywords" class="input" /></label>
+            <label>{{ wt('detail.form.sortOrder') }}<input v-model.number="detailForm.sort_order" type="number" class="input" /></label>
+            <label class="span-2">{{ wt('detail.form.tags') }}<input v-model="detailForm.tags" class="input" /></label>
+            <label class="span-2">{{ wt('detail.form.promptKeywords') }}<input v-model="detailForm.prompt_keywords" class="input" /></label>
           </div>
         </section>
 
         <section class="card detail-section detail-section--routes">
           <div class="section-head">
             <span class="layer-tag l2">L2</span>
-            <h3>模型类型路由</h3>
-            <span class="text-muted route-hint">最多 {{ MAX_ROUTES }} 个模型 · 点击选择</span>
+            <h3>{{ wt('routes.title') }}</h3>
+            <span class="text-muted route-hint">{{ wt('routes.maxHint', { n: MAX_ROUTES }) }}</span>
             <button
               class="btn btn-ghost btn-sm"
               :disabled="routesDraft.length >= MAX_ROUTES"
               @click="addRouteRow"
-            >+ 添加</button>
+            >{{ wt('routes.addRow') }}</button>
             <button class="btn btn-primary btn-sm" :disabled="routesSaving" @click="saveRoutes">
-              {{ routesSaving ? '保存中…' : '保存路由' }}
+              {{ routesSaving ? wt('routes.saving') : wt('routes.saveBtn') }}
             </button>
           </div>
           <div v-if="routesMsg" class="inline-msg">{{ routesMsg }}</div>
 
           <div v-if="!routesDraft.length" class="empty-routes">
-            尚未配置模型路由 — 点击「添加」选择最多 3 个标准模型
+            {{ wt('routes.empty') }}
           </div>
 
           <div class="route-cards">
@@ -504,23 +513,23 @@ watch(activeTab, (tab) => {
                 <span class="route-index">#{{ i + 1 }}</span>
                 <label class="route-enabled">
                   <input type="checkbox" v-model="rt.enabled" />
-                  启用
+                  {{ wt('routes.enabled') }}
                 </label>
-                <button class="btn btn-ghost btn-sm route-remove" @click="removeRouteRow(i)">移除</button>
+                <button class="btn btn-ghost btn-sm route-remove" @click="removeRouteRow(i)">{{ wt('routes.remove') }}</button>
               </div>
               <div class="route-picker-row">
-                <span class="field-label">标准模型</span>
+                <span class="field-label">{{ wt('routes.canonicalLabel') }}</span>
                 <ModelPicker
                   v-model="rt.canonical_name"
-                  placeholder="点击选择模型…"
-                  :title="`工作类型 ${detail.label} · 路由 #${i + 1}`"
+                  :placeholder="wt('routes.pickerPlaceholder')"
+                  :title="wt('routes.routeTitlePrefix', { label: detail.label, n: i + 1 })"
                 />
               </div>
               <div class="route-fields">
-                <label>权重
+                <label>{{ wt('routes.weight') }}
                   <input v-model.number="rt.weight" type="number" step="0.1" min="0.1" class="input compact" />
                 </label>
-                <label>最低分
+                <label>{{ wt('routes.minScore') }}
                   <input v-model.number="rt.min_score" type="number" step="0.1" class="input compact" />
                 </label>
                 <button
@@ -528,14 +537,14 @@ watch(activeTab, (tab) => {
                   :disabled="!rt.canonical_name.trim() || testingModel === rt.canonical_name"
                   @click="testRoute(rt)"
                 >
-                  {{ testingModel === rt.canonical_name ? '测试中…' : '测试' }}
+                  {{ testingModel === rt.canonical_name ? wt('routes.testing') : wt('routes.test') }}
                 </button>
               </div>
               <div v-if="testErrors[rt.canonical_name]" class="test-result test-result--fail">
                 {{ testErrors[rt.canonical_name] }}
               </div>
               <div v-else-if="testResults[rt.canonical_name]" class="test-result" :class="testResults[rt.canonical_name].success ? 'test-result--ok' : 'test-result--fail'">
-                <span>{{ testResults[rt.canonical_name].success ? '成功' : '失败' }}</span>
+                <span>{{ testResults[rt.canonical_name].success ? wt('routes.testOk') : wt('routes.testFail') }}</span>
                 <span v-if="testResults[rt.canonical_name].latency_ms != null">{{ testResults[rt.canonical_name].latency_ms }}ms</span>
                 <span v-if="testResults[rt.canonical_name].model_name">{{ testResults[rt.canonical_name].provider_name }}</span>
                 <span v-if="testResults[rt.canonical_name].error" class="test-err">{{ testResults[rt.canonical_name].error }}</span>
@@ -545,14 +554,14 @@ watch(activeTab, (tab) => {
 
           <div v-if="routesDraft.length" class="route-actions">
             <button class="btn btn-ghost btn-sm" :disabled="testingAll" @click="testAllRoutes">
-              {{ testingAll ? '批量测试中…' : '测试全部启用路由' }}
+              {{ testingAll ? wt('routes.testingAll') : wt('routes.testAll') }}
             </button>
           </div>
         </section>
       </div>
     </div>
 
-    <div v-else-if="activeTab === 'settings' && settingsLoading && detailKey" class="loading-hint">加载详情…</div>
+    <div v-else-if="activeTab === 'settings' && settingsLoading && detailKey" class="loading-hint">{{ wt('loadingDetail') }}</div>
 
     <!-- ═══ Settings — List ═══ -->
     <div v-else-if="activeTab === 'settings'" class="tab-content">
@@ -560,52 +569,52 @@ watch(activeTab, (tab) => {
         <div class="card-toolbar">
           <div class="toolbar-left">
             <span class="layer-tag l1">WT</span>
-            <span class="toolbar-title">工作类型列表</span>
+            <span class="toolbar-title">{{ wt('list.title') }}</span>
             <span class="text-muted">({{ workTypes.length }})</span>
           </div>
           <div class="toolbar-filters">
-            <button class="btn btn-sm btn-ghost" @click="doSyncACC" title="从 ACC 拉取工作类型配置">从 ACC 同步</button>
-            <button class="btn btn-primary btn-sm" @click="openCreate">+ 新建</button>
+            <button class="btn btn-sm btn-ghost" @click="doSyncACC" :title="wt('list.syncFromACC')">{{ wt('list.syncFromACC') }}</button>
+            <button class="btn btn-primary btn-sm" @click="openCreate">{{ wt('list.newBtn') }}</button>
           </div>
         </div>
-        <p class="list-hint">点击行进入详情，配置基本属性与模型类型路由（最多 3 个）。</p>
+        <p class="list-hint">{{ wt('list.hint') }}</p>
         <div v-if="syncMsg" class="policy-msg" :class="{ 'sync-ok': syncOk, 'sync-err': syncOk === false }">{{ syncMsg }}</div>
-        <div v-if="settingsLoading" class="loading-hint">加载…</div>
+        <div v-if="settingsLoading" class="loading-hint">{{ wt('loading') }}</div>
         <div v-else class="table-wrap">
           <table class="dense-table list-table">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Key</th>
-                <th>名称</th>
-                <th>分类</th>
-                <th>L1</th>
-                <th>Profile</th>
-                <th>模型路由</th>
-                <th>状态</th>
+                <th>{{ wt('list.tableHeaders.index') }}</th>
+                <th>{{ wt('list.tableHeaders.key') }}</th>
+                <th>{{ wt('list.tableHeaders.name') }}</th>
+                <th>{{ wt('list.tableHeaders.category') }}</th>
+                <th>{{ wt('list.tableHeaders.l1') }}</th>
+                <th>{{ wt('list.tableHeaders.profile') }}</th>
+                <th>{{ wt('list.tableHeaders.routes') }}</th>
+                <th>{{ wt('list.tableHeaders.status') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="(wt, i) in workTypes"
-                :key="wt.key"
+                v-for="(wtx, i) in workTypes"
+                :key="wtx.key"
                 class="model-row"
-                :class="{ disabled: !wt.enabled }"
+                :class="{ disabled: !wtx.enabled }"
                 tabindex="0"
-                @click="openDetail(wt.key)"
-                @keydown.enter="openDetail(wt.key)"
+                @click="openDetail(wtx.key)"
+                @keydown.enter="openDetail(wtx.key)"
               >
-                <td class="num">{{ wt.sort_order || i + 1 }}</td>
-                <td><code class="key-code">{{ wt.key }}</code></td>
-                <td>{{ wt.label }}</td>
-                <td><span class="badge badge-gray">{{ wt.category }}</span></td>
-                <td>{{ l1Label(wt.l1_task_type) }}</td>
-                <td>{{ profileLabel(wt.default_profile) }}</td>
+                <td class="num">{{ wtx.sort_order || i + 1 }}</td>
+                <td><code class="key-code">{{ wtx.key }}</code></td>
+                <td>{{ wtx.label }}</td>
+                <td><span class="badge badge-gray">{{ wtx.category }}</span></td>
+                <td>{{ l1Label(wtx.l1_task_type) }}</td>
+                <td>{{ profileLabel(wtx.default_profile) }}</td>
                 <td class="route-cell">
-                  <span v-if="!routeSummary(wt).length" class="text-muted">未配置</span>
-                  <span v-for="m in routeSummary(wt)" :key="m" class="route-chip">{{ m }}</span>
+                  <span v-if="!routeSummary(wtx).length" class="text-muted">{{ wt('list.notConfigured') }}</span>
+                  <span v-for="m in routeSummary(wtx)" :key="m" class="route-chip">{{ m }}</span>
                 </td>
-                <td><span :class="wt.enabled ? 'badge badge-green' : 'badge badge-red'">{{ wt.enabled ? '启用' : '禁用' }}</span></td>
+                <td><span :class="wtx.enabled ? 'badge badge-green' : 'badge badge-red'">{{ wtx.enabled ? wt('list.rowEnabled') : wt('list.rowDisabled') }}</span></td>
               </tr>
             </tbody>
           </table>
@@ -616,33 +625,33 @@ watch(activeTab, (tab) => {
     <!-- Create Modal -->
     <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
       <div class="modal-card">
-        <h3>新建工作类型</h3>
+        <h3>{{ wt('modal.title') }}</h3>
         <div class="form-grid">
-          <label class="span-2">Key <input v-model="createForm.key" placeholder="my_work_type" /></label>
-          <label>名称 <input v-model="createForm.label" /></label>
-          <label>分类
+          <label class="span-2">{{ wt('modal.fields.key') }} <input v-model="createForm.key" :placeholder="wt('modal.keyPlaceholder')" /></label>
+          <label>{{ wt('modal.fields.name') }} <input v-model="createForm.label" /></label>
+          <label>{{ wt('modal.fields.category') }}
             <select v-model="createForm.category">
               <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
             </select>
           </label>
-          <label>L1 任务
+          <label>{{ wt('modal.fields.l1Task') }}
             <select v-model="createForm.l1_task_type">
               <option v-for="t in L1_TASK_TYPES" :key="t.key" :value="t.key">{{ t.label }}</option>
             </select>
           </label>
-          <label>Profile
+          <label>{{ wt('modal.fields.profile') }}
             <select v-model="createForm.default_profile">
               <option v-for="p in PROFILES" :key="p.key" :value="p.key">{{ p.label }}</option>
             </select>
           </label>
-          <label>排序 <input v-model.number="createForm.sort_order" type="number" /></label>
-          <label class="span-2">Tags（逗号分隔）<input v-model="createForm.tags" /></label>
-          <label class="span-2">Prompt 关键词 <input v-model="createForm.prompt_keywords" /></label>
+          <label>{{ wt('modal.fields.sortOrder') }} <input v-model.number="createForm.sort_order" type="number" /></label>
+          <label class="span-2">{{ wt('modal.fields.tags') }}<input v-model="createForm.tags" /></label>
+          <label class="span-2">{{ wt('modal.fields.promptKeywords') }} <input v-model="createForm.prompt_keywords" /></label>
         </div>
         <div v-if="createError" class="alert alert-danger compact-alert">{{ createError }}</div>
         <div class="modal-actions">
-          <button class="btn btn-ghost" @click="showCreateModal = false">取消</button>
-          <button class="btn btn-primary" @click="saveCreate">创建并进入详情</button>
+          <button class="btn btn-ghost" @click="showCreateModal = false">{{ wt('modal.cancel') }}</button>
+          <button class="btn btn-primary" @click="saveCreate">{{ wt('modal.submit') }}</button>
         </div>
       </div>
     </div>

@@ -1,55 +1,55 @@
 <template>
   <div class="pricing-management">
     <div class="pm-header">
-      <h2>成本价格</h2>
+      <h2>{{ pm('page.title') }}</h2>
       <div class="pm-actions">
         <button class="btn btn-sm" @click="fetchData" :disabled="loading">
-          {{ loading ? '加载中…' : '刷新' }}
+          {{ loading ? pm('page.refreshLoading') : pm('page.refresh') }}
         </button>
-        <button class="btn btn-sm" @click="exportCsv">导出 CSV</button>
-        <button v-if="!readOnly" class="btn btn-sm btn-primary" @click="showImport = true">导入 CSV</button>
-        <button v-if="!readOnly" class="btn btn-sm btn-success" @click="autoInherit">自动继承</button>
+        <button class="btn btn-sm" @click="exportCsv">{{ pm('page.exportCsv') }}</button>
+        <button v-if="!readOnly" class="btn btn-sm btn-primary" @click="showImport = true">{{ pm('page.importCsv') }}</button>
+        <button v-if="!readOnly" class="btn btn-sm btn-success" @click="autoInherit">{{ pm('page.autoInherit') }}</button>
       </div>
     </div>
 
     <div v-if="readOnly" class="alert alert-info" style="margin-bottom:12px">
-      📖 您是租户管理员，当前为只读模式。上游成本价格仅供查看，不能修改或导入。
+      {{ pm('readOnly') }}
     </div>
 
     <div class="pm-summary" v-if="summary">
       <div class="stat-card">
         <div class="stat-val">{{ summary.total_offers }}</div>
-        <div class="stat-label">总 Offer</div>
+        <div class="stat-label">{{ pm('summary.totalOffers') }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-val">{{ summary.priced_in }}</div>
-        <div class="stat-label">已定价（输入）</div>
+        <div class="stat-label">{{ pm('summary.pricedIn') }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-val">{{ summary.priced_out }}</div>
-        <div class="stat-label">已定价（输出）</div>
+        <div class="stat-label">{{ pm('summary.pricedOut') }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-val">{{ summary.cny_offers }}</div>
-        <div class="stat-label">CNY</div>
+        <div class="stat-label">{{ pm('summary.cny') }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-val">{{ summary.usd_offers }}</div>
-        <div class="stat-label">USD</div>
+        <div class="stat-label">{{ pm('summary.usd') }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-val">{{ summary.free_offers }}</div>
-        <div class="stat-label">免费</div>
+        <div class="stat-label">{{ pm('summary.free') }}</div>
       </div>
       <div class="stat-card" :class="coverageClass">
         <div class="stat-val">{{ coveragePct }}%</div>
-        <div class="stat-label">覆盖率 ({{ summary.canonical_covered }}/{{ summary.total_canonical }})</div>
+        <div class="stat-label">{{ pm('summary.coverage', { covered: summary.canonical_covered, total: summary.total_canonical }) }}</div>
       </div>
     </div>
 
     <!-- Coverage by credential -->
     <div v-if="coverageByCred.length" class="pm-coverage">
-      <h3>按凭据覆盖率</h3>
+      <h3>{{ pm('coverage.title') }}</h3>
       <div class="cov-row" v-for="row in coverageByCred" :key="row.credential_id">
         <div class="cov-name">{{ row.credential_name }}</div>
         <div class="cov-bar">
@@ -57,7 +57,7 @@
         </div>
         <div class="cov-stats">
           {{ row.priced }}/{{ row.total }} ({{ row.pct }}%)
-          <span v-if="row.token_plan > 0" class="cov-tag cov-tag-tp">+{{ row.token_plan }} token_plan</span>
+          <span v-if="row.token_plan > 0" class="cov-tag cov-tag-tp">+{{ row.token_plan }} {{ pm('coverage.tokenPlanSuffix') }}</span>
         </div>
       </div>
     </div>
@@ -67,58 +67,58 @@
       <div class="filter-group">
         <ModelPicker
           v-model="filters.search"
-          placeholder="选择模型筛选…"
-          title="成本价格 · 模型筛选"
+          :placeholder="pm('filter.modelPlaceholder')"
+          :title="pm('filter.modelTitle')"
           @update:model-value="onFilterChange"
         />
       </div>
       <div class="filter-group">
         <select v-model="filters.provider_id" @change="onFilterChange" class="filter-select">
-          <option value="">全部供应商</option>
+          <option value="">{{ pm('filter.allProviders') }}</option>
           <option v-for="p in providers" :key="p.id" :value="p.id">{{ p.display_name }}</option>
         </select>
       </div>
       <div class="filter-group">
         <select v-model="filters.billing_mode" @change="onFilterChange" class="filter-select">
-          <option value="">全部计费</option>
-          <option value="token">Token（每百万）</option>
-          <option value="token_plan">Token 套餐（小米/火山）</option>
-          <option value="code_plan">Code 套餐</option>
-          <option value="per_token">按 Token（旧）</option>
-          <option value="per_request">按次</option>
-          <option value="monthly">包月</option>
-          <option value="free">免费</option>
+          <option value="">{{ pm('filter.allBilling') }}</option>
+          <option value="token">{{ pm('filter.billingToken') }}</option>
+          <option value="token_plan">{{ pm('filter.billingTokenPlan') }}</option>
+          <option value="code_plan">{{ pm('filter.billingCodePlan') }}</option>
+          <option value="per_token">{{ pm('filter.billingPerToken') }}</option>
+          <option value="per_request">{{ pm('filter.billingPerRequest') }}</option>
+          <option value="monthly">{{ pm('filter.billingMonthly') }}</option>
+          <option value="free">{{ pm('filter.billingFree') }}</option>
         </select>
       </div>
       <div class="filter-group">
         <select v-model="filters.currency" @change="onFilterChange" class="filter-select">
-          <option value="">全部币种</option>
+          <option value="">{{ pm('filter.allCurrency') }}</option>
           <option value="CNY">CNY</option>
           <option value="USD">USD</option>
         </select>
       </div>
       <div class="filter-group">
         <select v-model="filters.pricing_status" @change="onFilterChange" class="filter-select">
-          <option value="">全部定价</option>
-          <option value="priced">已定价</option>
-          <option value="unpriced">未定价</option>
-          <option value="free">免费</option>
+          <option value="">{{ pm('filter.allPricing') }}</option>
+          <option value="priced">{{ pm('filter.priced') }}</option>
+          <option value="unpriced">{{ pm('filter.unpriced') }}</option>
+          <option value="free">{{ pm('filter.freeStatus') }}</option>
         </select>
       </div>
       <div class="filter-group">
         <select v-model="filters.availability" @change="onFilterChange" class="filter-select">
-          <option value="">全部状态</option>
-          <option value="true">可用</option>
-          <option value="false">不可用</option>
+          <option value="">{{ pm('filter.allAvailability') }}</option>
+          <option value="true">{{ pm('filter.available') }}</option>
+          <option value="false">{{ pm('filter.unavailable') }}</option>
         </select>
       </div>
-      <button class="btn btn-sm" @click="clearFilters">清空</button>
+      <button class="btn btn-sm" @click="clearFilters">{{ pm('filter.clear') }}</button>
     </div>
 
     <!-- View Tabs -->
     <div class="pm-tabs">
-      <button :class="['tab', { active: viewMode === 'tree' }]" @click="viewMode = 'tree'">树形视图</button>
-      <button :class="['tab', { active: viewMode === 'table' }]" @click="viewMode = 'table'">表格视图</button>
+      <button :class="['tab', { active: viewMode === 'tree' }]" @click="viewMode = 'tree'">{{ pm('view.tree') }}</button>
+      <button :class="['tab', { active: viewMode === 'table' }]" @click="viewMode = 'table'">{{ pm('view.table') }}</button>
     </div>
 
     <!-- Tree View -->
@@ -128,7 +128,7 @@
           <div class="tree-family-header" @click="toggle(fam.canonical_name)">
             <span class="arrow" :class="{ open: expanded[fam.canonical_name] }">&#9654;</span>
             <span class="family-name">{{ fam.canonical_name }}</span>
-            <span class="family-meta">{{ fam.family }} | {{ fam.offers.length }} 个 offer</span>
+            <span class="family-meta">{{ fam.family }} | {{ fam.offers.length }} {{ pm('tree.offerSuffix') }}</span>
           </div>
           <div v-if="expanded[fam.canonical_name]" class="tree-offers">
             <div
@@ -145,8 +145,8 @@
               <span class="offer-price" v-if="offer.unit_price_in_per_1m != null">
                 {{ offer.unit_price_in_per_1m }}/{{ offer.unit_price_out_per_1m }} {{ offer.currency }}
               </span>
-              <span class="offer-price free" v-else-if="offer.billing_mode === 'free'">免费</span>
-              <span class="offer-price pending" v-else>待定价</span>
+              <span class="offer-price free" v-else-if="offer.billing_mode === 'free'">{{ pm('tree.free') }}</span>
+              <span class="offer-price pending" v-else>{{ pm('tree.pending') }}</span>
               <span class="offer-window" v-if="offer.window_requests">
                 W:{{ offer.window_success_rate ? (offer.window_success_rate * 100).toFixed(0) + '%' : '-' }}
               </span>
@@ -160,10 +160,10 @@
     <div v-if="viewMode === 'table'" class="pm-table-container">
       <div class="pagination-bar">
         <div class="pagination-info">
-          <span>共 {{ tableTotal }} 条</span>
-          <span v-if="tableTotal > 0">· 第 {{ tablePage }} / {{ Math.ceil(tableTotal / tablePageSize) }} 页</span>
+          <span>{{ t('common.pagination.total', { n: tableTotal }) }}</span>
+          <span v-if="tableTotal > 0">· {{ t('common.pagination.page', { n: tablePage }) }} / {{ Math.ceil(tableTotal / tablePageSize) }}</span>
           <span class="pagination-divider">·</span>
-          <span class="page-size-label">每页</span>
+          <span class="page-size-label">{{ pm('table.pageSizeLabel') }}</span>
           <select v-model.number="tablePageSize" @change="tablePage = 1; fetchTable()" class="page-size-select">
             <option :value="25">25</option>
             <option :value="50">50</option>
@@ -172,28 +172,28 @@
           </select>
         </div>
         <div class="pagination-controls">
-          <button class="btn btn-sm" :disabled="tablePage <= 1" @click="tablePage--; fetchTable()">上一页</button>
-          <button class="btn btn-sm" :disabled="tablePage >= Math.ceil(tableTotal / tablePageSize)" @click="tablePage++; fetchTable()">下一页</button>
+          <button class="btn btn-sm" :disabled="tablePage <= 1" @click="tablePage--; fetchTable()">{{ t('common.pagination.previous') }}</button>
+          <button class="btn btn-sm" :disabled="tablePage >= Math.ceil(tableTotal / tablePageSize)" @click="tablePage++; fetchTable()">{{ t('common.pagination.next') }}</button>
         </div>
       </div>
       <table class="pm-table">
         <thead>
           <tr>
             <th><input type="checkbox" @change="toggleSelectAll" :checked="allSelected" /></th>
-            <th @click="sortTable('canonical_name')" class="sortable">模型 {{ sortIcon('canonical_name') }}</th>
-            <th @click="sortTable('provider_name')" class="sortable">供应商 {{ sortIcon('provider_name') }}</th>
-            <th>凭据</th>
-            <th @click="sortTable('unit_price_in_per_1m')" class="sortable">输入价 {{ sortIcon('unit_price_in_per_1m') }}</th>
-            <th @click="sortTable('unit_price_out_per_1m')" class="sortable">输出价 {{ sortIcon('unit_price_out_per_1m') }}</th>
-            <th @click="sortTable('currency')" class="sortable">币种 {{ sortIcon('currency') }}</th>
-            <th @click="sortTable('billing_mode')" class="sortable">计费 {{ sortIcon('billing_mode') }}</th>
-            <th @click="sortTable('routing_tier')" class="sortable">Tier {{ sortIcon('routing_tier') }}</th>
-            <th @click="sortTable('weight')" class="sortable">权重 {{ sortIcon('weight') }}</th>
-            <th @click="sortTable('available')" class="sortable">可用 {{ sortIcon('available') }}</th>
-            <th @click="sortTable('success_rate')" class="sortable">成功率 {{ sortIcon('success_rate') }}</th>
-            <th @click="sortTable('p95_latency_ms')" class="sortable">P95 {{ sortIcon('p95_latency_ms') }}</th>
-            <th>窗口</th>
-            <th>操作</th>
+            <th @click="sortTable('canonical_name')" class="sortable">{{ pm('table.colModel') }} {{ sortIcon('canonical_name') }}</th>
+            <th @click="sortTable('provider_name')" class="sortable">{{ pm('table.colProvider') }} {{ sortIcon('provider_name') }}</th>
+            <th>{{ pm('table.colCredential') }}</th>
+            <th @click="sortTable('unit_price_in_per_1m')" class="sortable">{{ pm('table.colInPrice') }} {{ sortIcon('unit_price_in_per_1m') }}</th>
+            <th @click="sortTable('unit_price_out_per_1m')" class="sortable">{{ pm('table.colOutPrice') }} {{ sortIcon('unit_price_out_per_1m') }}</th>
+            <th @click="sortTable('currency')" class="sortable">{{ pm('table.colCurrency') }} {{ sortIcon('currency') }}</th>
+            <th @click="sortTable('billing_mode')" class="sortable">{{ pm('table.colBilling') }} {{ sortIcon('billing_mode') }}</th>
+            <th @click="sortTable('routing_tier')" class="sortable">{{ pm('table.colTier') }} {{ sortIcon('routing_tier') }}</th>
+            <th @click="sortTable('weight')" class="sortable">{{ pm('table.colWeight') }} {{ sortIcon('weight') }}</th>
+            <th @click="sortTable('available')" class="sortable">{{ pm('table.colAvailable') }} {{ sortIcon('available') }}</th>
+            <th @click="sortTable('success_rate')" class="sortable">{{ pm('table.colSuccessRate') }} {{ sortIcon('success_rate') }}</th>
+            <th @click="sortTable('p95_latency_ms')" class="sortable">{{ pm('table.colP95') }} {{ sortIcon('p95_latency_ms') }}</th>
+            <th>{{ pm('table.colWindow') }}</th>
+            <th>{{ pm('table.colActions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -213,18 +213,18 @@
             <td>{{ item.p95_latency_ms ? item.p95_latency_ms + 'ms' : '-' }}</td>
             <td>{{ item.window_requests ? `W:${item.window_success_rate ? (item.window_success_rate * 100).toFixed(0) + '%' : '-'}` : '-' }}</td>
             <td>
-              <button class="btn btn-xs" @click="editFromTable(item)">编辑</button>
-              <button class="btn btn-xs" @click="copyPriceFromTable(item)">复制</button>
+              <button class="btn btn-xs" @click="editFromTable(item)">{{ pm('table.edit') }}</button>
+              <button class="btn btn-xs" @click="copyPriceFromTable(item)">{{ pm('table.copy') }}</button>
             </td>
           </tr>
         </tbody>
       </table>
       <div class="pagination-bar">
         <div class="pagination-info">
-          <span>共 {{ tableTotal }} 条</span>
-          <span v-if="tableTotal > 0">· 第 {{ tablePage }} / {{ Math.ceil(tableTotal / tablePageSize) }} 页</span>
+          <span>{{ t('common.pagination.total', { n: tableTotal }) }}</span>
+          <span v-if="tableTotal > 0">· {{ t('common.pagination.page', { n: tablePage }) }} / {{ Math.ceil(tableTotal / tablePageSize) }}</span>
           <span class="pagination-divider">·</span>
-          <span class="page-size-label">每页</span>
+          <span class="page-size-label">{{ pm('table.pageSizeLabel') }}</span>
           <select v-model.number="tablePageSize" @change="tablePage = 1; fetchTable()" class="page-size-select">
             <option :value="25">25</option>
             <option :value="50">50</option>
@@ -233,27 +233,27 @@
           </select>
         </div>
         <div class="pagination-controls">
-          <button class="btn btn-sm" :disabled="tablePage <= 1" @click="tablePage--; fetchTable()">上一页</button>
-          <button class="btn btn-sm" :disabled="tablePage >= Math.ceil(tableTotal / tablePageSize)" @click="tablePage++; fetchTable()">下一页</button>
+          <button class="btn btn-sm" :disabled="tablePage <= 1" @click="tablePage--; fetchTable()">{{ t('common.pagination.previous') }}</button>
+          <button class="btn btn-sm" :disabled="tablePage >= Math.ceil(tableTotal / tablePageSize)" @click="tablePage++; fetchTable()">{{ t('common.pagination.next') }}</button>
         </div>
       </div>
       <div class="pm-bulk-actions" v-if="selectedRows.size > 0">
-        <span>已选 {{ selectedRows.size }} 项</span>
-        <button class="btn btn-sm" @click="pasteToSelected">粘贴价格到所选</button>
+        <span>{{ pm('table.selectedCount', { n: selectedRows.size }) }}</span>
+        <button class="btn btn-sm" @click="pasteToSelected">{{ pm('table.pasteToSelected') }}</button>
       </div>
     </div>
 
     <!-- Import Modal -->
     <div v-if="showImport" class="modal-overlay" @click.self="showImport = false">
       <div class="modal" @click.stop>
-        <h3>导入定价 CSV</h3>
-        <p>CSV 列：offer_id, unit_price_in_per_1m, unit_price_out_per_1m, currency, billing_mode</p>
+        <h3>{{ pm('import.title') }}</h3>
+        <p>{{ pm('import.desc') }}</p>
         <input type="file" accept=".csv" @change="onFileChange" />
         <div class="form-actions">
           <button class="btn btn-primary btn-sm" @click="importCsv" :disabled="!importFile || importing">
-            {{ importing ? '导入中…' : '导入' }}
+            {{ importing ? pm('import.submitting') : pm('import.submit') }}
           </button>
-          <button class="btn btn-sm" @click="showImport = false">取消</button>
+          <button class="btn btn-sm" @click="showImport = false">{{ pm('import.cancel') }}</button>
           <span v-if="importMsg">{{ importMsg }}</span>
         </div>
       </div>
@@ -268,55 +268,55 @@
               <h3 class="drawer-title">{{ selectedOffer.raw_model_name }}</h3>
               <p class="detail-sub">{{ selectedOffer.provider_name }} / {{ selectedOffer.credential_label }}</p>
             </div>
-            <button class="btn btn-ghost btn-sm" @click="closeDetail">✕ 关闭</button>
+            <button class="btn btn-ghost btn-sm" @click="closeDetail">{{ pm('detail.close') }}</button>
           </div>
 
           <div class="drawer-body">
             <!-- Routing Params -->
             <div class="detail-section">
-              <h4>路由参数</h4>
+              <h4>{{ pm('detail.routingParams') }}</h4>
               <div class="params-grid">
                 <div class="param">
-                  <label>Tier</label>
+                  <label>{{ pm('detail.tier') }}</label>
                   <span class="param-val">{{ selectedOffer.routing_tier }}</span>
                 </div>
                 <div class="param">
-                  <label>权重</label>
+                  <label>{{ pm('detail.weight') }}</label>
                   <span class="param-val">{{ selectedOffer.weight }}</span>
                 </div>
                 <div class="param">
-                  <label>可用</label>
-                  <span class="param-val" :class="{ ok: selectedOffer.available }">{{ selectedOffer.available ? '是' : '否' }}</span>
+                  <label>{{ pm('detail.available') }}</label>
+                  <span class="param-val" :class="{ ok: selectedOffer.available }">{{ selectedOffer.available ? pm('detail.yes') : pm('detail.no') }}</span>
                 </div>
                 <div class="param">
-                  <label>成功率</label>
+                  <label>{{ pm('detail.successRate') }}</label>
                   <span class="param-val">{{ selectedOffer.success_rate != null ? (selectedOffer.success_rate * 100).toFixed(1) + '%' : '-' }}</span>
                 </div>
                 <div class="param">
-                  <label>P95 延迟</label>
+                  <label>{{ pm('detail.p95') }}</label>
                   <span class="param-val">{{ selectedOffer.p95_latency_ms ? selectedOffer.p95_latency_ms + 'ms' : '-' }}</span>
                 </div>
                 <div class="param">
-                  <label>最近活跃</label>
-                  <span class="param-val">{{ selectedOffer.last_seen_at ? new Date(selectedOffer.last_seen_at).toLocaleString() : '-' }}</span>
+                  <label>{{ pm('detail.lastActive') }}</label>
+                  <span class="param-val">{{ selectedOffer.last_seen_at ? fmtDateTime(selectedOffer.last_seen_at) : '-' }}</span>
                 </div>
               </div>
             </div>
 
             <!-- Window Stats -->
             <div class="detail-section" v-if="selectedOffer.window_requests">
-              <h4>窗口统计（10 分钟）</h4>
+              <h4>{{ pm('detail.windowStats') }}</h4>
               <div class="params-grid">
                 <div class="param">
-                  <label>请求数</label>
+                  <label>{{ pm('detail.windowRequests') }}</label>
                   <span class="param-val">{{ selectedOffer.window_requests }}</span>
                 </div>
                 <div class="param">
-                  <label>成功率</label>
+                  <label>{{ pm('detail.successRate') }}</label>
                   <span class="param-val">{{ selectedOffer.window_success_rate ? (selectedOffer.window_success_rate * 100).toFixed(1) + '%' : '-' }}</span>
                 </div>
                 <div class="param">
-                  <label>P95 延迟</label>
+                  <label>{{ pm('detail.windowP95') }}</label>
                   <span class="param-val">{{ selectedOffer.window_latency_p95_ms ? selectedOffer.window_latency_p95_ms.toFixed(0) + 'ms' : '-' }}</span>
                 </div>
               </div>
@@ -324,52 +324,52 @@
 
             <!-- Pricing Form -->
             <div class="detail-section">
-              <h4>定价</h4>
+              <h4>{{ pm('detail.pricing') }}</h4>
               <div class="form-group">
-                <label>输入价（每百万 Token）</label>
+                <label>{{ pm('detail.inPrice') }}</label>
                 <input v-model.number="editForm.unit_price_in_per_1m" type="number" step="0.001" />
               </div>
               <div class="form-group">
-                <label>输出价（每百万 Token）</label>
+                <label>{{ pm('detail.outPrice') }}</label>
                 <input v-model.number="editForm.unit_price_out_per_1m" type="number" step="0.001" />
               </div>
               <div class="form-group">
-                <label>缓存读价（每百万）</label>
+                <label>{{ pm('detail.cacheReadPrice') }}</label>
                 <input v-model.number="editForm.cache_read_price_per_1m" type="number" step="0.001" />
               </div>
               <div class="form-group">
-                <label>缓存写价（每百万）</label>
+                <label>{{ pm('detail.cacheWritePrice') }}</label>
                 <input v-model.number="editForm.cache_write_price_per_1m" type="number" step="0.001" />
               </div>
               <div class="form-group">
-                <label>币种</label>
+                <label>{{ pm('detail.currency') }}</label>
                 <select v-model="editForm.currency">
                   <option value="CNY">CNY</option>
                   <option value="USD">USD</option>
                 </select>
               </div>
               <div class="form-group">
-                <label>计费模式</label>
+                <label>{{ pm('detail.billingMode') }}</label>
                 <select v-model="editForm.billing_mode">
-                  <option value="per_token">按 Token</option>
-                  <option value="per_request">按次</option>
-                  <option value="monthly">包月</option>
-                  <option value="free">免费</option>
+                  <option value="per_token">{{ pm('detail.billingPerToken') }}</option>
+                  <option value="per_request">{{ pm('detail.billingPerRequest') }}</option>
+                  <option value="monthly">{{ pm('detail.billingMonthly') }}</option>
+                  <option value="free">{{ pm('detail.billingFree') }}</option>
                 </select>
               </div>
             </div>
 
             <div class="detail-balance" v-if="selectedOffer.balance_usd != null">
-              <strong>余额：</strong> {{ selectedOffer.balance_usd }} {{ selectedOffer.balance_currency || 'USD' }}
-              <span v-if="selectedOffer.pool_group"> | 资源池：{{ selectedOffer.pool_group }}</span>
+              <strong>{{ pm('detail.balance') }}</strong> {{ selectedOffer.balance_usd }} {{ selectedOffer.balance_currency || 'USD' }}
+              <span v-if="selectedOffer.pool_group"> | {{ pm('detail.poolGroup') }}{{ selectedOffer.pool_group }}</span>
             </div>
 
             <div class="form-actions">
               <button class="btn btn-primary btn-sm" @click="saveOffer" :disabled="saving">
-                {{ saving ? '保存中…' : '保存' }}
+                {{ saving ? pm('detail.saving') : pm('detail.save') }}
               </button>
-              <button class="btn btn-sm" @click="copyPrice">复制价格</button>
-              <button class="btn btn-sm" @click="pastePrice" :disabled="!clipboard">粘贴</button>
+              <button class="btn btn-sm" @click="copyPrice">{{ pm('detail.copyPrice') }}</button>
+              <button class="btn btn-sm" @click="pastePrice" :disabled="!clipboard">{{ pm('detail.pastePrice') }}</button>
               <span v-if="saveMsg" class="save-msg" :class="{ ok: saveOk }">{{ saveMsg }}</span>
             </div>
           </div>
@@ -380,19 +380,19 @@
     <!-- Auto Inherit Modal -->
     <div v-if="showInheritPreview" class="modal-overlay" @click.self="showInheritPreview = false">
       <div class="modal" @click.stop>
-        <h3>自动继承定价</h3>
-        <p>{{ inheritPreview.would_inherit }} 个 offer 将从同供应商+模型继承定价。</p>
+        <h3>{{ pm('inherit.title') }}</h3>
+        <p>{{ pm('inherit.desc', { n: inheritPreview.would_inherit }) }}</p>
         <div class="inherit-details" v-if="inheritPreview.details">
           <div v-for="d in inheritPreview.details.slice(0, 20)" :key="d.target_offer_id" class="inherit-row">
-            Offer #{{ d.target_offer_id }} ← Offer #{{ d.source_offer_id }}
+            {{ pm('inherit.offerPrefix') }}{{ d.target_offer_id }} ← {{ pm('inherit.offerPrefix') }}{{ d.source_offer_id }}
           </div>
-          <p v-if="inheritPreview.details.length > 20">… 另有 {{ inheritPreview.details.length - 20 }} 项</p>
+          <p v-if="inheritPreview.details.length > 20">{{ pm('inherit.more', { n: inheritPreview.details.length - 20 }) }}</p>
         </div>
         <div class="form-actions">
           <button class="btn btn-primary btn-sm" @click="confirmInherit" :disabled="inheriting">
-            {{ inheriting ? '继承中…' : '确认继承' }}
+            {{ inheriting ? pm('inherit.confirming') : pm('inherit.confirm') }}
           </button>
-          <button class="btn btn-sm" @click="showInheritPreview = false">取消</button>
+          <button class="btn btn-sm" @click="showInheritPreview = false">{{ pm('inherit.cancel') }}</button>
         </div>
       </div>
     </div>
@@ -401,8 +401,15 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useFormat } from '../i18n/useFormat'
 import { store, isReadOnlyMode, authBearer } from '../store'
 import ModelPicker from '../components/ModelPicker.vue'
+
+const { t } = useI18n()
+const { fmtDateTime } = useFormat()
+const pm = (k: string, params?: Record<string, unknown>): string =>
+  t(`pricingManagement.${k}` as never, params as never)
 
 const readOnly = computed(() => isReadOnlyMode())
 
@@ -710,15 +717,15 @@ async function saveOffer() {
     })
     const data = await res.json()
     if (data.updated > 0) {
-      saveMsg.value = '已保存'
+      saveMsg.value = pm('detail.saved')
       saveOk.value = true
       await fetchData()
     } else {
-      saveMsg.value = '无变更'
+      saveMsg.value = pm('detail.noChange')
       saveOk.value = false
     }
   } catch (e) {
-    saveMsg.value = '保存失败'
+    saveMsg.value = pm('detail.saveFailed')
     saveOk.value = false
   } finally {
     saving.value = false
@@ -728,7 +735,7 @@ async function saveOffer() {
 function copyPrice() {
   if (selectedOffer.value) {
     clipboard.value = { ...selectedOffer.value }
-    saveMsg.value = '价格已复制'
+    saveMsg.value = pm('detail.copied')
     saveOk.value = true
   }
 }
@@ -743,13 +750,13 @@ function pastePrice() {
     currency: clipboard.value.currency || 'USD',
     billing_mode: clipboard.value.billing_mode || 'per_token',
   }
-  saveMsg.value = '已粘贴，请点击保存生效'
+  saveMsg.value = pm('detail.pasted')
   saveOk.value = true
 }
 
 function copyPriceFromTable(item: Offer) {
   clipboard.value = { ...item }
-  saveMsg.value = '价格已复制'
+  saveMsg.value = pm('detail.copied')
   saveOk.value = true
 }
 
@@ -776,12 +783,12 @@ async function pasteToSelected() {
       body: JSON.stringify({ updates }),
     })
     const data = await res.json()
-    saveMsg.value = `已更新 ${data.updated} 个 offer`
+    saveMsg.value = pm('import.success', { n: data.updated })
     saveOk.value = true
     selectedRows.value.clear()
     await fetchTable()
   } catch (e) {
-    saveMsg.value = '批量更新失败'
+    saveMsg.value = pm('import.failed')
     saveOk.value = false
   } finally {
     saving.value = false
@@ -844,11 +851,11 @@ async function confirmInherit() {
     })
     const data = await res.json()
     showInheritPreview.value = false
-    saveMsg.value = `已继承 ${data.inherited} 个 offer`
+    saveMsg.value = pm('inherit.done', { n: data.inherited })
     saveOk.value = true
     await fetchData()
   } catch (e) {
-    saveMsg.value = '自动继承失败'
+    saveMsg.value = pm('inherit.failed')
     saveOk.value = false
   } finally {
     inheriting.value = false
@@ -884,11 +891,11 @@ async function importCsv() {
       body: fd,
     })
     const data = await res.json()
-    importMsg.value = `已更新 ${data.updated} 个 offer`
+    importMsg.value = pm('import.success', { n: data.updated })
     showImport.value = false
     await fetchData()
   } catch (e) {
-    importMsg.value = '导入失败'
+    importMsg.value = pm('import.failed')
   } finally {
     importing.value = false
   }

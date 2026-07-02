@@ -13,6 +13,7 @@
 //   5. verdict        — top-3 models per task type, ranked
 
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getAutoRouteCorrelations,
   type AutoRouteCorrelationsResponse,
@@ -20,6 +21,10 @@ import {
   type CorrelationRowMT,
   type CorrelationVerdict,
 } from '../api'
+
+const { t } = useI18n()
+const cn = (k: string, params?: Record<string, unknown>): string =>
+  t(`correlations.${k}` as never, params as never)
 
 // ── State ────────────────────────────────────────────────────────
 const resp = ref<AutoRouteCorrelationsResponse | null>(null)
@@ -95,7 +100,7 @@ onMounted(load)
 
 <template>
   <div class="correlations-view">
-    <h1>Auto-Route 关联分析 (Correlations)</h1>
+    <h1>{{ cn('title') }}</h1>
     <p class="subtitle">
       Cross-references the promoted columns on
       <code>request_logs</code> (P7.2) to surface correlations between

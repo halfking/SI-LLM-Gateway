@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getAuditLogs, type AuditLogEntry } from '../api'
+import { useFormat } from '../i18n/useFormat'
+
+const { t } = useI18n()
+const { fmtDate: fmtDateBase, fmtTime: fmtTimeBase, fmtDateTime: fmtDateTimeBase } = useFormat()
+// Short alias for the auditLog locale namespace.
+const al = (k: string, params?: Record<string, unknown>): string =>
+  t(`auditLog.${k}` as never, params as never)
 
 const entries = ref<AuditLogEntry[]>([])
 const total = ref(0)
@@ -34,7 +42,7 @@ async function load() {
     entries.value = r.entries || []
     total.value = r.total || 0
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : al('errors.loadFailed')
     entries.value = []
     total.value = 0
   } finally {
@@ -72,33 +80,25 @@ function actionBadgeClass(action: string): string {
 }
 
 function actionLabel(action: string): string {
-  const labels: Record<string, string> = {
-    'user.create': '创建用户',
-    'user.update': '更新用户',
-    'user.delete': '删除用户',
-    'user.reset_password': '重置密码',
-    'user.change_password': '修改密码',
-    'auth.login': '登录',
-    'auth.login_failed': '登录失败',
-    'auth.logout': '登出',
-    'auth.rate_limited': '限流',
-  }
-  return labels[action] || action
+  // Use the auditLog.actions map; falls back to the raw action key.
+  const translated = al(`actions.${action}`)
+  if (translated && translated !== `actions.${action}`) return translated
+  return action
 }
 
 function fmtDate(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+  if (!s) return al('pagination.dash')
+  return fmtDateBase(s)
 }
 
 function fmtTime(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  if (!s) return al('pagination.dash')
+  return fmtTimeBase(s)
 }
 
 function fmtTs(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleString('zh-CN', { hour12: false })
+  if (!s) return al('pagination.dash')
+  return fmtDateTimeBase(s)
 }
 
 function fmtJson(v: unknown): string {
@@ -119,7 +119,7 @@ function fmtJson(v: unknown): string {
 
 function detailPreview(e: AuditLogEntry): string {
   const raw = e.after_json ?? e.before_json
-  if (raw == null) return '—'
+  if (raw == null) return al('pagination.dash')
   const text = typeof raw === 'string' ? raw : JSON.stringify(raw)
   if (text.length <= 80) return text
   return text.slice(0, 79) + '…'
@@ -141,62 +141,62 @@ onMounted(load)
 <template>
   <div class="audit-page">
     <div class="page-header">
-      <h2>审计日志</h2>
+      <h2>{{ al('page.title') }}</h2>
       <div class="header-actions">
-        <span class="count-chip" aria-live="polite">共 {{ total }} 条</span>
+        <span class="count-chip" aria-live="polite">{{ al('page.totalChip', { n: total }) }}</span>
         <button class="btn btn-primary btn-sm" :disabled="loading" @click="load">
-          {{ loading ? '刷新中…' : '刷新' }}
+          {{ loading ? al('page.refreshing') : al('page.refresh') }}
         </button>
       </div>
     </div>
 
-    <p class="page-desc">记录用户管理与认证相关操作，仅超级管理员可查看。</p>
+    <p class="page-desc">{{ al('page.desc') }}</p>
 
     <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
 
     <div class="compact-filter-bar compact-filter-bar--stacked">
       <div class="cf-row">
         <div class="cf-field cf-field--actor">
-          <span class="cf-label">操作员</span>
+          <span class="cf-label">{{ al('filter.actorLabel') }}</span>
           <input
             v-model="filterActor"
             type="text"
             class="cf-input"
-            placeholder="模糊匹配用户名"
-            aria-label="操作员筛选"
+            :placeholder="al('filter.actorPlaceholder')"
+            :aria-label="al('filter.actorAria')"
             @keyup.enter="resetPageAndLoad"
           />
         </div>
         <div class="cf-field cf-field--action">
-          <span class="cf-label">动作</span>
+          <span class="cf-label">{{ al('filter.actionLabel') }}</span>
           <input
             v-model="filterAction"
             type="text"
             class="cf-input"
-            placeholder="如 user.* 或 auth.*"
-            aria-label="动作筛选"
+            :placeholder="al('filter.actionPlaceholder')"
+            :aria-label="al('filter.actionAria')"
             @keyup.enter="resetPageAndLoad"
           />
         </div>
         <div class="cf-field cf-field--time">
-          <span class="cf-label">起始时间</span>
-          <input v-model="filterFrom" type="datetime-local" class="cf-input" aria-label="起始时间" />
+          <span class="cf-label">{{ al('filter.fromLabel') }}</span>
+          <input v-model="filterFrom" type="datetime-local" class="cf-input" :aria-label="al('filter.fromAria')" />
         </div>
         <div class="cf-field cf-field--time">
-          <span class="cf-label">截止时间</span>
-          <input v-model="filterTo" type="datetime-local" class="cf-input" aria-label="截止时间" />
+          <span class="cf-label">{{ al('filter.toLabel') }}</span>
+          <input v-model="filterTo" type="datetime-local" class="cf-input" :aria-label="al('filter.toAria')" />
         </div>
-        <button class="btn btn-primary btn-sm" :disabled="loading" @click="resetPageAndLoad">查询</button>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="clearFilters">重置</button>
+        <button class="btn btn-primary btn-sm" :disabled="loading" @click="resetPageAndLoad">{{ al('filter.query') }}</button>
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="clearFilters">{{ al('filter.reset') }}</button>
       </div>
     </div>
 
     <div v-if="!loading && total > 0" class="pagination-bar">
       <div class="pagination-meta">
-        <span>共 {{ total }} 条</span>
-        <span>· 第 {{ page }} / {{ totalPages }} 页</span>
+        <span>{{ al('pagination.total', { n: total }) }}</span>
+        <span>{{ al('pagination.pageOf', { page: page, total: totalPages }) }}</span>
         <label class="page-size-label">
-          <span class="text-muted">每页</span>
+          <span class="text-muted">{{ al('pagination.perPage') }}</span>
           <select v-model.number="size" class="page-size-select" @change="resetPageAndLoad">
             <option :value="25">25</option>
             <option :value="50">50</option>
@@ -206,8 +206,8 @@ onMounted(load)
         </label>
       </div>
       <div class="pagination-actions">
-        <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="changePage(-1)">上一页</button>
-        <button class="btn btn-ghost btn-sm" :disabled="page >= totalPages" @click="changePage(1)">下一页</button>
+        <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="changePage(-1)">{{ al('pagination.previous') }}</button>
+        <button class="btn btn-ghost btn-sm" :disabled="page >= totalPages" @click="changePage(1)">{{ al('pagination.next') }}</button>
       </div>
     </div>
 
@@ -216,21 +216,21 @@ onMounted(load)
         <table class="data-table audit-table">
           <thead>
             <tr>
-              <th class="col-time">时间</th>
-              <th class="col-actor">操作员</th>
-              <th class="col-action">动作</th>
-              <th class="col-target">目标</th>
-              <th class="col-details">详情</th>
+              <th class="col-time">{{ al('table.headers.time') }}</th>
+              <th class="col-actor">{{ al('table.headers.actor') }}</th>
+              <th class="col-action">{{ al('table.headers.action') }}</th>
+              <th class="col-target">{{ al('table.headers.target') }}</th>
+              <th class="col-details">{{ al('table.headers.details') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="5" class="state-cell">加载中…</td>
+              <td colspan="5" class="state-cell">{{ al('page.loading') }}</td>
             </tr>
             <tr v-else-if="!entries.length">
               <td colspan="5" class="state-cell">
-                <p>暂无审计记录</p>
-                <p class="text-muted">调整筛选条件或扩大时间范围后重试</p>
+                <p>{{ al('page.emptyTitle') }}</p>
+                <p class="text-muted">{{ al('page.emptyHint') }}</p>
               </td>
             </tr>
             <tr
@@ -248,7 +248,7 @@ onMounted(load)
                 <div class="cell-line2">{{ fmtTime(e.ts) }}</div>
               </td>
               <td class="col-actor">
-                <span class="actor-name">{{ e.actor || '—' }}</span>
+                <span class="actor-name">{{ e.actor || al('pagination.dash') }}</span>
               </td>
               <td class="col-action">
                 <span class="badge" :class="actionBadgeClass(e.action)" :title="e.action">
@@ -260,7 +260,7 @@ onMounted(load)
                   <span class="target-type">{{ e.target_type }}</span>
                   <span class="target-id">#{{ e.target_id ?? '?' }}</span>
                 </template>
-                <span v-else class="text-muted">—</span>
+                <span v-else class="text-muted">{{ al('pagination.dash') }}</span>
               </td>
               <td class="col-details">
                 <code class="detail-preview" :title="detailPreview(e)">{{ detailPreview(e) }}</code>
@@ -273,10 +273,10 @@ onMounted(load)
 
     <div v-if="!loading && total > 0" class="pagination-bar">
       <div class="pagination-meta">
-        <span>共 {{ total }} 条</span>
-        <span>· 第 {{ page }} / {{ totalPages }} 页</span>
+        <span>{{ al('pagination.total', { n: total }) }}</span>
+        <span>{{ al('pagination.pageOf', { page: page, total: totalPages }) }}</span>
         <label class="page-size-label">
-          <span class="text-muted">每页</span>
+          <span class="text-muted">{{ al('pagination.perPage') }}</span>
           <select v-model.number="size" class="page-size-select" @change="resetPageAndLoad">
             <option :value="25">25</option>
             <option :value="50">50</option>
@@ -286,42 +286,42 @@ onMounted(load)
         </label>
       </div>
       <div class="pagination-actions">
-        <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="changePage(-1)">上一页</button>
-        <button class="btn btn-ghost btn-sm" :disabled="page >= totalPages" @click="changePage(1)">下一页</button>
+        <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="changePage(-1)">{{ al('pagination.previous') }}</button>
+        <button class="btn btn-ghost btn-sm" :disabled="page >= totalPages" @click="changePage(1)">{{ al('pagination.next') }}</button>
       </div>
     </div>
 
     <div v-if="detailVisible && detailEntry" class="drawer-backdrop" @click="closeDetail">
       <div class="drawer-panel card drawer-panel-wide" role="dialog" aria-labelledby="audit-detail-title" @click.stop>
         <div class="drawer-header">
-          <h3 id="audit-detail-title">审计详情 #{{ detailEntry.id }}</h3>
-          <button class="btn btn-sm btn-ghost" @click="closeDetail">关闭</button>
+          <h3 id="audit-detail-title">{{ al('detail.titleWithId', { id: detailEntry.id }) }}</h3>
+          <button class="btn btn-sm btn-ghost" @click="closeDetail">{{ al('detail.close') }}</button>
         </div>
 
         <div class="drawer-section detail-meta">
-          <span><strong>时间</strong> {{ fmtTs(detailEntry.ts) }}</span>
-          <span><strong>操作员</strong> {{ detailEntry.actor || '—' }}</span>
+          <span><strong>{{ al('detail.metaTime') }}</strong> {{ fmtTs(detailEntry.ts) }}</span>
+          <span><strong>{{ al('detail.metaActor') }}</strong> {{ detailEntry.actor || al('pagination.dash') }}</span>
           <span>
-            <strong>动作</strong>
+            <strong>{{ al('detail.metaAction') }}</strong>
             <span class="badge" :class="actionBadgeClass(detailEntry.action)">{{ detailEntry.action }}</span>
           </span>
           <span v-if="detailEntry.target_type">
-            <strong>目标</strong> {{ detailEntry.target_type }} #{{ detailEntry.target_id ?? '?' }}
+            <strong>{{ al('detail.metaTarget') }}</strong> {{ detailEntry.target_type }} #{{ detailEntry.target_id ?? '?' }}
           </span>
         </div>
 
         <div v-if="detailEntry.before_json" class="drawer-section">
-          <div class="drawer-section-title">变更前</div>
+          <div class="drawer-section-title">{{ al('detail.beforeTitle') }}</div>
           <pre class="json-block">{{ fmtJson(detailEntry.before_json) }}</pre>
         </div>
 
         <div v-if="detailEntry.after_json" class="drawer-section">
-          <div class="drawer-section-title">变更后</div>
+          <div class="drawer-section-title">{{ al('detail.afterTitle') }}</div>
           <pre class="json-block">{{ fmtJson(detailEntry.after_json) }}</pre>
         </div>
 
         <div v-if="!detailEntry.before_json && !detailEntry.after_json" class="drawer-section">
-          <p class="text-muted">无附加详情</p>
+          <p class="text-muted">{{ al('detail.noExtra') }}</p>
         </div>
       </div>
     </div>

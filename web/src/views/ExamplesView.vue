@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { resolveRouting } from '../api'
 import ModelPicker from '../components/ModelPicker.vue'
 import ClientConfigGenerator from '../components/ClientConfigGenerator.vue'
 import { useGatewayApiKey } from '../composables/useGatewayApiKey'
+
+const { t } = useI18n()
+const tx = (k: string, params?: Record<string, unknown>): string =>
+  t(`examples.${k}` as never, params as never)
 
 const { apiKey: gatewayApiKey } = useGatewayApiKey()
 
@@ -11,7 +16,7 @@ const selectedModel = ref('glm-4-flash')
 const realApiKey = computed(() => gatewayApiKey.value || '')
 const maskedApiKey = computed(() => {
   const k = realApiKey.value
-  if (!k) return '<YOUR_API_KEY>'
+  if (!k) return tx('placeholder')
   if (k.length <= 16) return `${k.slice(0, 4)}****`
   return `${k.slice(0, 12)}****${k.slice(-4)}`
 })
@@ -203,9 +208,14 @@ async function runTest(exampleId: ExampleId) {
     if (realApiKey.value) {
       try {
         const route = await resolveRouting(selectedModel.value)
-        d.routing = `模型: ${route.client_model}\n标准名: ${route.canonical_name || '未映射'}\n路径: ${route.resolution_path}\n候选数: ${route.candidates?.length || 0}\n原始模型: ${route.raw_models?.join(', ') || '无'}`
+        d.routing =
+          `${tx('routing.rawModel', { client_model: route.client_model })}\n` +
+          `${route.canonical_name ? tx('routing.canonical', { canonical: route.canonical_name }) : tx('routing.fallbackCanonical')}\n` +
+          `${tx('routing.path', { path: route.resolution_path })}\n` +
+          `${tx('routing.candidates', { n: route.candidates?.length || 0 })}\n` +
+          `${route.raw_models?.length ? tx('routing.rawList', { list: route.raw_models.join(', ') }) : tx('routing.fallbackModel')}`
       } catch {
-        d.routing = '路由信息获取失败'
+        d.routing = tx('routing.failed')
       }
     }
   } catch (err: any) {
@@ -220,13 +230,13 @@ function closeDrawer(exampleId: ExampleId) {
   drawers.value[exampleId].open = false
 }
 
-const exampleTitle: Record<ExampleId, string> = {
-  curl: 'cURL Chat 测试',
-  python: 'Python Chat 测试',
-  stream: '流式输出测试',
-  js: 'JavaScript Chat 测试',
-  models: '列出模型测试',
-}
+const exampleTitle = computed<Record<ExampleId, string>>(() => ({
+  curl: tx('drawer.titleCurl'),
+  python: tx('drawer.titlePython'),
+  stream: tx('drawer.titleStream'),
+  js: tx('drawer.titleJs'),
+  models: tx('drawer.titleModels'),
+}))
 
 type ClientGuideId = 'cherry' | 'cursor' | 'claude' | 'roocode'
 const openGuide = ref<ClientGuideId | null>('cherry')
@@ -242,55 +252,55 @@ interface ClientGuide {
 const clientGuides = computed((): ClientGuide[] => [
   {
     id: 'cherry',
-    name: 'Cherry Studio',
+    name: tx('guides.cherry.name'),
     icon: '🍒',
     steps: [
-      '打开 Cherry Studio → 设置 → 模型服务 → 添加 OpenAI 兼容提供商',
-      `API 地址（Base URL）：${baseUrl.value}`,
-      'API Key：在左侧「API 密钥」创建或复制你的 sk-* 密钥',
-      '模型：填写网关支持的模型 ID（如 glm-4-flash），或使用 auto 开启自动路由',
-      '保存后可在对话窗口选择该提供商下的模型',
+      tx('guides.cherry.steps[0]'),
+      tx('guides.cherry.steps[1]', { url: baseUrl.value }),
+      tx('guides.cherry.steps[2]'),
+      tx('guides.cherry.steps[3]'),
+      tx('guides.cherry.steps[4]'),
     ],
-    mcpNote: 'MCP：设置 → MCP 服务器 → 导入配置。Memora 端点 https://[MCP_DOMAIN]/memora/mcp，Header 填 Authorization: Bearer <MEMORA_API_KEY>（与 LLM 密钥不同，需在 ACC 申请 memora scope）。',
+    mcpNote: tx('guides.cherry.mcp'),
   },
   {
     id: 'cursor',
-    name: 'Cursor IDE',
+    name: tx('guides.cursor.name'),
     icon: '⌨️',
     steps: [
-      'Cursor Settings（Cmd/Ctrl+Shift+J）→ Models',
-      'OpenAI API Key → 填入你的 sk-* 网关密钥',
-      `开启 Override OpenAI Base URL → ${baseUrl.value}`,
-      '点击 Verify 验证连通性',
-      'Add Custom Model：添加 glm-5.1、minimax-m3、deepseek-v4-pro 等（完整列表见下方「列出模型」示例）',
-      '可选：请求头 X-Client-Profile: cursor、X-Request-Mode: agent 用于 Agent 模式优化',
+      tx('guides.cursor.steps[0]'),
+      tx('guides.cursor.steps[1]'),
+      tx('guides.cursor.steps[2]', { url: baseUrl.value }),
+      tx('guides.cursor.steps[3]'),
+      tx('guides.cursor.steps[4]'),
+      tx('guides.cursor.steps[5]'),
     ],
-    mcpNote: 'MCP：Cursor Settings → MCP，可导入 [MCP_DOMAIN] 的 acc/memora/trendradar 服务（需对应 scope 的 API Key）。',
+    mcpNote: tx('guides.cursor.mcp'),
   },
   {
     id: 'claude',
-    name: 'Claude Desktop',
+    name: tx('guides.claude.name'),
     icon: '🤖',
     steps: [
-      'Claude Desktop 本身走 Anthropic 账号；若需接入开轩 MCP 工具：',
-      '编辑 claude_desktop_config.json（macOS: ~/Library/Application Support/Claude/）',
-      '添加 HTTP MCP：url https://[MCP_DOMAIN]/memora/mcp，headers.Authorization = Bearer <MEMORA_API_KEY>',
-      'Quit & Reopen Claude Desktop 生效（需 ≥ 1.0 版本）',
-      `LLM 对话走网关：使用支持 OpenAI 协议的客户端，Base URL ${baseUrl.value}`,
+      tx('guides.claude.steps[0]'),
+      tx('guides.claude.steps[1]'),
+      tx('guides.claude.steps[2]'),
+      tx('guides.claude.steps[3]'),
+      tx('guides.claude.steps[4]', { url: baseUrl.value }),
     ],
   },
   {
     id: 'roocode',
-    name: 'Roo Code / VS Code',
+    name: tx('guides.roocode.name'),
     icon: '🧩',
     steps: [
-      '扩展设置中选择 OpenAI Compatible 提供商',
-      `Base URL：${baseUrl.value}`,
-      'API Key：你的 sk-* 网关密钥',
-      '模型：与 Cherry Studio 相同，支持 auto 或具体模型 ID',
-      '可选 Header：X-Client-Profile: roocode',
+      tx('guides.roocode.steps[0]'),
+      tx('guides.roocode.steps[1]', { url: baseUrl.value }),
+      tx('guides.roocode.steps[2]'),
+      tx('guides.roocode.steps[3]'),
+      tx('guides.roocode.steps[4]'),
     ],
-    mcpNote: 'VS Code / Roo Code MCP：在 mcp.json 中配置 streamable-http 类型端点，参考仓库 docs/clients/roocode-mcp.json。',
+    mcpNote: tx('guides.roocode.mcp'),
   },
 ])
 
@@ -302,14 +312,13 @@ function toggleGuide(id: ClientGuideId) {
 <template>
   <div>
     <div class="page-header">
-      <h2>接入指南</h2>
+      <h2>{{ tx('title') }}</h2>
     </div>
 
-    <p style="color:var(--muted);margin-bottom:12px">
-      网关兼容 OpenAI API 协议。将 <code>base_url</code> 指向此网关即可使用任意支持的模型；也可在侧栏「对话」直接网页聊天。
+    <p style="color:var(--muted);margin-bottom:12px" v-html="tx('intro')">
     </p>
 
-    <h3 class="section-heading">常用客户端配置</h3>
+    <h3 class="section-heading">{{ tx('sectionClientConfig') }}</h3>
     <ClientConfigGenerator />
 
     <div class="guide-list">
@@ -327,42 +336,42 @@ function toggleGuide(id: ClientGuideId) {
       </div>
     </div>
 
-    <h3 class="section-heading" style="margin-top:28px">API 请求示例</h3>
+    <h3 class="section-heading" style="margin-top:28px">{{ tx('sectionApiExamples') }}</h3>
     <p v-if="realApiKey" class="key-hint">
-      示例代码中的 API Key 已脱敏显示；点击「测试」将使用当前登录密钥。复制示例后请自行替换为真实 Key。
+      {{ tx('keyHint') }}
       <button type="button" class="btn btn-ghost btn-sm" @click="copyCode('realkey', realApiKey)">
-        {{ copied === 'realkey' ? '已复制!' : '复制完整 Key' }}
+        {{ copied === 'realkey' ? tx('copied') : tx('copyKey') }}
       </button>
     </p>
 
     <div class="card" style="margin-bottom:20px">
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-        <div style="font-weight:500;white-space:nowrap">选择示例模型：</div>
+        <div style="font-weight:500;white-space:nowrap">{{ tx('selectModel') }}</div>
         <div style="max-width:360px;flex:1;min-width:240px">
           <ModelPicker
             v-model="selectedModel"
-            placeholder="选择模型…"
-            title="选择示例模型"
+            :placeholder="tx('modelPickerPlaceholder')"
+            :title="tx('modelPickerTitle')"
           />
         </div>
         <div style="font-size:12px;color:var(--muted)">
-          当前模型: <code style="color:var(--accent)">{{ selectedModel }}</code>
+          {{ tx('currentModel') }} <code style="color:var(--accent)">{{ selectedModel }}</code>
         </div>
         <div style="font-size:12px;color:var(--muted)">
-          Base URL: <code>{{ baseUrl }}</code>
+          {{ tx('baseUrlLabel') }} <code>{{ baseUrl }}</code>
         </div>
       </div>
     </div>
 
     <div class="card" style="margin-bottom:20px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h4 style="margin:0">cURL — Chat Completions</h4>
+        <h4 style="margin:0">{{ tx('example.curl') }}</h4>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" @click="copyCode('curl', curlExample)">
-            {{ copied === 'curl' ? '已复制!' : '复制' }}
+            {{ copied === 'curl' ? tx('copied') : tx('button.copy') }}
           </button>
           <button class="btn btn-primary btn-sm" @click="runTest('curl')" :disabled="drawers.curl.loading">
-            {{ drawers.curl.loading ? '测试中...' : '测试' }}
+            {{ drawers.curl.loading ? tx('button.testing') : tx('button.test') }}
           </button>
         </div>
       </div>
@@ -371,13 +380,13 @@ function toggleGuide(id: ClientGuideId) {
 
     <div class="card" style="margin-bottom:20px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h4 style="margin:0">Python (openai SDK)</h4>
+        <h4 style="margin:0">{{ tx('example.python') }}</h4>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" @click="copyCode('python', pythonExample)">
-            {{ copied === 'python' ? '已复制!' : '复制' }}
+            {{ copied === 'python' ? tx('copied') : tx('button.copy') }}
           </button>
           <button class="btn btn-primary btn-sm" @click="runTest('python')" :disabled="drawers.python.loading">
-            {{ drawers.python.loading ? '测试中...' : '测试' }}
+            {{ drawers.python.loading ? tx('button.testing') : tx('button.test') }}
           </button>
         </div>
       </div>
@@ -386,13 +395,13 @@ function toggleGuide(id: ClientGuideId) {
 
     <div class="card" style="margin-bottom:20px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h4 style="margin:0">Python — 流式输出 (Streaming)</h4>
+        <h4 style="margin:0">{{ tx('example.stream') }}</h4>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" @click="copyCode('stream', streamExample)">
-            {{ copied === 'stream' ? '已复制!' : '复制' }}
+            {{ copied === 'stream' ? tx('copied') : tx('button.copy') }}
           </button>
           <button class="btn btn-primary btn-sm" @click="runTest('stream')" :disabled="drawers.stream.loading">
-            {{ drawers.stream.loading ? '测试中...' : '测试' }}
+            {{ drawers.stream.loading ? tx('button.testing') : tx('button.test') }}
           </button>
         </div>
       </div>
@@ -401,13 +410,13 @@ function toggleGuide(id: ClientGuideId) {
 
     <div class="card" style="margin-bottom:20px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h4 style="margin:0">JavaScript / TypeScript (openai SDK)</h4>
+        <h4 style="margin:0">{{ tx('example.js') }}</h4>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" @click="copyCode('js', jsExample)">
-            {{ copied === 'js' ? '已复制!' : '复制' }}
+            {{ copied === 'js' ? tx('copied') : tx('button.copy') }}
           </button>
           <button class="btn btn-primary btn-sm" @click="runTest('js')" :disabled="drawers.js.loading">
-            {{ drawers.js.loading ? '测试中...' : '测试' }}
+            {{ drawers.js.loading ? tx('button.testing') : tx('button.test') }}
           </button>
         </div>
       </div>
@@ -416,13 +425,13 @@ function toggleGuide(id: ClientGuideId) {
 
     <div class="card" style="margin-bottom:20px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h4 style="margin:0">cURL — 列出可用模型</h4>
+        <h4 style="margin:0">{{ tx('example.models') }}</h4>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" @click="copyCode('models', listModelsExample)">
-            {{ copied === 'models' ? '已复制!' : '复制' }}
+            {{ copied === 'models' ? tx('copied') : tx('button.copy') }}
           </button>
           <button class="btn btn-primary btn-sm" @click="runTest('models')" :disabled="drawers.models.loading">
-            {{ drawers.models.loading ? '测试中...' : '测试' }}
+            {{ drawers.models.loading ? tx('button.testing') : tx('button.test') }}
           </button>
         </div>
       </div>
@@ -435,28 +444,28 @@ function toggleGuide(id: ClientGuideId) {
           <div class="drawer-header">
             <h4 style="margin:0">{{ exampleTitle[eid] }}</h4>
             <div style="display:flex;align-items:center;gap:12px">
-              <span style="font-size:13px;color:var(--muted)">模型: <code>{{ selectedModel }}</code></span>
-              <button class="btn btn-ghost btn-sm" @click="closeDrawer(eid)">关闭 ✕</button>
+              <span style="font-size:13px;color:var(--muted)">{{ tx('drawer.model', { model: selectedModel }) }}</span>
+              <button class="btn btn-ghost btn-sm" @click="closeDrawer(eid)">{{ tx('button.close') }}</button>
             </div>
           </div>
 
           <div v-if="drawers[eid].loading" class="drawer-loading">
             <div class="spinner"></div>
-            <span>请求中...</span>
+            <span>{{ tx('drawer.requesting') }}</span>
           </div>
 
           <template v-else>
             <div class="drawer-meta">
               <div class="meta-item">
-                <span class="meta-label">状态</span>
+                <span class="meta-label">{{ tx('drawer.status') }}</span>
                 <span :class="drawers[eid].status >= 200 && drawers[eid].status < 300 ? 'badge badge-green' : 'badge badge-red'">{{ drawers[eid].status || '—' }}</span>
               </div>
               <div class="meta-item">
-                <span class="meta-label">延迟</span>
+                <span class="meta-label">{{ tx('drawer.latency') }}</span>
                 <span>{{ drawers[eid].latency }}ms</span>
               </div>
               <div class="meta-item">
-                <span class="meta-label">类型</span>
+                <span class="meta-label">{{ tx('drawer.type') }}</span>
                 <code>{{ drawers[eid].testKind }}</code>
               </div>
             </div>
@@ -466,17 +475,17 @@ function toggleGuide(id: ClientGuideId) {
             </div>
 
             <div v-if="drawers[eid].requestBody" class="drawer-section">
-              <div class="section-title">请求内容</div>
+              <div class="section-title">{{ tx('drawer.requestBody') }}</div>
               <pre class="code-block compact">{{ drawers[eid].requestBody }}</pre>
             </div>
 
             <div v-if="drawers[eid].responseBody" class="drawer-section">
-              <div class="section-title">响应内容</div>
+              <div class="section-title">{{ tx('drawer.responseBody') }}</div>
               <pre class="code-block compact">{{ drawers[eid].responseBody }}</pre>
             </div>
 
             <div v-if="drawers[eid].routing" class="drawer-section">
-              <div class="section-title">路由信息</div>
+              <div class="section-title">{{ tx('drawer.routing') }}</div>
               <pre class="code-block compact">{{ drawers[eid].routing }}</pre>
             </div>
           </template>

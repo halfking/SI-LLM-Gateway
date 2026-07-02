@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { getTenantsAdmin, TENANT_STATUSES, TENANT_STATUS_LABELS, TENANT_STATUS_COLORS } from '../api'
 import type { Tenant } from '../api'
 import TenantCreateDialog from './TenantCreateDialog.vue'
 import FeeCostCell from '../components/FeeCostCell.vue'
 import { isPlatformOpsView } from '../store'
+import { useFormat } from '../i18n/useFormat'
 
 const router = useRouter()
+const { t: td } = useI18n()
+const tt = (k: string, params?: Record<string, unknown>): string => td(`tenants.list.${k}` as never, params as never)
+const { fmtDateTime, fmtNumber } = useFormat()
+
 const tenants = ref<Tenant[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -20,7 +26,7 @@ async function load() {
   try {
     tenants.value = await getTenantsAdmin(filterStatus.value || undefined)
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : tt('loadFailed')
   } finally {
     loading.value = false
   }
@@ -32,16 +38,6 @@ function statusColor(s: string) {
 
 function statusLabel(s: string) {
   return TENANT_STATUS_LABELS[s] || s
-}
-
-function fmtTime(s: string) {
-  if (!s) return '-'
-  return new Date(s).toLocaleString('zh-CN')
-}
-
-function fmtNum(n?: number) {
-  if (n == null) return '-'
-  return n.toLocaleString()
 }
 
 const showCost = isPlatformOpsView()
@@ -56,34 +52,34 @@ onMounted(load)
 <template>
   <div class="tenants-page">
     <div class="page-header">
-      <h1>🏢 租户管理</h1>
-      <button class="btn btn-primary" @click="showCreate = true">+ 新建租户</button>
+      <h1>{{ tt('title') }}</h1>
+      <button class="btn btn-primary" @click="showCreate = true">{{ tt('createBtn') }}</button>
     </div>
 
     <div v-if="error" class="alert alert-danger" style="margin-bottom:12px">{{ error }}</div>
 
     <div class="filters">
-      <label>状态:</label>
+      <label>{{ tt('statusLabel') }}:</label>
       <select v-model="filterStatus" @change="load">
-        <option value="">全部</option>
+        <option value="">{{ tt('allStatuses') }}</option>
         <option v-for="s in TENANT_STATUSES" :key="s" :value="s">{{ statusLabel(s) }}</option>
       </select>
     </div>
 
-    <div v-if="loading" class="loading">加载中…</div>
+    <div v-if="loading" class="loading">{{ tt('loading') }}</div>
 
     <table v-else class="table tenants-table" style="width:100%">
       <thead>
         <tr>
-          <th>租户名</th>
-          <th>租户 code</th>
-          <th>状态</th>
-          <th>用户数</th>
-          <th>密钥数</th>
-          <th>7天费用</th>
-          <th>总请求</th>
-          <th>联系邮箱</th>
-          <th>创建时间</th>
+          <th>{{ tt('colName') }}</th>
+          <th>{{ tt('colCode') }}</th>
+          <th>{{ tt('colStatus') }}</th>
+          <th>{{ tt('colUsers') }}</th>
+          <th>{{ tt('colKeys') }}</th>
+          <th>{{ tt('colCost7d') }}</th>
+          <th>{{ tt('colRequests') }}</th>
+          <th>{{ tt('colContact') }}</th>
+          <th>{{ tt('colCreated') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -98,8 +94,8 @@ onMounted(load)
           <td><strong>{{ t.name }}</strong></td>
           <td><code>{{ t.code }}</code></td>
           <td><span class="badge" :class="statusColor(t.status)">{{ statusLabel(t.status) }}</span></td>
-          <td>{{ fmtNum(t.user_count) }}</td>
-          <td>{{ fmtNum(t.api_key_count) }}</td>
+          <td>{{ fmtNumber(t.user_count ?? 0) }}</td>
+          <td>{{ fmtNumber(t.api_key_count ?? 0) }}</td>
           <td>
             <FeeCostCell
               :credits="t.credits_7d"
@@ -107,12 +103,12 @@ onMounted(load)
               :show-cost="showCost"
             />
           </td>
-          <td>{{ fmtNum(t.total_requests) }}</td>
+          <td>{{ fmtNumber(t.total_requests ?? 0) }}</td>
           <td>{{ t.contact_email || '-' }}</td>
-          <td class="mono">{{ fmtTime(t.created_at) }}</td>
+          <td class="mono">{{ fmtDateTime(t.created_at) }}</td>
         </tr>
         <tr v-if="tenants.length === 0">
-          <td colspan="9" style="text-align:center; color: var(--muted); padding: 40px">无数据</td>
+          <td colspan="9" style="text-align:center; color: var(--muted); padding: 40px">{{ tt('empty') }}</td>
         </tr>
       </tbody>
     </table>

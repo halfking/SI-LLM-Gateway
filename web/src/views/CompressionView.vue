@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   getCompressionStats,
   getCompressionSessions,
   type CompressionStats,
   type CompressionSessionItem,
 } from '../api'
+
+const { t } = useI18n()
+const tp = (k: string, params?: Record<string, unknown>): string =>
+  t(`compression.${k}` as never, params as never)
 
 const router = useRouter()
 
@@ -129,15 +134,15 @@ function fmtDate(v: string | null | undefined): string {
 }
 
 const strategyLabels: Record<string, string> = {
-  delta_append: '增量拼接',
-  sliding_window_token: '滑动窗口(Token)',
-  sliding_window_count: '滑动窗口(条数)',
-  sliding_window_idle: '滑动窗口(空闲)',
-  mechanical_trim: '机械裁剪',
-  memora_l1_inject: 'Memora注入',
-  llm_summary: 'LLM总结',
-  noop: '空操作',
-  none: '未压缩',
+  delta_append: tp('strategies.delta_append'),
+  sliding_window_token: tp('strategies.sliding_window_token'),
+  sliding_window_count: tp('strategies.sliding_window_count'),
+  sliding_window_idle: tp('strategies.sliding_window_idle'),
+  mechanical_trim: tp('strategies.mechanical_trim'),
+  memora_l1_inject: tp('strategies.memora_l1_inject'),
+  llm_summary: tp('strategies.llm_summary'),
+  noop: tp('strategies.noop'),
+  none: tp('strategies.none'),
 }
 
 const strategyColors: Record<string, string> = {
@@ -171,9 +176,9 @@ const timeBucketLabel = computed(() => {
         ? (new Date(customTo.value).getTime() - new Date(customFrom.value).getTime()) / 3600000
         : 24)
     : (displayHours.value || 24)
-  if (hours <= 48) return '按小时'
-  if (hours <= 168) return '每6小时'
-  return '按天'
+  if (hours <= 48) return tp('charts.timeBucketHour')
+  if (hours <= 168) return tp('charts.timeBucket6Hour')
+  return tp('charts.timeBucketDay')
 })
 
 const chartBuckets = computed(() => {
@@ -206,14 +211,14 @@ watch(activeTab, loadAll)
 <template>
   <div class="compression-view">
     <div class="page-header">
-      <h2>压缩概览</h2>
+      <h2>{{ tp('title') }}</h2>
       <div class="time-range-tabs">
         <button
           v-for="tab in ([
-            { id: '24h' as TabId, label: '24小时' },
-            { id: '7d' as TabId, label: '7天' },
-            { id: '30d' as TabId, label: '30天' },
-            { id: 'custom' as TabId, label: '自定义' },
+            { id: '24h' as TabId, label: tp('tabs.h24') },
+            { id: '7d' as TabId, label: tp('tabs.d7') },
+            { id: '30d' as TabId, label: tp('tabs.d30') },
+            { id: 'custom' as TabId, label: tp('tabs.custom') },
           ])"
           :key="tab.id"
           class="tab-btn"
@@ -228,38 +233,38 @@ watch(activeTab, loadAll)
           v-model="customFromInput"
           type="datetime-local"
           class="input-sm"
-          placeholder="开始时间"
+          :placeholder="tp('custom.from')"
         />
-        <span class="range-sep">至</span>
+        <span class="range-sep">{{ tp('custom.sep') }}</span>
         <input
           v-model="customToInput"
           type="datetime-local"
           class="input-sm"
-          placeholder="结束时间"
+          :placeholder="tp('custom.to')"
         />
-        <button class="btn btn-sm btn-primary" @click="applyCustom">查询</button>
+        <button class="btn btn-sm btn-primary" @click="applyCustom">{{ tp('custom.apply') }}</button>
       </div>
       <button class="btn btn-ghost btn-sm refresh-btn" @click="loadAll" :disabled="loading">
-        {{ loading ? '加载中…' : '刷新' }}
+        {{ loading ? tp('loading') : tp('refresh') }}
       </button>
     </div>
 
     <!-- Summary Cards -->
     <div class="stats-row" v-if="stats" :class="{ loading }">
       <div class="stat-card">
-        <div class="stat-label">总请求数</div>
+        <div class="stat-label">{{ tp('stats.totalRequests') }}</div>
         <div class="stat-value">{{ fmtNum(stats.total_requests) }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">已压缩</div>
+        <div class="stat-label">{{ tp('stats.compressed') }}</div>
         <div class="stat-value" style="color:var(--success,#22c55e)">{{ fmtNum(stats.compressed_total) }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">压缩率</div>
+        <div class="stat-label">{{ tp('stats.compressionRate') }}</div>
         <div class="stat-value">{{ fmtPct(stats.compression_rate) }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">预估节省 Token</div>
+        <div class="stat-label">{{ tp('stats.estimatedSaved') }}</div>
         <div class="stat-value" style="color:var(--warning,#f59e0b)">
           {{ stats.estimated_tokens_saved != null ? fmtNum(stats.estimated_tokens_saved) : '—' }}
         </div>
@@ -269,13 +274,13 @@ watch(activeTab, loadAll)
     <!-- Strategy Distribution + Time Series -->
     <div class="charts-row" v-if="stats">
       <div class="card chart-card">
-        <h3 class="card-title">压缩策略分布</h3>
+        <h3 class="card-title">{{ tp('charts.strategyDistribution') }}</h3>
         <div class="strategy-bars">
           <div
             v-for="[strategy, count] in strategyEntries"
             :key="strategy"
             class="strategy-bar-row"
-            :title="`${strategyLabel(strategy)}: ${count} 条 (${fmtPct(stats ? count / stats.total_requests : 0)})`"
+            :title="tp('charts.titleSuffix', { strategy: strategyLabel(strategy), count, pct: fmtPct(stats ? count / stats.total_requests : 0) })"
           >
             <span class="strategy-label">{{ strategyLabel(strategy) }}</span>
             <div class="bar-track">
@@ -292,7 +297,7 @@ watch(activeTab, loadAll)
         </div>
       </div>
       <div class="card chart-card">
-        <h3 class="card-title">压缩率趋势 <span class="badge">{{ timeBucketLabel }}</span></h3>
+        <h3 class="card-title">{{ tp('charts.compressionRateTrend') }} <span class="badge">{{ timeBucketLabel }}</span></h3>
         <div class="time-series" v-if="chartBuckets.length">
           <div class="chart-y-axis">
             <span>{{ fmtPct(1) }}</span>
@@ -306,35 +311,35 @@ watch(activeTab, loadAll)
               v-for="bucket in chartBuckets"
               :key="bucket.hour"
               class="chart-bar-col"
-              :title="`${bucket.hour}: ${fmtNum(bucket.total)} 请求, ${fmtPct(bucket.rate)} 压缩率`"
+              :title="tp('charts.barTitle', { hour: bucket.hour, n: fmtNum(bucket.total), pct: fmtPct(bucket.rate) })"
             >
               <div class="rate-bar" :style="{ height: (bucket.rate * 100) + '%' }" />
             </div>
           </div>
         </div>
-        <div v-else class="empty-hint">暂无可用的时间序列数据</div>
+        <div v-else class="empty-hint">{{ tp('charts.noData') }}</div>
       </div>
     </div>
 
     <!-- Session Detail Table -->
     <div class="card session-card">
       <div class="card-header">
-        <h3 class="card-title">会话压缩详情</h3>
-        <span class="count-badge">共 {{ sessionsCount }} 条</span>
+        <h3 class="card-title">{{ tp('table.title') }}</h3>
+        <span class="count-badge">{{ tp('table.count', { n: sessionsCount }) }}</span>
       </div>
-      <div v-if="sessionsLoading" class="loading-hint">加载中…</div>
-      <div v-else-if="!sessions.length" class="empty-hint">所选时间段内没有压缩会话记录</div>
+      <div v-if="sessionsLoading" class="loading-hint">{{ tp('loading') }}</div>
+      <div v-else-if="!sessions.length" class="empty-hint">{{ tp('table.empty') }}</div>
       <div v-else class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
-              <th>会话ID</th>
-              <th>策略</th>
-              <th>请求数</th>
-              <th>压缩消息数</th>
-              <th>压缩Token数</th>
-              <th>消息节省</th>
-              <th>最后时间</th>
+              <th>{{ tp('table.sessionId') }}</th>
+              <th>{{ tp('table.strategy') }}</th>
+              <th>{{ tp('table.requests') }}</th>
+              <th>{{ tp('table.compressedMsgs') }}</th>
+              <th>{{ tp('table.compressedTokens') }}</th>
+              <th>{{ tp('table.msgSaved') }}</th>
+              <th>{{ tp('table.lastTime') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -366,15 +371,15 @@ watch(activeTab, loadAll)
           :disabled="sessionPage <= 1"
           @click="goPage(sessionPage - 1)"
         >
-          上一页
+          {{ tp('pagination.previous') }}
         </button>
-        <span class="page-info">{{ sessionPage }} / {{ totalPages }}</span>
+        <span class="page-info">{{ tp('pagination.pageInfo', { current: sessionPage, total: totalPages }) }}</span>
         <button
           class="btn btn-sm"
           :disabled="sessionPage >= totalPages"
           @click="goPage(sessionPage + 1)"
         >
-          下一页
+          {{ tp('pagination.next') }}
         </button>
       </div>
     </div>

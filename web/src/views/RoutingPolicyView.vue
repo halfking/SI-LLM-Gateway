@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getPolicy, patchPolicy, getFeatured, patchFeatured,
   getScoringWeights, updateScoringWeights,
   type RoutingPolicy, type ScoringWeights,
 } from '../api'
 import ModelPicker from '../components/ModelPicker.vue'
+
+const { t } = useI18n()
+const rp = (k: string, params?: Record<string, unknown>): string =>
+  t(`routing.policy.${k}` as never, params as never)
 
 const policy   = ref<RoutingPolicy | null>(null)
 const draft    = ref<Partial<RoutingPolicy>>({})
@@ -25,20 +30,20 @@ const weights   = ref<ScoringWeights>({
 const weightsDraft = ref<ScoringWeights>({ ...weights.value })
 
 const FIELDS: { key: keyof RoutingPolicy; label: string; min?: number; max?: number; step?: number }[] = [
-  { key: 'algorithm_version',         label: '算法版本 (1=旧, 2=v2 分层)', min: 1, max: 2, step: 1 },
-  { key: 'retry_per_credential',      label: '同凭据重试次数',              min: 0, max: 5, step: 1 },
-  { key: 'tier_fallback_max',         label: '跨级回退最大候选数',          min: 1, max: 20, step: 1 },
-  { key: 'slot_soft_limit_ratio',     label: '并发软上限比例',              min: 0.1, max: 5,  step: 0.1 },
-  { key: 'slot_hard_limit_ratio',     label: '并发硬上限比例',              min: 0.1, max: 5,  step: 0.1 },
-  { key: 'slot_wait_max_ms',          label: '槽位等待最大毫秒',            min: 0, max: 5000, step: 10 },
-  { key: 'circuit_open_seconds',      label: '熔断基础冷却秒',              min: 1, max: 3600, step: 1 },
-  { key: 'circuit_failure_threshold', label: '熔断触发连续失败次数',        min: 1, max: 50, step: 1 },
-  { key: 'circuit_max_open_seconds',  label: '熔断最大冷却秒',              min: 1, max: 86400, step: 1 },
+  { key: 'algorithm_version',         label: rp('fields.algorithm_version'), min: 1, max: 2, step: 1 },
+  { key: 'retry_per_credential',      label: rp('fields.retry_per_credential'), min: 0, max: 5, step: 1 },
+  { key: 'tier_fallback_max',         label: rp('fields.tier_fallback_max'), min: 1, max: 20, step: 1 },
+  { key: 'slot_soft_limit_ratio',     label: rp('fields.slot_soft_limit_ratio'), min: 0.1, max: 5,  step: 0.1 },
+  { key: 'slot_hard_limit_ratio',     label: rp('fields.slot_hard_limit_ratio'), min: 0.1, max: 5,  step: 0.1 },
+  { key: 'slot_wait_max_ms',          label: rp('fields.slot_wait_max_ms'), min: 0, max: 5000, step: 10 },
+  { key: 'circuit_open_seconds',      label: rp('fields.circuit_open_seconds'), min: 1, max: 3600, step: 1 },
+  { key: 'circuit_failure_threshold', label: rp('fields.circuit_failure_threshold'), min: 1, max: 50, step: 1 },
+  { key: 'circuit_max_open_seconds',  label: rp('fields.circuit_max_open_seconds'), min: 1, max: 86400, step: 1 },
 ]
 
 const formulaPreview = computed(() => {
   const w = weightsDraft.value
-  return `composite_score = 手工序号 + (归一化价格 × ${w.price}) + (会话负载 × ${w.session_load}) + (错误次数 × ${w.failure_penalty})`
+  return rp('formulaPrefix', { price: w.price, session_load: w.session_load, failure_penalty: w.failure_penalty })
 })
 
 async function load() {
@@ -53,7 +58,7 @@ async function load() {
     weights.value = w
     weightsDraft.value = { ...w }
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : rp('loading')
   } finally {
     loading.value = false
   }
@@ -76,7 +81,7 @@ const weightsDirty = computed(() => {
 
 async function savePolicy() {
   if (!dirtyKeys.value.length) {
-    message.value = '没有变更'
+    message.value = rp('noChanges')
     return
   }
   saving.value = true
@@ -88,9 +93,9 @@ async function savePolicy() {
     const updated = await patchPolicy(patch as Partial<RoutingPolicy>)
     policy.value = updated
     draft.value  = { ...updated }
-    message.value = '策略已更新'
+    message.value = rp('updatedPolicy')
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '保存失败'
+    error.value = e instanceof Error ? e.message : rp('saveFailed')
   } finally {
     saving.value = false
   }
@@ -103,9 +108,9 @@ async function saveWeights() {
   try {
     await updateScoringWeights(weightsDraft.value)
     weights.value = { ...weightsDraft.value }
-    message.value = '综合得分系数已更新'
+    message.value = rp('updatedWeights')
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '保存失败'
+    error.value = e instanceof Error ? e.message : rp('saveFailed')
   } finally {
     saving.value = false
   }
@@ -118,10 +123,10 @@ async function saveFeatured() {
   try {
     const list = featuredArray.value.map(s => s.trim()).filter(Boolean)
     await patchFeatured(list)
-    message.value = `特色模型已更新（${list.length}）`
+    message.value = rp('updatedFeatured', { n: list.length })
     await load()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '保存失败'
+    error.value = e instanceof Error ? e.message : rp('saveFailed')
   } finally {
     saving.value = false
   }
@@ -133,22 +138,22 @@ onMounted(load)
 <template>
   <div>
     <div class="page-header">
-      <h2>路由策略</h2>
-      <button class="btn btn-ghost" @click="load" :disabled="loading">刷新</button>
+      <h2>{{ rp('title') }}</h2>
+      <button class="btn btn-ghost" @click="load" :disabled="loading">{{ rp('loading') }}</button>
     </div>
     <p style="color:var(--muted);margin-bottom:16px">
-      调整路由 v2 全局策略：算法版本、并发槽位、熔断阈值、综合得分系数。改动会写入审计日志并立即生效。
+      {{ rp('description') }}
     </p>
 
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
     <div v-if="message" class="alert alert-success">{{ message }}</div>
-    <div v-if="loading" class="empty">加载中…</div>
+    <div v-if="loading" class="empty">{{ rp('loading') }}</div>
 
     <div v-if="!loading && policy" class="card" style="margin-bottom:16px">
-      <h3 style="margin-top:0">全局策略</h3>
+      <h3 style="margin-top:0">{{ rp('globalTitle') }}</h3>
       <table>
         <thead>
-          <tr><th style="width:40%">参数</th><th>当前值</th><th>新值</th></tr>
+          <tr><th style="width:40%">{{ rp('tableHeaders.0') }}</th><th>{{ rp('tableHeaders.1') }}</th><th>{{ rp('tableHeaders.2') }}</th></tr>
         </thead>
         <tbody>
           <tr v-for="f in FIELDS" :key="String(f.key)">
@@ -169,73 +174,73 @@ onMounted(load)
       </table>
       <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
         <button class="btn btn-primary" @click="savePolicy" :disabled="saving || !dirtyKeys.length">
-          {{ saving ? '保存中…' : '保存策略' }}
+          {{ saving ? rp('saving') : rp('savePolicy') }}
         </button>
         <span v-if="dirtyKeys.length" style="color:var(--muted);font-size:12px">
-          {{ dirtyKeys.length }} 项变更：{{ dirtyKeys.join(', ') }}
+          {{ rp('dirtyHint', { n: dirtyKeys.length, keys: dirtyKeys.join(', ') }) }}
         </span>
       </div>
     </div>
 
     <div v-if="!loading" class="card" style="margin-bottom:16px">
-      <h3 style="margin-top:0">综合得分系数</h3>
+      <h3 style="margin-top:0">{{ rp('weightsTitle') }}</h3>
       <p style="color:var(--muted);font-size:12px;margin-bottom:12px">
-        综合得分公式：值越小，候选越优先。<strong>免费模型（价格=0）得分固定为 0，最高优先。</strong>
+        {{ rp('formulaLabel') }}<strong>{{ rp('freeHighlight') }}</strong>
       </p>
       <div style="background:var(--bg-subtle,#161b22);border:1px solid var(--border,#30363d);padding:12px;border-radius:6px;margin-bottom:16px;font-family:monospace;font-size:13px;color:var(--text,#e6edf3)">
         {{ formulaPreview }}
       </div>
       <div class="weights-grid">
         <div class="weight-item">
-          <label>价格权重 (W2)</label>
+          <label>{{ rp('weights.price') }}</label>
           <input type="number" v-model.number="weightsDraft.price" min="0" max="100" step="1" />
-          <span class="cell-muted">归一化价格 = 实际价格 / 默认价格</span>
+          <span class="cell-muted">{{ rp('weights.priceHint') }}</span>
         </div>
         <div class="weight-item">
-          <label>会话负载权重 (W3)</label>
+          <label>{{ rp('weights.sessionLoad') }}</label>
           <input type="number" v-model.number="weightsDraft.session_load" min="0" max="100" step="1" />
-          <span class="cell-muted">会话数 / 并发上限，0-1</span>
+          <span class="cell-muted">{{ rp('weights.sessionLoadHint') }}</span>
         </div>
         <div class="weight-item">
-          <label>错误惩罚权重 (W4)</label>
+          <label>{{ rp('weights.errorPenalty') }}</label>
           <input type="number" v-model.number="weightsDraft.failure_penalty" min="0" max="100" step="1" />
-          <span class="cell-muted">直接使用连续错误次数</span>
+          <span class="cell-muted">{{ rp('weights.errorPenaltyHint') }}</span>
         </div>
         <div class="weight-item">
-          <label>国内模型默认价格 (CNY)</label>
+          <label>{{ rp('weights.defaultPriceCny') }}</label>
           <input type="number" v-model.number="weightsDraft.default_price_cny" min="0.01" max="100" step="0.1" />
-          <span class="cell-muted">无价格时的归一化基准</span>
+          <span class="cell-muted">{{ rp('weights.defaultPriceHint') }}</span>
         </div>
         <div class="weight-item">
-          <label>国外模型默认价格 (USD)</label>
+          <label>{{ rp('weights.defaultPriceUsd') }}</label>
           <input type="number" v-model.number="weightsDraft.default_price_usd" min="0.01" max="100" step="0.1" />
-          <span class="cell-muted">无价格时的归一化基准</span>
+          <span class="cell-muted">{{ rp('weights.defaultPriceHint') }}</span>
         </div>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
         <button class="btn btn-primary" @click="saveWeights" :disabled="saving || !weightsDirty">
-          {{ saving ? '保存中…' : '保存系数' }}
+          {{ saving ? rp('saving') : rp('savingWeights') }}
         </button>
         <span v-if="weightsDirty" style="color:var(--muted);font-size:12px">
-          系数有变更，未保存
+          {{ rp('weightsDirty') }}
         </span>
       </div>
     </div>
 
     <div v-if="!loading" class="card">
-      <h3 style="margin-top:0">特色模型 (Featured)</h3>
+      <h3 style="margin-top:0">{{ rp('featuredTitle') }}</h3>
       <p style="color:var(--muted);font-size:12px;margin-bottom:8px">
-        选择标准模型名称，将在路由总览中以 ★ 标记，并可启用「仅特色」筛选。
+        {{ rp('featuredDescription') }}
       </p>
       <ModelPicker
         v-model="featuredArray"
         mode="multi"
-        placeholder="选择特色模型…"
-        title="特色模型（多选）"
+        :placeholder="rp('featuredPlaceholder')"
+        :title="rp('featuredMultiTitle')"
       />
       <div style="margin-top:8px">
         <button class="btn btn-primary" @click="saveFeatured" :disabled="saving">
-          {{ saving ? '保存中…' : '保存特色模型' }}
+          {{ saving ? rp('saving') : rp('saveFeatured') }}
         </button>
       </div>
     </div>

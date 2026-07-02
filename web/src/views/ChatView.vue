@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { deleteGatewaySession, getAvailableModels, type PopularModel } from '../api'
 import {
   copyToClipboard,
@@ -18,6 +19,10 @@ import { formatSessionModelLabel, useChatSessions } from '../composables/useChat
 import { useGatewayApiKey } from '../composables/useGatewayApiKey'
 import ApiKeySelectModal from '../components/ApiKeySelectModal.vue'
 import GatewayApiKeyPicker from '../components/GatewayApiKeyPicker.vue'
+
+const { t } = useI18n()
+const tc = (k: string, params?: Record<string, unknown>): string =>
+  t(`chat.${k}` as never, params as never)
 
 interface SendOptions {
   text?: string
@@ -110,9 +115,9 @@ const currentKeyLabel = computed(() => {
   if (selectedKeyMeta.value) return formatApiKeyLabel(selectedKeyMeta.value)
   const match = candidateKeys.value.find((k) => k.id === selectedKeyId.value)
   if (match) return formatApiKeyLabel(match)
-  if (selectedKeyId.value) return `密钥 #${selectedKeyId.value}`
-  if (keyLoading.value) return '加载中…'
-  return '未选择'
+  if (selectedKeyId.value) return tc('page.keyIdPrefix', { id: selectedKeyId.value })
+  if (keyLoading.value) return tc('page.loading')
+  return tc('page.keyNotSelected')
 })
 
 const hasMessages = computed(() => messages.value.length > 0)
@@ -155,7 +160,8 @@ function sessionListModelLabel(s: (typeof sessions.value)[0]): string {
 function stripFailedAssistantTail<T extends { role: string; content: string }>(msgs: T[]): T[] {
   const copy = [...msgs]
   const last = copy[copy.length - 1]
-  if (last?.role === 'assistant' && (!last.content || last.content.startsWith('错误：'))) {
+  const errorPrefix = tc('page.errorPrefix')
+  if (last?.role === 'assistant' && (!last.content || last.content.startsWith(errorPrefix))) {
     copy.pop()
   }
   return copy
@@ -262,12 +268,12 @@ async function send(opts?: SendOptions) {
   sendError.value = ''
   const key = apiKey.value || (await resolveApiKey())
   if (!key) {
-    sendError.value = keyError.value || '无法获取 API 密钥'
+    sendError.value = keyError.value || tc('page.fetchKeyFailed')
     openKeyModal('manual')
     return
   }
   if (!selectedKeyId.value) {
-    sendError.value = '无法确定 API 密钥，请选择一把密钥'
+    sendError.value = tc('page.selectKeyRequired')
     openKeyModal('manual')
     return
   }
@@ -347,18 +353,18 @@ async function send(opts?: SendOptions) {
   } catch (e: unknown) {
     if (isSessionForbiddenError(e) && !opts?.isAutoRetry) {
       pendingRetryText.value = text
-      sendError.value = '当前 API 密钥无法访问此会话，请选择正确的密钥'
+      sendError.value = tc('page.sessionForbidden')
       const errMsgs = stripFailedAssistantTail(activeSession.value?.messages ?? withPlaceholder)
       updateActive({ messages: errMsgs })
       openKeyModal('session-forbidden')
       return
     }
 
-    const msg = e instanceof Error ? e.message : '发送失败'
+    const msg = e instanceof Error ? e.message : tc('page.sendFailed')
     sendError.value = msg
     const errMsgs = [...(activeSession.value?.messages ?? withPlaceholder)]
     if (errMsgs[assistantIdx] && !errMsgs[assistantIdx].content) {
-      errMsgs[assistantIdx] = { role: 'assistant', content: `错误：${msg}` }
+      errMsgs[assistantIdx] = { role: 'assistant', content: `${tc('page.errorPrefix')}${msg}` }
       updateActive({ messages: errMsgs })
     }
   } finally {
@@ -395,7 +401,7 @@ async function removeSession(id: string, e?: Event) {
   if (sending.value || summarizing.value) return
   const s = sessions.value.find((x) => x.id === id)
   if (!s) return
-  if (s.messages.length > 0 && !window.confirm(`删除会话「${s.title}」？此操作不可恢复。`)) return
+  if (s.messages.length > 0 && !window.confirm(tc('sidebar.confirmDelete', { title: s.title }))) return
 
   const removed = deleteSession(id)
   if (!removed) return
@@ -427,7 +433,7 @@ async function runSummarize() {
 
   const key = apiKey.value || (await resolveApiKey())
   if (!key || !selectedKeyId.value) {
-    sendError.value = '请先选择 API 密钥'
+    sendError.value = tc('page.needsKeyTitle')
     return
   }
 
@@ -454,7 +460,7 @@ async function runSummarize() {
       result.usage,
     )
   } catch (e: unknown) {
-    sendError.value = e instanceof Error ? e.message : '总结失败'
+    sendError.value = e instanceof Error ? e.message : tc('page.summarizeFailed')
   } finally {
     summarizing.value = false
   }
@@ -472,12 +478,12 @@ function onKeydown(e: KeyboardEvent) {
   <div class="chat-page">
     <div class="page-header chat-header">
       <div>
-        <h2>对话</h2>
-        <p class="chat-subtitle">通过 OpenAI 兼容接口直接与网关模型对话</p>
+        <h2>{{ tc('page.title') }}</h2>
+        <p class="chat-subtitle">{{ tc('page.subtitle') }}</p>
       </div>
       <div class="chat-controls">
         <label class="model-label key-label key-label--primary">
-          <span class="key-label__text">API 密钥</span>
+          <span class="key-label__text">{{ tc('page.apiKeyLabel') }}</span>
           <select
             class="model-select key-select"
             :value="selectedKeyId ?? ''"
@@ -488,12 +494,12 @@ function onKeydown(e: KeyboardEvent) {
             <option value="" disabled>
               {{
                 keyLoading
-                  ? '加载中…'
+                  ? tc('page.loading')
                   : hasNoKeys
-                    ? '无可用密钥'
+                    ? tc('page.noAvailableKeys')
                     : candidateKeys.length
-                      ? '选择密钥…'
-                      : '无可用密钥'
+                      ? tc('page.selectKey')
+                      : tc('page.noAvailableKeys')
               }}
             </option>
             <option
@@ -502,7 +508,7 @@ function onKeydown(e: KeyboardEvent) {
               :value="k.id"
               :disabled="unrevealableKeyIds.has(k.id)"
             >
-              {{ formatApiKeyLabel(k) }}{{ unrevealableKeyIds.has(k.id) ? '（无法还原）' : '' }}
+              {{ formatApiKeyLabel(k) }}{{ unrevealableKeyIds.has(k.id) ? tc('page.unrevealable') : '' }}
             </option>
           </select>
         </label>
@@ -512,12 +518,12 @@ function onKeydown(e: KeyboardEvent) {
           :disabled="sending || picking || hasNoKeys"
           @click="openKeyModal('manual')"
         >
-          管理密钥
+          {{ tc('page.manageKeys') }}
         </button>
         <label class="model-label">
-          <span>模型</span>
+          <span>{{ tc('page.modelLabel') }}</span>
           <select v-model="pickerModel" class="model-select" :disabled="sending || hasNoKeys">
-            <option value="auto">自动路由 (auto)</option>
+            <option value="auto">{{ tc('page.autoRoute') }}</option>
             <option
               v-for="m in popularModels"
               :key="m.canonical_name"
@@ -528,22 +534,22 @@ function onKeydown(e: KeyboardEvent) {
           </select>
         </label>
         <button type="button" class="btn btn-ghost btn-sm" :disabled="sending" @click="clearChat">
-          新建
+          {{ tc('page.new') }}
         </button>
       </div>
     </div>
 
-    <div v-if="keyLoading" class="alert alert-info">正在加载 API 密钥…</div>
+    <div v-if="keyLoading" class="alert alert-info">{{ tc('page.loadingKeys') }}</div>
     <div v-else-if="hasNoKeys" class="alert alert-warning no-keys-banner">
       <div class="no-keys-banner__body">
-        <strong>请先申请 API 密钥</strong>
-        <p>对话需要一把属于您且已启用的 API 密钥。您当前没有可用密钥，请先申请或创建。</p>
+        <strong>{{ tc('page.needsKeyTitle') }}</strong>
+        <p>{{ tc('page.needsKeyDesc') }}</p>
       </div>
       <RouterLink
         to="/keys?redirect=/chat&action=create"
         class="btn btn-primary btn-sm no-keys-banner__cta"
       >
-        前往申请密钥
+        {{ tc('page.applyKeyCta') }}
       </RouterLink>
     </div>
     <GatewayApiKeyPicker
@@ -555,7 +561,7 @@ function onKeydown(e: KeyboardEvent) {
     />
     <div v-else-if="keyError && !apiKey" class="alert alert-danger">
       {{ keyError }}
-      <RouterLink to="/keys?redirect=/chat" class="link-inline">前往 API 密钥</RouterLink>
+      <RouterLink to="/keys?redirect=/chat" class="link-inline">{{ tc('page.goToKeys') }}</RouterLink>
     </div>
 
     <ApiKeySelectModal
@@ -573,9 +579,9 @@ function onKeydown(e: KeyboardEvent) {
     <div class="chat-body">
       <aside class="session-sidebar card">
         <div class="session-sidebar__head">
-          <span class="session-sidebar__title">会话</span>
+          <span class="session-sidebar__title">{{ tc('sidebar.title') }}</span>
           <button type="button" class="btn btn-ghost btn-sm" :disabled="sending" @click="clearChat">
-            + 新建
+            {{ tc('sidebar.new') }}
           </button>
         </div>
         <ul class="session-list">
@@ -596,7 +602,7 @@ function onKeydown(e: KeyboardEvent) {
                 <button
                   type="button"
                   class="session-item__del"
-                  title="删除会话"
+                  :title="tc('sidebar.deleteTitle')"
                   :disabled="sending || summarizing"
                   @click="removeSession(s.id, $event)"
                 >
@@ -612,7 +618,7 @@ function onKeydown(e: KeyboardEvent) {
               </span>
             </button>
           </li>
-          <li v-if="!sessions.length" class="session-empty">暂无会话</li>
+          <li v-if="!sessions.length" class="session-empty">{{ tc('sidebar.empty') }}</li>
         </ul>
       </aside>
 
@@ -621,15 +627,15 @@ function onKeydown(e: KeyboardEvent) {
           <div class="chat-session-bar__info">
             <span class="chat-session-bar__title">{{ activeSession.title }}</span>
             <span class="chat-session-bar__model" :title="sessionModelLabel">
-              当前: {{ pickerModel === 'auto' ? '自动' : (modelDisplayMap.get(pickerModel) || pickerModel) }}
+              {{ tc('session.current', { model: pickerModel === 'auto' ? tc('page.auto') : (modelDisplayMap.get(pickerModel) || pickerModel) }) }}
               <template v-if="activeSession.lastResolvedModel">
-                · 最近实际: {{ modelDisplayMap.get(activeSession.lastResolvedModel) || activeSession.lastResolvedModel }}
+                · {{ tc('session.lastResolved', { model: modelDisplayMap.get(activeSession.lastResolvedModel) || activeSession.lastResolvedModel }) }}
               </template>
             </span>
             <span
               v-if="sessionUsage && sessionUsage.totalTokens > 0"
               class="chat-session-bar__tokens"
-              :title="`输入 ${sessionUsage.promptTokens} / 输出 ${sessionUsage.completionTokens} / 合计 ${sessionUsage.totalTokens}`"
+              :title="tc('session.tokensDetail', { in: sessionUsage.promptTokens, out: sessionUsage.completionTokens, total: sessionUsage.totalTokens })"
             >
               {{ formatTokenCount(sessionUsage.promptTokens) }} in /
               {{ formatTokenCount(sessionUsage.completionTokens) }} out /
@@ -643,7 +649,7 @@ function onKeydown(e: KeyboardEvent) {
               :disabled="sending || summarizing"
               @click="exportSession"
             >
-              导出
+              {{ tc('session.export') }}
             </button>
             <button
               type="button"
@@ -651,7 +657,7 @@ function onKeydown(e: KeyboardEvent) {
               :disabled="sending || summarizing"
               @click="runSummarize"
             >
-              {{ summarizing ? '总结中…' : '总结' }}
+              {{ summarizing ? tc('session.summarizing') : tc('session.summarize') }}
             </button>
             <button
               type="button"
@@ -659,15 +665,15 @@ function onKeydown(e: KeyboardEvent) {
               :disabled="sending || summarizing"
               @click="removeSession(activeSession.id)"
             >
-              删除
+              {{ tc('session.delete') }}
             </button>
           </div>
         </div>
 
         <div ref="messagesEl" class="chat-messages">
           <div v-if="!messages.length" class="chat-empty">
-            <p v-if="hasNoKeys">申请 API 密钥后即可开始对话。</p>
-            <p v-else>输入消息开始对话。选择 <code>auto</code> 将由网关自动挑选合适模型。</p>
+            <p v-if="hasNoKeys">{{ tc('session.noKeyHint') }}</p>
+            <p v-else>{{ tc('session.emptyHint') }}</p>
           </div>
           <div
             v-for="(msg, i) in messages"
@@ -677,9 +683,9 @@ function onKeydown(e: KeyboardEvent) {
           >
             <div class="bubble-head">
               <span class="bubble-role">
-                {{ msg.role === 'user' ? '你' : '助手' }}
+                {{ msg.role === 'user' ? tc('session.roleUser') : tc('session.roleAssistant') }}
                 <template v-if="msg.role === 'user' && msg.requestedModel">
-                  · {{ msg.requestedModel === 'auto' ? '自动' : (modelDisplayMap.get(msg.requestedModel) || msg.requestedModel) }}
+                  · {{ msg.requestedModel === 'auto' ? tc('page.auto') : (modelDisplayMap.get(msg.requestedModel) || msg.requestedModel) }}
                 </template>
                 <template v-if="msg.role === 'assistant' && msg.resolvedModel">
                   · {{ modelDisplayMap.get(msg.resolvedModel) || msg.resolvedModel }}
@@ -692,27 +698,27 @@ function onKeydown(e: KeyboardEvent) {
                      call. Helps the user understand why the model did
                      not spend new tokens for this turn. -->
                 <template v-if="msg.role === 'assistant' && msg.resumed">
-                  <span class="resumed-badge" title="从网关缓存恢复（无新 LLM 调用）">↻ 已恢复</span>
+                  <span class="resumed-badge" :title="tc('session.resumedTitle')">{{ tc('session.resumedBadge') }}</span>
                 </template>
               </span>
               <span class="bubble-actions">
                 <button
                   type="button"
                   class="bubble-btn"
-                  :title="copiedKey === `copy-${i}` ? '已复制' : '复制'"
+                  :title="copiedKey === `copy-${i}` ? tc('session.copied') : tc('session.copy')"
                   @click="onCopy(msg.content, `copy-${i}`)"
                 >
-                  {{ copiedKey === `copy-${i}` ? '✓' : '复制' }}
+                  {{ copiedKey === `copy-${i}` ? '✓' : tc('session.copy') }}
                 </button>
                 <button
                   v-if="msg.role === 'user'"
                   type="button"
                   class="bubble-btn"
                   :disabled="sending"
-                  title="重发此问题"
+                  :title="tc('session.resendTitle')"
                   @click="resendUserMessage(i)"
                 >
-                  重发
+                  {{ tc('session.resend') }}
                 </button>
               </span>
             </div>
@@ -732,7 +738,7 @@ function onKeydown(e: KeyboardEvent) {
             v-model="input"
             class="chat-input"
             rows="3"
-            placeholder="输入消息…（Enter 发送，Shift+Enter 换行）"
+            :placeholder="tc('input.placeholder')"
             :disabled="sending || keyLoading || showPicker || hasNoKeys"
             @keydown="onKeydown"
           />
@@ -742,7 +748,7 @@ function onKeydown(e: KeyboardEvent) {
             :disabled="sending || keyLoading || showPicker || hasNoKeys || !input.trim()"
             @click="send()"
           >
-            {{ sending ? '生成中…' : '发送' }}
+            {{ sending ? tc('input.sending') : tc('input.send') }}
           </button>
         </div>
       </div>
@@ -751,15 +757,15 @@ function onKeydown(e: KeyboardEvent) {
     <div v-if="showSummaryModal" class="modal-overlay" @click.self="showSummaryModal = false">
       <div class="modal-card">
         <div class="modal-head">
-          <h3>会话总结</h3>
+          <h3>{{ tc('modal.summaryTitle') }}</h3>
           <button type="button" class="modal-close" @click="showSummaryModal = false">×</button>
         </div>
         <div class="modal-body">{{ summaryText }}</div>
         <div class="modal-foot">
           <button type="button" class="btn btn-ghost btn-sm" @click="onCopy(summaryText, 'summary')">
-            {{ copiedKey === 'summary' ? '已复制' : '复制总结' }}
+            {{ copiedKey === 'summary' ? tc('modal.copied') : tc('modal.copySummary') }}
           </button>
-          <button type="button" class="btn btn-primary btn-sm" @click="showSummaryModal = false">关闭</button>
+          <button type="button" class="btn btn-primary btn-sm" @click="showSummaryModal = false">{{ tc('modal.close') }}</button>
         </div>
       </div>
     </div>
