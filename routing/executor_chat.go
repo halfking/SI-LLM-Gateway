@@ -491,9 +491,12 @@ func (e *Executor) executeOpenAI(
 						)
 					}
 				} else if errKind == errorsx.KindRateLimit {
-				e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
-			} else if errKind == errorsx.KindConcurrent {
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, errorsx.KindConcurrent)
+					e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
+				} else if errKind == errorsx.KindConcurrent {
+					// 2026-07-03 fix (P0-3): Removed duplicate Circuit.RecordFailure call.
+					// The outer executor.go:1187 already records all failures uniformly.
+					// Keeping this here caused double-counting, reducing the circuit
+					// threshold from 10 to 5 effectively.
 					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, errorsx.KindConcurrent,
 						fmt.Errorf("upstream %d concurrent overload: %s", resp.StatusCode, string(body[:min(n, 200)])))
 					e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, errorsx.KindConcurrent)
@@ -556,9 +559,9 @@ func (e *Executor) executeOpenAI(
 					return nil, fmt.Errorf("upstream %d: %s", resp.StatusCode, string(body[:min(n, 200)]))
 				}
 				return nil, &retryableError{err: fmt.Errorf("upstream %d", resp.StatusCode)}
-		}
+			}
 
-		e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
+			e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
 			latencyMs := int(time.Since(tTotal).Milliseconds())
 
 			if params.IsStream {
@@ -598,8 +601,8 @@ func (e *Executor) executeOpenAI(
 						"benign_eof", isBenignEOF,
 					)
 
-				if isBenignEOF {
-					e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
+					if isBenignEOF {
+						e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
 						return &ExecuteResult{
 							Response:    resp,
 							Candidate:   cand,
@@ -613,30 +616,31 @@ func (e *Executor) executeOpenAI(
 							CompressionReason:   strPtrCompat(contextLenRecovery.lastReason),
 							CompressionStrategy: strPtrCompat(contextLenRecovery.lastStrategy),
 							CompressionMeta:     mergeCompressionMeta(contextLenRecovery.lastMeta, preTrimMeta),
-					}, nil
-				} else if isResumable {
-					e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
-					if streamKind == errorsx.KindConcurrent {
+						}, nil
+					} else if isResumable {
+						// 2026-07-03 fix (P0-3): Removed duplicate Circuit.RecordFailure.
+						// The outer executor.go:1187 handles all failures uniformly.
+						if streamKind == errorsx.KindConcurrent {
+							e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind,
+								fmt.Errorf("stream %s (concurrent-overload inferred)", streamOutcome.Reason))
+							e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
+						} else if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind) {
+							e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind, fmt.Errorf("stream %s", streamOutcome.Reason))
+							e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
+						}
+					} else if streamKind == errorsx.KindConcurrent {
+						// 2026-07-03 fix (P0-3): Removed duplicate Circuit.RecordFailure.
 						e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind,
-							fmt.Errorf("stream %s (concurrent-overload inferred)", streamOutcome.Reason))
+							fmt.Errorf("stream %s (concurrent-overload inferred, non-resumable)", streamOutcome.Reason))
 						e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
-					} else if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind) {
-						e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind, fmt.Errorf("stream %s", streamOutcome.Reason))
-						e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
-					}
-				} else if streamKind == errorsx.KindConcurrent {
-					e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
-					e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind,
-						fmt.Errorf("stream %s (concurrent-overload inferred, non-resumable)", streamOutcome.Reason))
-					e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, streamKind)
-					slog.Warn("non-resumable stream interrupted by concurrent-overload, credential now in 5-min cooling",
-						"credential_id", cand.CredentialID,
-						"provider_id", cand.ProviderID,
-						"reason", streamOutcome.Reason,
-						"chunk_count", streamOutcome.ChunkCount,
-					)
-				} else {
-					e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
+						slog.Warn("non-resumable stream interrupted by concurrent-overload, credential now in 5-min cooling",
+							"credential_id", cand.CredentialID,
+							"provider_id", cand.ProviderID,
+							"reason", streamOutcome.Reason,
+							"chunk_count", streamOutcome.ChunkCount,
+						)
+					} else {
+						// 2026-07-03 fix (P0-3): Removed duplicate Circuit.RecordFailure.
 						if e.shouldWriteCredentialStateOnConfirmedFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind) {
 							e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, streamKind,
 								fmt.Errorf("stream %s (non-resumable)", streamOutcome.Reason))
