@@ -56,6 +56,23 @@ async function load() {
   }
 }
 
+// 2026-07-03: background refresh used by inline drawer edits (plan type
+// select, immediate probe check, manual disable toggle, lifecycle
+// change, default probe model pick). Unlike `load()` it MUST NOT set
+// `loading=true` — that flag drives the `<template v-if="provider &&
+// !loading">` wrapper that mounts the tab bodies, so flipping it would
+// unmount CredsTab mid-edit and silently destroy the open drawer.
+// We only need to refresh the creds list so badges in the table stay
+// consistent; the drawer reads its own `selected` ref.
+async function refreshCredsSilent() {
+  try {
+    const credsData = await getProviderCredentials(providerId.value)
+    creds.value = credsData
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : pp('loadFailed')
+  }
+}
+
 async function toggle() {
   if (!provider.value) return
   try {
@@ -149,7 +166,17 @@ watch(providerId, () => {
         <button type="button" class="tab-btn" :class="{ active: tab === 'settings' }" @click="tab = 'settings'">{{ pp('tabSettings') }}</button>
       </div>
 
-      <CredsTab v-if="tab==='creds'" :provider="provider" :creds="creds" @refresh="load" />
+      <!-- 2026-07-03: `@silent-refresh` lets inline drawer edits (plan
+           type select, 立即检测) refresh the creds list without
+           flipping `loading=true`, which would unmount CredsTab and
+           close the drawer mid-edit. -->
+      <CredsTab
+        v-if="tab==='creds'"
+        :provider="provider"
+        :creds="creds"
+        @refresh="load"
+        @silent-refresh="refreshCredsSilent"
+      />
       <ModelsTab
         v-if="tab==='models'"
         :provider-id="providerId"
