@@ -74,6 +74,17 @@ type Candidate struct {
 	// hits the hard-exclude threshold. Added 2026-06-22 (defect ③ soft layer).
 	RecentSuccessRate *float64 `json:"recent_success_rate,omitempty"`
 	RecentSamples     int      `json:"recent_samples,omitempty"`
+	// ProviderManualDisabled / CredentialManualDisabled mirror
+	// providers.manual_disabled and credentials.manual_disabled. Populated
+	// from the v_routable_credential_models projection (added 2026-07-03 in
+	// migration 065) so UnavailableReason() can return a precise reason
+	// string instead of a generic "routing_blocked". The SQL WHERE clause
+	// in loadCandidatesDBWithThreshold ALSO filters these out as a
+	// defence-in-depth, so live traffic should never see these flags set
+	// on a routable candidate — but the fields exist for diagnostics and
+	// to keep the admin resolve endpoint in sync with provider.Client.
+	ProviderManualDisabled  bool `json:"provider_manual_disabled,omitempty"`
+	CredentialManualDisabled bool `json:"credential_manual_disabled,omitempty"`
 }
 
 func (c *Candidate) CalcCost(promptTokens, completionTokens int, cacheReadTokens, cacheWriteTokens *int) float64 {
@@ -108,6 +119,19 @@ func (c *Candidate) IsAvailable() bool {
 // candidate cannot be used, or "" if it is fully available. Order matches
 // IsAvailable() so the first non-nil branch is the dominant reason.
 func (c *Candidate) UnavailableReason() string {
+	// 2026-07-03 v738: top-priority manual disable gates. Order matches
+	// admin/routing.go::handleRoutingResolve BlockReason precedence
+	// (provider before credential). These flags should rarely be set
+	// on a routable candidate in production because the SQL in
+	// loadCandidatesDBWithThreshold also filters on them — but they
+	// exist for diagnostics and to surface the precise reason in the
+	// admin resolve endpoint without forcing a second DB roundtrip.
+	if c.ProviderManualDisabled {
+		return "routing_blocked:provider_manual_disabled"
+	}
+	if c.CredentialManualDisabled {
+		return "routing_blocked:credential_manual_disabled"
+	}
 	if !c.Routable {
 		if c.BlockReason != nil && *c.BlockReason != "" {
 			return "routing_blocked:" + *c.BlockReason
@@ -670,9 +694,17 @@ func (c *Client) loadCandidatesDBWithThreshold(ctx context.Context, clientModel 
 			COALESCE(mo.cache_read_price_per_1m, 0)::float8 AS cache_read_price_per_1m,
 			COALESCE(mo.cache_write_price_per_1m, 0)::float8 AS cache_write_price_per_1m,
 			-- is_routable comes from the unified VIEW (manual > auto priority).
-			-- Spec: 2026-06-12-credential-availability-audit-design §3.1
+			-- Spec: 2026-06-12-credential-availability-audit-design §3.1.
+			-- 2026-07-03 v738: also project the manual_disabled flags so
+			-- Candidate.UnavailableReason can return the precise reason
+			-- string. The SQL WHERE clause above already filters on these,
+			-- so they should always be FALSE on routable candidates — the
+			-- projections are kept for diagnostics and admin resolve
+			-- endpoint parity.
 			COALESCE(v.is_routable, FALSE) AS runtime_routable,
 			v.unavailable_reason,
+			COALESCE(v.provider_manual_disabled, COALESCE(p.manual_disabled, FALSE)) AS provider_manual_disabled,
+			COALESCE(v.credential_manual_disabled, COALESCE(c.manual_disabled, FALSE)) AS credential_manual_disabled,
 			CASE WHEN cc.capability = 'prompt_caching' AND cc.supported IS TRUE THEN TRUE ELSE FALSE END AS supports_prompt_cache,
 			COALESCE(cc.evidence_json->>'cache_mode', '') AS cache_mode,
 			COALESCE(mo.manual_priority, 99)::int AS manual_priority,
@@ -717,8 +749,15 @@ func (c *Client) loadCandidatesDBWithThreshold(ctx context.Context, clientModel 
 		WHERE p.tenant_id = 'default'
 		  AND COALESCE(mc.status, 'active') != 'disabled'
 		  AND COALESCE(c.status, 'active') NOT IN ('disabled')
-		  -- v.is_routable is FALSE for any model with manual disable at any layer
-		  -- (provider.manual_disabled, credentials.manual_disabled, or cmb.unavailable_reason='manual')
+		  -- 2026-07-03 v738 manual_disabled defence-in-depth. Migration 065
+		  -- updated v_routable_credential_models to also gate on these flags,
+		  -- so v.is_routable = TRUE already implies them being false. We add
+		  -- the explicit clauses so a regression that drops the
+		  -- manual_disabled branches from the view body cannot re-introduce
+		  -- the "EvolAI 积分不足" routing incident. Matches admin/routing.go
+		  -- handleRoutingResolve in-memory gate (line ~313).
+		  AND COALESCE(p.manual_disabled, FALSE) = FALSE
+		  AND COALESCE(c.manual_disabled, FALSE) = FALSE
 		  AND v.is_routable = TRUE
 		  -- 2026-06-22 defect (2): drop (credential, model) pairs whose
 		  -- model_probe_state is 'broken_confirmed'. The probe worker marks a
@@ -826,6 +865,8 @@ func (c *Client) loadCandidatesDBWithThreshold(ctx context.Context, clientModel 
 			&cand.QualityFixMode,
 			&cand.RecentSuccessRate,
 			&cand.RecentSamples,
+			&cand.ProviderManualDisabled,
+			&cand.CredentialManualDisabled,
 		); err != nil {
 			return nil, err
 		}

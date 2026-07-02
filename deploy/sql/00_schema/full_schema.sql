@@ -7087,21 +7087,26 @@ CREATE VIEW public.v_routable_credential_models AS
             WHEN c.availability_state = 'unavailable'::text AND (c.availability_recover_at IS NULL OR c.availability_recover_at > now()) THEN false
             WHEN (c.plan_type = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (mo.billing_mode <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN false
             WHEN (mo.billing_mode = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (c.plan_type <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN false
+            WHEN COALESCE(p.manual_disabled, false) = true THEN false
+            WHEN COALESCE(c.manual_disabled, false) = true THEN false
             ELSE true
         END AS is_routable,
         CASE
+            WHEN COALESCE(p.manual_disabled, false) = true THEN 'provider_manual_disabled'::text
+            WHEN COALESCE(c.manual_disabled, false) = true THEN 'credential_manual_disabled'::text
             WHEN c.status <> ALL (ARRAY['active'::text, 'cooling'::text, 'degraded'::text]) THEN 'credential_status_'::text || c.status
-            WHEN c.lifecycle_status <> 'active'::text THEN 'lifecycle_'::text || c.lifecycle_status
+            WHEN c.lifecycle_status <> 'active'::text THEN 'credential_lifecycle_'::text || c.lifecycle_status
             WHEN cmb.available IS NOT TRUE THEN 'binding_unavailable'::text
             WHEN c.quota_state = 'periodic_exhausted'::text THEN 'quota_periodic_exhausted'::text
-            WHEN c.quota_state = 'exhausted'::text THEN 'quota_exhausted'::text
-            WHEN c.availability_state = 'unavailable'::text THEN 'availability_unavailable'::text
+            WHEN c.quota_state = 'exhausted'::text AND (c.quota_recover_at IS NULL OR c.quota_recover_at > now()) THEN 'quota_exhausted'::text
+            WHEN c.availability_state = 'unavailable'::text AND (c.availability_recover_at IS NULL OR c.availability_recover_at > now()) THEN 'availability_unavailable'::text
             WHEN (c.plan_type = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (mo.billing_mode <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN 'plan_incompatible_model_requires_'::text || COALESCE(mo.billing_mode, 'token'::text)
             WHEN (mo.billing_mode = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (c.plan_type <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN 'plan_incompatible_credential_not_'::text || mo.billing_mode
             ELSE NULL::text
         END AS unavailable_reason
    FROM credential_model_bindings cmb
      JOIN credentials c ON c.id = cmb.credential_id
+     JOIN providers p ON p.id = c.provider_id
      JOIN provider_models pm ON pm.id = cmb.provider_model_id
      LEFT JOIN model_offers mo ON mo.credential_id = cmb.credential_id AND mo.raw_model_name = pm.raw_model_name
   WHERE c.tenant_id = 'default'::text;

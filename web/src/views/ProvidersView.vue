@@ -28,15 +28,44 @@ const credentialErrors = ref<Record<number, string>>({})
 
 // ── Filter & sort state ──────────────────────────────────────────────────────
 const filterSearch = ref('')
-const filterHealthStatus = ref('healthy')
+// 2026-07-03 v738: split into two orthogonal filter dimensions. The
+// healthStatus dimension is now scoped to credential probe health
+// only (healthy / warning / unreachable / unknown). Routability is
+// the new dimension that answers "can this provider route traffic
+// right now" and is independent of credential health.
+const filterHealthStatus = ref<'all' | 'healthy' | 'warning' | 'unreachable' | 'unknown'>('all')
+const filterRoutability = ref<'all' | 'available' | 'unavailable' | 'no_models' | 'manual_disabled'>('available')
 const filterFreeModel = ref<'all' | 'yes' | 'no'>('all')
 let _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+// 2026-07-03 v738: visibleProviders is now a no-op (returns providers
+// verbatim). The server-side routability + health_status + manual_disabled
+// filters do all the work; this just keeps the v-for="p in visibleProviders"
+// line in the template stable. The previous client-side .filter() was
+// removed because the visibleProviders comment in the previous revision
+// noted it raced with the stale provider.Client candidate cache (see
+// admin/provider_offer_force_recover.go:437 — fixed in v733 but the
+// client-side filter was still risky).
+const visibleProviders = computed<Provider[]>(() => providers.value)
 
 const healthStatusOptions = computed(() => [
   { value: 'all',         label: pm('filter.healthChipAll') },
   { value: 'healthy',     label: pm('filter.healthChipHealthy') },
   { value: 'warning',     label: pm('filter.healthChipWarning') },
   { value: 'unreachable', label: pm('filter.healthChipUnreachable') },
+])
+
+// 2026-07-03 v738: routability chip options. "可用" here means
+// "routable_binding_count > 0" (i.e. at least one model binding is
+// currently routable), not "has at least one healthy credential".
+// This fixes the original "可用" 误标为手工禁用供应商 bug reported
+// on 2026-07-03.
+const routabilityOptions = computed(() => [
+  { value: 'all',            label: pm('filter.routabilityChipAll') },
+  { value: 'available',      label: pm('filter.routabilityChipAvailable') },
+  { value: 'unavailable',    label: pm('filter.routabilityChipUnavailable') },
+  { value: 'no_models',      label: pm('filter.routabilityChipNoModels') },
+  { value: 'manual_disabled', label: pm('filter.routabilityChipManualDisabled') },
 ])
 
 const freeModelOptions = computed(() => [
@@ -375,6 +404,27 @@ function healthBadgeClass(status?: string | null): string {
   return 'badge-gray'
 }
 
+// 2026-07-03 v738: routability badge helpers. The routability column is
+// the orthogonal dimension to health_status — it answers "can this
+// provider route traffic right now" rather than "are its credentials
+// probe-healthy". A provider can have all credentials in
+// health_status=healthy but still be routability=unavailable (e.g. all
+// credentials in quota_exhausted state), and vice versa.
+function routabilityBadgeClass(r?: string | null): string {
+  if (r === 'available') return 'badge-green'
+  if (r === 'unavailable') return 'badge-red'
+  if (r === 'no_models') return 'badge-gray'
+  if (r === 'manual_disabled') return 'badge-red'
+  return 'badge-gray'
+}
+function routabilityLabel(r?: string | null): string {
+  if (r === 'available') return pm('filter.routabilityBadgeAvailable')
+  if (r === 'unavailable') return pm('filter.routabilityBadgeUnavailable')
+  if (r === 'no_models') return pm('filter.routabilityBadgeNoModels')
+  if (r === 'manual_disabled') return pm('filter.routabilityBadgeManualDisabled')
+  return '—'
+}
+
 function healthLabel(status?: string | null): string {
   if (status === 'healthy')     return pm('list.health.healthy')
   if (status === 'warning')     return pm('list.health.warning')
@@ -554,7 +604,18 @@ async function load() {
       getProviders({
         search: filterSearch.value || undefined,
         health_status: filterHealthStatus.value || undefined,
+        // 2026-07-03 v738: send routability as its own filter. The backend
+        // (admin/providers.go listProviders) supports the
+        // ?routability=available|unavailable|no_models|manual_disabled|all
+        // query param and post-filters rows. Default to 'available' on
+        // first load so operators land on a "currently usable" view.
+        routability: filterRoutability.value,
         has_free_model: hasFreeParam,
+        // 2026-07-03 v738: the previous design had a client-side
+        // "Show manually disabled" checkbox that sent manual_disabled=true
+        // to the backend. With routability, manual_disabled rows now have
+        // their own chip, so the bool toggle is removed from the UI.
+        manual_disabled: 'all',
       }),
       getCatalog(),
     ])
@@ -572,8 +633,13 @@ function onSearchInput() {
   _searchDebounceTimer = setTimeout(() => load(), 300)
 }
 
-function onHealthStatusChange(status: string) {
+function onHealthStatusChange(status: 'all' | 'healthy' | 'warning' | 'unreachable' | 'unknown') {
   filterHealthStatus.value = status
+  load()
+}
+
+function onRoutabilityChange(value: 'all' | 'available' | 'unavailable' | 'no_models' | 'manual_disabled') {
+  filterRoutability.value = value
   load()
 }
 
@@ -656,12 +722,28 @@ onUnmounted(() => {
         <span class="filter-search-icon">🔍</span>
       </div>
       <div class="filter-tabs">
+        <span class="filter-tab-label">{{ pm('filter.healthChipGroup') }}</span>
         <button
           v-for="opt in healthStatusOptions"
           :key="opt.value"
           class="filter-tab"
           :class="{ active: filterHealthStatus === opt.value }"
-          @click="onHealthStatusChange(opt.value)"
+          @click="onHealthStatusChange(opt.value as 'all' | 'healthy' | 'warning' | 'unreachable' | 'unknown')"
+        >{{ opt.label }}</button>
+      </div>
+      <div class="filter-divider" aria-hidden="true"></div>
+      <!-- 2026-07-03 v738: new "可路由性" chip group. This is the
+           dimension that drives the "全部 / 可用 / 不可用 / 无模型 /
+           已禁用" semantics the user reported. Default to "可用" so
+           the operator lands on a routable-only view. -->
+      <div class="filter-tabs">
+        <span class="filter-tab-label">{{ pm('filter.routabilityChipGroup') }}</span>
+        <button
+          v-for="opt in routabilityOptions"
+          :key="opt.value"
+          class="filter-tab"
+          :class="{ active: filterRoutability === opt.value }"
+          @click="onRoutabilityChange(opt.value as 'all' | 'available' | 'unavailable' | 'no_models' | 'manual_disabled')"
         >{{ opt.label }}</button>
       </div>
       <div class="filter-divider" aria-hidden="true"></div>
@@ -691,20 +773,36 @@ onUnmounted(() => {
             <th>{{ pm('list.table.freeModels') }}</th>
             <th>{{ pm('list.table.errorRate24h') }}</th>
             <th>{{ pm('list.table.health') }}</th>
+            <!-- 2026-07-03 v738: new column showing routability
+                 (available / unavailable / no_models / manual_disabled).
+                 The "可用" / "不可用" semantics that used to live on
+                 health_status now live on routability. -->
+            <th>{{ pm('filter.routabilityChipGroup') }}</th>
             <th>{{ pm('list.table.status') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr
-            v-for="p in providers"
+            v-for="p in visibleProviders"
             :key="p.id"
             class="provider-row"
+            :class="{ 'row-manual-disabled': p.manual_disabled }"
             tabindex="0"
             @click="router.push('/providers/' + p.id)"
             @keydown.enter="router.push('/providers/' + p.id)"
           >
             <td>
-              <div style="font-weight:500">{{ p.display_name }}</div>
+              <div style="font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span>{{ p.display_name }}</span>
+                <!-- 2026-07-03 v738: surface manual_disabled at a glance so
+                     the operator cannot mistake a disabled vendor for an
+                     active one with healthy credentials. -->
+                <span
+                  v-if="p.manual_disabled"
+                  class="badge badge-red"
+                  :title="pm('list.manualDisabledTooltip')"
+                >{{ pm('list.manualDisabledBadge') }}</span>
+              </div>
               <div style="font-size:11px;color:var(--muted)" v-if="p.notes">{{ p.notes }}</div>
             </td>
             <td>
@@ -745,14 +843,27 @@ onUnmounted(() => {
               <div class="muted" v-if="(p.warning_credential_count ?? 0) > 0">{{ pm('list.warningsPrefix') }} {{ p.warning_credential_count }}</div>
             </td>
             <td>
-              <span class="badge" :class="p.enabled ? 'badge-green' : 'badge-gray'">
+              <span class="badge" :class="routabilityBadgeClass(p.routability)">
+                {{ routabilityLabel(p.routability) }}
+              </span>
+              <div class="muted" v-if="p.routable_binding_count != null && p.total_binding_count != null">
+                {{ p.routable_binding_count }} / {{ p.total_binding_count }}
+              </div>
+            </td>
+            <td>
+              <span
+                v-if="p.manual_disabled"
+                class="badge badge-red"
+                :title="pm('list.manualDisabledTooltip')"
+              >{{ pm('list.manualDisabledBadge') }}</span>
+              <span v-else class="badge" :class="p.enabled ? 'badge-green' : 'badge-gray'">
                 {{ p.enabled ? pm('list.enabledBadge') : pm('list.disabledBadge') }}
               </span>
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="!loading && providers.length === 0" class="empty">{{ pm('list.empty') }}</div>
+      <div v-if="!loading && visibleProviders.length === 0" class="empty">{{ pm('list.empty') }}</div>
     </div>
 
     <!-- ── Add Provider Modal ─────────────────────────────────────────────── -->
@@ -1416,5 +1527,15 @@ onUnmounted(() => {
   padding: 2px 6px;
   background: rgba(0, 255, 128, 0.1);
   border-radius: 3px;
+}
+
+/* 2026-07-03 v738: visually de-emphasize manually-disabled rows so an
+   operator scanning the table cannot mistake them for active vendors.
+   Same palette as the manual_disabled badge (red tint). */
+.provider-row.row-manual-disabled {
+  background: rgba(255, 80, 80, 0.06);
+}
+.provider-row.row-manual-disabled:hover {
+  background: rgba(255, 80, 80, 0.12);
 }
 </style>

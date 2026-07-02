@@ -36,6 +36,19 @@ export interface Provider {
   protocol?: string | null
   category?: string | null
   vendor_name?: string | null
+  // 2026-07-03 v738: routability is the orthogonal dimension to
+  // health_status. A provider can have healthy credentials but still
+  // be unavailable (all credentials in quota_exhausted state, or all
+  // models filtered out by plan_type/billing_mode), or no models at
+  // all (catalog_provider with no model_offer rows yet). The /providers
+  // page's "可用 / 不可用 / 无模型 / 已禁用" chips filter on this field.
+  routability?: 'available' | 'unavailable' | 'no_models' | 'manual_disabled'
+  // routable_binding_count and total_binding_count back the routability
+  // computation on the server side. The view
+  // v_routable_credential_models.is_routable drives these. The frontend
+  // can use them to render the per-provider badge breakdown if needed.
+  routable_binding_count?: number
+  total_binding_count?: number
 }
 
 export interface CredentialCheckResult {
@@ -82,14 +95,29 @@ export interface DiagnoseProviderResponse {
 export function getProviders(params?: {
   search?: string
   health_status?: string
+  // 2026-07-03 v738: routability filter for the "可用/不可用/无模型/已禁用"
+  // chip on the /providers page. Maps 1:1 to the routability field on
+  // the Provider interface.
+  routability?: 'available' | 'unavailable' | 'no_models' | 'manual_disabled' | 'all'
   has_free_model?: boolean
-  manual_disabled?: boolean
+  // Four-state (2026-07-03 v738): "all" / "false" / "true" / "only".
+  // `boolean` is kept for backward-compat with the existing 0.7 frontend
+  // but new code should pass the four-state string to avoid the
+  // ambiguous true=only/false=include/missing=exclude case.
+  manual_disabled?: boolean | 'all' | 'true' | 'false' | 'only'
 }) {
   const query = new URLSearchParams()
   if (params?.search) query.set('search', params.search)
   if (params?.health_status && params.health_status !== 'all') query.set('health_status', params.health_status)
+  if (params?.routability && params.routability !== 'all') query.set('routability', params.routability)
   if (params?.has_free_model != null) query.set('has_free_model', String(params.has_free_model))
-  if (params?.manual_disabled != null) query.set('manual_disabled', String(params.manual_disabled))
+  if (params?.manual_disabled != null) {
+    const v = params.manual_disabled
+    // Translate boolean to the four-state string so the wire contract
+    // stays explicit. false → "false" (exclude), true → "true" (only).
+    if (typeof v === 'boolean') query.set('manual_disabled', v ? 'true' : 'false')
+    else query.set('manual_disabled', v)
+  }
   const qs = query.toString()
   return req<Provider[]>('GET', `/api/providers${qs ? '?' + qs : ''}`)
 }
