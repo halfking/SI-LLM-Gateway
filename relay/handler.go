@@ -322,6 +322,79 @@ func (h *ChatHandler) expandToolIDs(ctx context.Context, tenantID string, toolID
 	return json.Marshal(tools)
 }
 
+// injectCCRRetrievalTool adds the headroom_retrieve tool definition to the
+// request's tools array. Returns (modifiedBody, true, nil) if injection
+// succeeded, (originalBody, false, nil) if no tools array exists, or
+// (originalBody, false, err) on parse error.
+func (h *ChatHandler) injectCCRRetrievalTool(body []byte, protocol string) ([]byte, bool, error) {
+	var req map[string]interface{}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return body, false, err
+	}
+
+	// Get or create tools array
+	toolsRaw, ok := req["tools"]
+	var tools []interface{}
+	if !ok || toolsRaw == nil {
+		// No tools array — create one with just the CCR tool
+		tools = []interface{}{}
+	} else {
+		tools, ok = toolsRaw.([]interface{})
+		if !ok {
+			// tools exists but is not an array — skip injection
+			return body, false, nil
+		}
+	}
+
+	// Check if headroom_retrieve already exists (avoid duplicates)
+	for _, t := range tools {
+		if toolMap, ok := t.(map[string]interface{}); ok {
+			if name, ok := toolMap["name"].(string); ok && name == "headroom_retrieve" {
+				// Already present
+				return body, false, nil
+			}
+			// Anthropic format uses "function.name"
+			if fn, ok := toolMap["function"].(map[string]interface{}); ok {
+				if name, ok := fn["name"].(string); ok && name == "headroom_retrieve" {
+					return body, false, nil
+				}
+			}
+		}
+	}
+
+	// Generate tool definition based on protocol
+	var toolDef map[string]interface{}
+	if protocol == "anthropic-messages" {
+		// Anthropic format: {name, description, input_schema}
+		toolDef = map[string]interface{}{
+			"name":         h.ccrRetrievalTool.Name(),
+			"description":  h.ccrRetrievalTool.Description(),
+			"input_schema": h.ccrRetrievalTool.InputSchema(),
+		}
+	} else {
+		// OpenAI format: {type: "function", function: {name, description, parameters}}
+		toolDef = map[string]interface{}{
+			"type": "function",
+			"function": map[string]interface{}{
+				"name":        h.ccrRetrievalTool.Name(),
+				"description": h.ccrRetrievalTool.Description(),
+				"parameters":  h.ccrRetrievalTool.InputSchema(),
+			},
+		}
+	}
+
+	// Append to tools array
+	tools = append(tools, toolDef)
+	req["tools"] = tools
+
+	modified, err := json.Marshal(req)
+	if err != nil {
+		return body, false, err
+	}
+
+	return modified, true, nil
+}
+
 func (h *ChatHandler) SetAuth(kv *auth.KeyVerifier, rl ratelimit.RPMLimiter) {
 	h.keyVerifier = kv
 	h.rateLimiter = rl
@@ -1234,29 +1307,49 @@ func (h *ChatHandler) serveWithExecutor(
 		outboundForLog = outboundModelForLog(clientModel, explicitOutbound, candidates[0].RawModel)
 	}
 
+	// Determine protocol for tool injection and session compression
+	protocol := "openai"
+	if isAnthropicMessagesPath(r.URL.Path) {
+		protocol = "anthropic-messages"
+	}
+
 	// ── Phase 2 Meta-tool expansion ────────────────────────────────────
 	// When the request's `tools` array contains the meta-tools
 	// (list_categories, load_tools), expand them in-place with the full
-	// tool set loaded from tool_registry. The expanded request is then
-	// forwarded upstream so the LLM sees all concrete tools in a
-	// single round-trip (no list_categories → load_tools dance needed).
-	// Runs BEFORE session compression so we don't compress the small
-	// meta-tool body — only the expanded one.
-	if h.metaToolInterceptor != nil {
-		modified, intercepted, err := h.metaToolInterceptor.InterceptRequest(r.Context(), bodyBytes)
-		if err != nil {
-			captureAndEmitFailure("meta_tool_error", fmt.Sprintf("meta-tool expansion failed: %v", err), nil, nil)
-			writeErrorJSON(w, http.StatusInternalServerError, requestID, "Meta-tool processing failed", "internal_error", "meta_tool_error")
-			return
+		// tool set loaded from tool_registry. The expanded request is then
+		// forwarded upstream so the LLM sees all concrete tools in a
+		// single round-trip (no list_categories → load_tools dance needed).
+		// Runs BEFORE session compression so we don't compress the small
+		// meta-tool body — only the expanded one.
+		if h.metaToolInterceptor != nil {
+			modified, intercepted, err := h.metaToolInterceptor.InterceptRequest(r.Context(), bodyBytes)
+			if err != nil {
+				captureAndEmitFailure("meta_tool_error", fmt.Sprintf("meta-tool expansion failed: %v", err), nil, nil)
+				writeErrorJSON(w, http.StatusInternalServerError, requestID, "Meta-tool processing failed", "internal_error", "meta_tool_error")
+				return
+			}
+			if intercepted {
+				// Meta-tools replaced with full tool set; continue with the
+				// expanded body.
+				bodyBytes = modified
+			}
 		}
-		if intercepted {
-			// Meta-tools replaced with full tool set; continue with the
-			// expanded body.
-			bodyBytes = modified
-		}
-	}
 
-	// ── v3 Session-level intelligent compression ────────────────────────
+		// ── Headroom CCR retrieval tool injection ───────────────────────────
+		// When HeadroomCompressor is active, inject the headroom_retrieve tool
+		// definition into the request's tools array so the LLM can retrieve
+		// compressed data when it encounters <<ccr:HASH>> markers.
+		if h.ccrRetrievalTool != nil {
+			modified, injected, err := h.injectCCRRetrievalTool(bodyBytes, protocol)
+			if err != nil {
+				// Log but don't fail the request — CCR injection is non-critical
+				slog.Warn("ccr: failed to inject retrieval tool", "error", err)
+			} else if injected {
+				bodyBytes = modified
+			}
+		}
+
+		// ── v3 Session-level intelligent compression ────────────────────────
 	// Runs AFTER candidate resolution so we know the target model's context
 	// window (B1 fix: previously passed 0, which disabled the TOKEN trigger
 	// and the mechanical-trim fallback). The session compressor delta-appends
@@ -1266,10 +1359,6 @@ func (h *ChatHandler) serveWithExecutor(
 		tenantForSC := "default"
 		if keyInfo != nil {
 			tenantForSC = keyInfo.TenantID
-		}
-		protocolForSC := "openai"
-		if isAnthropicMessagesPath(r.URL.Path) {
-			protocolForSC = "anthropic-messages"
 		}
 		// Resolve the target model context window from the first candidate.
 		// 0 when unknown (TOKEN trigger then relies on msg_count / idle only).
@@ -1282,7 +1371,7 @@ func (h *ChatHandler) serveWithExecutor(
 			bodyBytes,
 			tenantForSC,
 			gwSessionID,
-			protocolForSC,
+			protocol,
 			ctxWindow,
 			false, // not streaming yet at this point
 		)
