@@ -430,6 +430,9 @@ onMounted(load)
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 13px;
 }
+.num-th {
+  text-align: end;
+}
 .amount-neg { color: #f87171; }
 .amount-pos { color: #4ade80; }
 .ref-cell {
