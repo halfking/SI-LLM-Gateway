@@ -157,7 +157,7 @@ type CredentialModelStatus struct {
 // shape changes. The in-memory cache uses the version as part of the key, so
 // older cached responses (with the previous schema) are automatically
 // ignored after a redeploy — no manual flush needed.
-const monitorSummarySchemaVersion = 4
+const monitorSummarySchemaVersion = 5
 
 // WindowStats aggregates recent sliding window data.
 type WindowStats struct {
@@ -252,15 +252,16 @@ func (m *CredentialMonitorHandlers) handleMonitorSummary(w http.ResponseWriter, 
 					FROM model_offers mo
 					LEFT JOIN credential_model_bindings cmb
 						ON cmb.credential_id = mo.credential_id
-					   AND cmb.provider_model_id = (SELECT id FROM provider_models pm WHERE pm.raw_model_name = mo.raw_model_name AND pm.provider_id = c.provider_id LIMIT 1)
+						   AND cmb.provider_model_id = (SELECT id FROM provider_models pm WHERE pm.raw_model_name = mo.raw_model_name AND pm.provider_id = c.provider_id LIMIT 1)
 					LEFT JOIN model_probe_state mps
 						ON mps.credential_id = mo.credential_id
-					   AND mps.raw_model_name = mo.raw_model_name
+						   AND mps.raw_model_name = mo.raw_model_name
 					-- P95: bg rollup (5min bucket, latest 1) - main hot path
 					LEFT JOIN LATERAL (
 						SELECT p95_latency_ms, bucket
 						FROM credential_model_index
 						WHERE credential_id = c.id AND raw_model = mo.raw_model_name
+						  AND bucket > NOW() - INTERVAL '10 minutes'
 						ORDER BY bucket DESC LIMIT 1
 					) cmi ON true
 					-- P95 live: percentile_cont 3h window fallback
@@ -375,7 +376,15 @@ func (m *CredentialMonitorHandlers) handleMonitorSummary(w http.ResponseWriter, 
 		"credentials": summaries,
 		"count":       len(summaries),
 	}
-	monitorSummaryCache.set(cacheKey, resp)
+	// 2026-07-03: don't cache empty results. If the query hit the 15s ctx
+	// timeout (or any transient DB blip) and returned no rows, caching the
+	// empty array would lock the UI on "no credentials" for 30s — which is
+	// exactly the symptom the operator reported on /routing-v2/credentials.
+	// Non-empty responses are still cached so the page auto-refreshes stay
+	// cheap.
+	if len(summaries) > 0 {
+		monitorSummaryCache.set(cacheKey, resp)
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
