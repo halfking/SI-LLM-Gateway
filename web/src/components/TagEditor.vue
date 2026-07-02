@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { listTags, type TagInfo } from '../api'
 
 const props = defineProps<{
@@ -12,6 +13,8 @@ const emit = defineEmits<{
   (e: 'update:modelValue', tags: string[]): void
   (e: 'reset'): void
 }>()
+
+const { t } = useI18n()
 
 const draft = ref('')
 const allTags = ref<TagInfo[]>([])
@@ -90,7 +93,7 @@ onMounted(loadTags)
       <input
         v-model="draft"
         class="tag-input"
-        placeholder="输入 <ns>:<值>，Enter 添加"
+        :placeholder="t('tagEditor.placeholder')"
         @keydown="onKey"
         @focus="showSuggest = true"
         @blur="onBlur"
@@ -104,13 +107,13 @@ onMounted(loadTags)
         class="btn btn-ghost btn-sm"
         @click="nsHint(ns)"
       >{{ ns }}:</button>
-      <span v-if="locked" class="badge badge-yellow tag-locked-badge">已锁定</span>
+      <span v-if="locked" class="badge badge-yellow tag-locked-badge">{{ t('tagEditor.locked') }}</span>
       <button
         v-if="locked"
         type="button"
         class="btn btn-ghost btn-sm"
         @click="emit('reset')"
-      >重置为自动</button>
+      >{{ t('tagEditor.reset') }}</button>
     </div>
     <ul v-if="showSuggest && filtered.length" class="suggest">
       <li v-for="s in filtered" :key="s" @mousedown.prevent="addTag(s)">{{ s }}</li>

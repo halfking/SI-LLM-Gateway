@@ -1,6 +1,9 @@
 <script setup lang="ts">
 // SixDimScoreBar — 6 维度水平条形图（纯 SVG，零依赖）
 // 复用 KeyDetailView.vue 的 viewBox + path 计算模式
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   scores: {
@@ -17,12 +20,12 @@ const props = withDefaults(defineProps<{
 })
 
 const DIMS = [
-  { key: 'price_score',     label: '价格',   color: 'var(--success)' },
-  { key: 'speed_score',     label: '速度',   color: 'var(--accent)' },
-  { key: 'stability_score', label: '稳定性', color: '#3fb950' },
-  { key: 'match_score',     label: '匹配度', color: '#d29922' },
-  { key: 'pressure_score',  label: '压力',   color: '#f85149' },
-  { key: 'context_fit',     label: '上下文', color: '#a371f7' },
+  { key: 'price_score',     color: 'var(--success)' },
+  { key: 'speed_score',     color: 'var(--accent)' },
+  { key: 'stability_score', color: '#3fb950' },
+  { key: 'match_score',     color: '#d29922' },
+  { key: 'pressure_score',  color: '#f85149' },
+  { key: 'context_fit',     color: '#a371f7' },
 ] as const
 
 function val(k: string): number {
@@ -30,12 +33,16 @@ function val(k: string): number {
   if (v === undefined || v === null || isNaN(v)) return 0
   return Math.max(0, Math.min(100, v))
 }
+
+function getLabel(key: string): string {
+  return t(`sixDimScoreBar.dimensions.${key}`)
+}
 </script>
 
 <template>
   <div class="six-dim" :class="{ compact }">
     <div v-for="dim in DIMS" :key="dim.key" class="dim-row">
-      <span class="dim-label">{{ dim.label }}</span>
+      <span class="dim-label">{{ getLabel(dim.key) }}</span>
       <div class="dim-bar-bg">
         <div
           class="dim-bar-fill"

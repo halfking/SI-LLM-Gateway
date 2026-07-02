@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 interface SlotDetail {
   index: number
@@ -49,7 +52,7 @@ function holderLabel(d: SlotDetail): string {
 function ttlLabel(d: SlotDetail | null): string {
   if (!d || !d.holder) return ''
   const secs = d.ttl_seconds
-  if (secs <= 0) return '已过期'
+  if (secs <= 0) return t('fpSlotVisualizer.expired')
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
   if (h >= 1) return `${h}h${m}m`
@@ -68,15 +71,15 @@ function isLongHeld(d: SlotDetail | null): boolean {
     <div class="fp-header">
       <div class="fp-stat">
         <span class="fp-stat-num">{{ stats.occupied }}</span>
-        <span class="fp-stat-label">已占用</span>
+        <span class="fp-stat-label">{{ t('fpSlotVisualizer.statOccupied') }}</span>
       </div>
       <div class="fp-stat">
         <span class="fp-stat-num">{{ stats.free }}</span>
-        <span class="fp-stat-label">空闲</span>
+        <span class="fp-stat-label">{{ t('fpSlotVisualizer.statFree') }}</span>
       </div>
       <div class="fp-stat">
         <span class="fp-stat-num">{{ stats.total }}</span>
-        <span class="fp-stat-label">总槽位</span>
+        <span class="fp-stat-label">{{ t('fpSlotVisualizer.statTotal') }}</span>
       </div>
     </div>
 
@@ -90,29 +93,29 @@ function isLongHeld(d: SlotDetail | null): boolean {
           <div class="fp-cell-num">#{{ d.index }}</div>
           <div class="fp-cell-icon">●</div>
           <div class="fp-cell-ttl">{{ ttlLabel(d) }}</div>
-          <button class="fp-cell-close" @click.stop="emit('release', d.index)" title="释放此槽位">×</button>
+          <button class="fp-cell-close" @click.stop="emit('release', d.index)" :title="t('fpSlotVisualizer.releaseSlot')">×</button>
           <div class="fp-tooltip">
             <div class="fp-tooltip-title">{{ holderLabel(d) }}</div>
             <div class="fp-tooltip-meta">
-              <div>槽位 #{{ d.index }} · TTL {{ ttlLabel(d) }}</div>
-              <div class="fp-tooltip-session">会话: {{ d.session_id || d.holder }}</div>
+              <div>{{ t('fpSlotVisualizer.slotLabel') }} #{{ d.index }} · TTL {{ ttlLabel(d) }}</div>
+              <div class="fp-tooltip-session">{{ t('fpSlotVisualizer.sessionLabel') }}: {{ d.session_id || d.holder }}</div>
               <div v-if="d.session_title" class="fp-tooltip-hint">
-                (ID 为内部 session_id，标题是自动生成的会话主题)
+                {{ t('fpSlotVisualizer.tooltipHint') }}
               </div>
             </div>
           </div>
         </template>
         <template v-else>
           <div class="fp-cell-num">#{{ idx }}</div>
-          <div class="fp-cell-empty">空闲</div>
+          <div class="fp-cell-empty">{{ t('fpSlotVisualizer.freeLabel') }}</div>
         </template>
       </div>
     </div>
 
     <div class="fp-legend">
-      <span class="fp-legend-item"><span class="fp-legend-dot fp-legend-dot--occupied"></span>占用中</span>
-      <span class="fp-legend-item"><span class="fp-legend-dot fp-legend-dot--long"></span>长期持有 (&gt;12h)</span>
-      <span class="fp-legend-item"><span class="fp-legend-dot fp-legend-dot--free"></span>空闲</span>
+      <span class="fp-legend-item"><span class="fp-legend-dot fp-legend-dot--occupied"></span>{{ t('fpSlotVisualizer.legendOccupied') }}</span>
+      <span class="fp-legend-item"><span class="fp-legend-dot fp-legend-dot--long"></span>{{ t('fpSlotVisualizer.legendLongHeld') }}</span>
+      <span class="fp-legend-item"><span class="fp-legend-dot fp-legend-dot--free"></span>{{ t('fpSlotVisualizer.legendFree') }}</span>
     </div>
   </div>
 </template>

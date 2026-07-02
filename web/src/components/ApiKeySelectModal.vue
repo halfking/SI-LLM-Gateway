@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import type { ApiKey } from '../api'
 import { formatApiKeyLabel } from '../utils/apiKey'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   visible: boolean
@@ -23,13 +26,13 @@ const router = useRouter()
 const route = useRoute()
 
 const title = computed(() =>
-  props.reason === 'session-forbidden' ? '会话密钥不匹配' : '选择 API 密钥',
+  props.reason === 'session-forbidden' ? t('apiKeySelectModal.titleSessionForbidden') : t('apiKeySelectModal.titleManual'),
 )
 
 const hint = computed(() =>
   props.reason === 'session-forbidden'
-    ? '此对话绑定的网关会话属于另一把 API 密钥。请选择拥有该会话的密钥，系统将自动重发上一条消息。'
-    : '对话需要完整的 sk-* 密钥。请从下方选择一把可用密钥。',
+    ? t('apiKeySelectModal.hintSessionForbidden')
+    : t('apiKeySelectModal.hintManual'),
 )
 
 const redirectPath = computed(() => {
@@ -63,7 +66,7 @@ function goKeys(action?: string) {
             v-if="reason !== 'session-forbidden'"
             type="button"
             class="modal-panel__close"
-            aria-label="关闭"
+            :aria-label="t('apiKeySelectModal.closeLabel')"
             @click="emit('close')"
           >
             ×
@@ -76,7 +79,7 @@ function goKeys(action?: string) {
             <div class="key-list__meta">
               <span class="key-list__label">
                 {{ formatApiKeyLabel(k) }}
-                <span v-if="isUnrevealable(k.id)" class="key-list__badge">无法还原</span>
+                <span v-if="isUnrevealable(k.id)" class="key-list__badge">{{ t('apiKeySelectModal.unrevealabledBadge') }}</span>
               </span>
               <span class="key-list__sub">{{ k.tenant_id }} · {{ k.owner_user || '—' }}</span>
             </div>
@@ -89,22 +92,22 @@ function goKeys(action?: string) {
             >
               {{
                 loading
-                  ? '加载中…'
+                  ? t('apiKeySelectModal.buttonLoading')
                   : isUnrevealable(k.id)
-                    ? '不可选'
+                    ? t('apiKeySelectModal.buttonUnavailable')
                     : selectedId === k.id
-                      ? '当前密钥'
-                      : '使用此密钥'
+                      ? t('apiKeySelectModal.buttonCurrent')
+                      : t('apiKeySelectModal.buttonUse')
               }}
             </button>
           </li>
         </ul>
         <div v-if="!keys.length" class="key-list__empty">
-          没有可用的密钥。请先申请或创建 API 密钥。
+          {{ t('apiKeySelectModal.emptyMessage') }}
         </div>
         <div class="modal-panel__actions">
-          <button type="button" class="btn btn-ghost btn-sm" @click="goKeys('create')">签发新密钥</button>
-          <button type="button" class="btn btn-ghost btn-sm" @click="goKeys()">前往 API 密钥管理</button>
+          <button type="button" class="btn btn-ghost btn-sm" @click="goKeys('create')">{{ t('apiKeySelectModal.createNewKey') }}</button>
+          <button type="button" class="btn btn-ghost btn-sm" @click="goKeys()">{{ t('apiKeySelectModal.goToKeyManagement') }}</button>
         </div>
       </div>
     </div>

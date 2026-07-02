@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getCatalog, type CatalogEntry } from '../api'
 import ActiveFilterChips from './ActiveFilterChips.vue'
 import { useFilterChips } from '../composables/useFilterChips'
+
+const { t } = useI18n()
 
 const entries  = ref<CatalogEntry[]>([])
 const loading  = ref(false)
@@ -13,8 +16,8 @@ const search     = ref('')
 const tiers = ['all', 'local', 'tier1', 'tier2', 'tier3', 'tier4']
 
 const tierLabel: Record<string, string> = {
-  all: '全部',
-  local: '本地',
+  all: t('catalogPanel.tierAll'),
+  local: t('catalogPanel.tierLocal'),
   tier1: 'Tier 1',
   tier2: 'Tier 2',
   tier3: 'Tier 3',
@@ -36,7 +39,7 @@ async function load() {
   try {
     entries.value = await getCatalog()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : t('catalogPanel.loadFailed')
   } finally {
     loading.value = false
   }
@@ -84,13 +87,13 @@ function selectTier(tier: string) {
 const activeFilterChips = useFilterChips(() => [
   tierFilter.value !== 'all' ? {
     key: `tier:${tierFilter.value}`,
-    label: `层级: ${tierLabel[tierFilter.value]}`,
+    label: `${t('catalogPanel.tierLabel')}: ${tierLabel[tierFilter.value]}`,
     onRemove: clearTierFilter,
     className: tierBadge(tierFilter.value),
   } : null,
   search.value.trim() ? {
     key: `search:${search.value.trim()}`,
-    label: `搜索: ${search.value.trim()}`,
+    label: `${t('catalogPanel.searchLabel')}: ${search.value.trim()}`,
     onRemove: clearSearchFilter,
     className: 'badge-gray',
   } : null,
@@ -129,7 +132,7 @@ onMounted(load)
 <template>
   <div>
     <div class="panel-toolbar">
-      <span class="badge badge-gray">{{ filtered.length }} 个提供商</span>
+      <span class="badge badge-gray">{{ t('catalogPanel.providerCount', { count: filtered.length }) }}</span>
     </div>
 
     <div class="filter-bar">
@@ -140,16 +143,16 @@ onMounted(load)
           :class="tierFilter === option.value ? 'btn-primary' : 'btn-ghost'"
           :disabled="option.disabled"
           @click="selectTier(option.value)"
-          :title="option.disabled ? '当前搜索条件下无匹配提供商' : `${option.count} 个提供商`"
+          :title="option.disabled ? t('catalogPanel.noMatchingProviders') : t('catalogPanel.providerCount', { count: option.count })"
         >{{ tierLabel[option.value] }} <span class="tier-count">{{ option.count }}</span></button>
       </div>
-      <input v-model="search" placeholder="搜索提供商…" style="max-width:220px" />
+      <input v-model="search" :placeholder="t('catalogPanel.searchPlaceholder')" style="max-width:220px" />
     </div>
 
     <ActiveFilterChips :chips="activeFilterChips" style="margin-bottom:20px" />
 
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
-    <div v-if="loading" class="empty">加载中…</div>
+    <div v-if="loading" class="empty">{{ t('catalogPanel.loading') }}</div>
 
     <div class="catalog-grid" v-if="!loading">
       <div class="catalog-card card" v-for="entry in filtered" :key="entry.code">
@@ -160,7 +163,7 @@ onMounted(load)
           </div>
           <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
             <span class="badge" :class="tierBadge(entry.tier)">{{ entry.tier }}</span>
-            <span class="badge badge-green" v-if="entry.domestic">国内</span>
+            <span class="badge badge-green" v-if="entry.domestic">{{ t('catalogPanel.domestic') }}</span>
           </div>
         </div>
         <div class="meta-row">
@@ -168,17 +171,17 @@ onMounted(load)
           <span class="tag">{{ entry.kind }}</span>
           <span class="tag">{{ entry.protocol }}</span>
         </div>
-        <div class="model-count">{{ modelCount(entry) }} 个模型</div>
+        <div class="model-count">{{ t('catalogPanel.modelCount', { count: modelCount(entry) }) }}</div>
         <div class="model-tags">
           <span class="model-tag" v-for="m in topModels(entry)" :key="m">{{ m }}</span>
           <span class="model-tag-more" v-if="modelCount(entry) > 4">+{{ modelCount(entry) - 4 }}</span>
         </div>
         <div class="card-footer" v-if="entry.docs_url">
-          <a :href="entry.docs_url" target="_blank" rel="noopener">文档 →</a>
+          <a :href="entry.docs_url" target="_blank" rel="noopener">{{ t('catalogPanel.documentation') }}</a>
         </div>
       </div>
     </div>
-    <div v-if="!loading && filtered.length === 0" class="empty">无匹配结果</div>
+    <div v-if="!loading && filtered.length === 0" class="empty">{{ t('catalogPanel.noResults') }}</div>
   </div>
 </template>
 

@@ -32,6 +32,19 @@ import examples from './examples'
 import dataLifecycle from './dataLifecycle'
 import tuning from './tuning'
 import correlations from './correlations'
+import tenantModelPolicyPanel from './tenantModelPolicyPanel'
+import clientConfigDialog from './clientConfigDialog'
+import memoraStatusButton from './memoraStatusButton'
+import slotInfoCard from './slotInfoCard'
+import gatewayApiKeyPicker from './gatewayApiKeyPicker'
+import statusBadge from './statusBadge'
+import tagEditor from './tagEditor'
+import modelCatalogFilterBar from './modelCatalogFilterBar'
+import sixDimScoreBar from './sixDimScoreBar'
+import catalogPanel from './catalogPanel'
+import apiKeySelectModal from './apiKeySelectModal'
+import fpSlotVisualizer from './fpSlotVisualizer'
+import modelPicker from './modelPicker'
 
 export default {
   common,
@@ -66,4 +79,17 @@ export default {
   dataLifecycle,
   tuning,
   correlations,
+  tenantModelPolicyPanel,
+  clientConfigDialog,
+  memoraStatusButton,
+  slotInfoCard,
+  gatewayApiKeyPicker,
+  statusBadge,
+  tagEditor,
+  modelCatalogFilterBar,
+  sixDimScoreBar,
+  catalogPanel,
+  apiKeySelectModal,
+  fpSlotVisualizer,
+  modelPicker,
 }

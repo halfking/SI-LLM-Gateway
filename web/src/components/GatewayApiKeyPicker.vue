@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import type { ApiKey } from '../api'
 import { formatApiKeyLabel } from '../utils/apiKey'
 
@@ -14,6 +15,7 @@ const emit = defineEmits<{
   select: [id: number]
 }>()
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 
@@ -31,10 +33,8 @@ function goKeys(action?: string) {
 
 <template>
   <div class="key-picker card">
-    <h3 class="key-picker__title">选择 API 密钥</h3>
-    <p class="key-picker__hint">
-      对话需要完整的 <code>sk-*</code> 密钥。请从下方选择一把可用密钥；若密钥无法还原，请重新签发。
-    </p>
+    <h3 class="key-picker__title">{{ t('gatewayApiKeyPicker.title') }}</h3>
+    <p class="key-picker__hint" v-html="t('gatewayApiKeyPicker.hint')"></p>
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
     <ul class="key-picker__list">
       <li v-for="k in keys" :key="k.id" class="key-picker__item">
@@ -50,19 +50,19 @@ function goKeys(action?: string) {
           :disabled="loading"
           @click="emit('select', k.id)"
         >
-          {{ loading ? '加载中…' : '使用此密钥' }}
+          {{ loading ? t('gatewayApiKeyPicker.loading') : t('gatewayApiKeyPicker.useKey') }}
         </button>
       </li>
     </ul>
     <div v-if="!keys.length" class="key-picker__empty">
-      没有可用的密钥。
+      {{ t('gatewayApiKeyPicker.empty') }}
     </div>
     <div class="key-picker__actions">
       <button type="button" class="btn btn-ghost btn-sm" @click="goKeys('create')">
-        签发新密钥
+        {{ t('gatewayApiKeyPicker.actions.createNew') }}
       </button>
       <button type="button" class="btn btn-ghost btn-sm" @click="goKeys()">
-        前往 API 密钥管理
+        {{ t('gatewayApiKeyPicker.actions.manage') }}
       </button>
     </div>
   </div>

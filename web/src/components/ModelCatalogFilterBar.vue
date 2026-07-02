@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import ModelPicker from './ModelPicker.vue'
 import type { CatalogFilterStatusOption } from '../composables/useModelCatalogFilters'
+
+const { t } = useI18n()
 
 withDefaults(defineProps<{
   pickedModel: string
@@ -21,14 +24,14 @@ withDefaults(defineProps<{
 }>(), {
   extraFilter: '',
   textSearch: '',
-  pickerTitle: '选择标准模型',
-  pickerPlaceholder: '搜索标准模型…',
-  vendorLabel: '全部厂家',
+  pickerTitle: '',
+  pickerPlaceholder: '',
+  vendorLabel: '',
   statusOptions: null,
-  statusLabel: '全部',
+  statusLabel: '',
   statusSelectClass: 'cf-source',
   showTextSearch: false,
-  textSearchPlaceholder: 'family / 标签…',
+  textSearchPlaceholder: '',
   showClear: true,
 })
 
@@ -65,8 +68,8 @@ function onText(e: Event) {
     <div class="cf-grow" style="min-width:200px">
       <ModelPicker
         :model-value="pickedModel"
-        :placeholder="pickerPlaceholder"
-        :title="pickerTitle"
+        :placeholder="pickerPlaceholder || t('modelCatalogFilterBar.pickerPlaceholder')"
+        :title="pickerTitle || t('modelCatalogFilterBar.pickerTitle')"
         @update:model-value="onPickedModel"
       />
     </div>
@@ -75,7 +78,7 @@ function onText(e: Event) {
       :value="filterVendor"
       @change="onVendor"
     >
-      <option value="">{{ vendorLabel }}</option>
+      <option value="">{{ vendorLabel || t('modelCatalogFilterBar.vendorLabel') }}</option>
       <option v-for="v in vendorOptions" :key="v" :value="v">{{ v }}</option>
     </select>
     <select
@@ -85,7 +88,7 @@ function onText(e: Event) {
       :value="extraFilter"
       @change="onExtra"
     >
-      <option value="">{{ statusLabel }}</option>
+      <option value="">{{ statusLabel || t('modelCatalogFilterBar.statusLabel') }}</option>
       <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
         {{ opt.label }}
       </option>
@@ -95,7 +98,7 @@ function onText(e: Event) {
       class="cf-input cf-grow"
       type="search"
       :value="textSearch"
-      :placeholder="textSearchPlaceholder"
+      :placeholder="textSearchPlaceholder || t('modelCatalogFilterBar.textSearchPlaceholder')"
       @input="onText"
     />
     <button
@@ -104,8 +107,8 @@ function onText(e: Event) {
       class="btn btn-ghost btn-sm"
       @click="emit('clear')"
     >
-      清空
+      {{ t('modelCatalogFilterBar.clear') }}
     </button>
-    <span class="cf-meta">共 {{ count }} 个</span>
+    <span class="cf-meta">{{ t('modelCatalogFilterBar.count', { count }) }}</span>
   </div>
 </template>
