@@ -83,7 +83,7 @@ type Candidate struct {
 	// defence-in-depth, so live traffic should never see these flags set
 	// on a routable candidate — but the fields exist for diagnostics and
 	// to keep the admin resolve endpoint in sync with provider.Client.
-	ProviderManualDisabled  bool `json:"provider_manual_disabled,omitempty"`
+	ProviderManualDisabled   bool `json:"provider_manual_disabled,omitempty"`
 	CredentialManualDisabled bool `json:"credential_manual_disabled,omitempty"`
 }
 
@@ -279,10 +279,10 @@ func (c *Client) GetCandidates(ctx context.Context, model, profile string) ([]Ca
 		return nil, DefaultPolicy(), fmt.Errorf("provider client not configured")
 	}
 	routeModel := modelname.NormalizeRouteKey(model)
-	
-	slog.Info("provider.GetCandidates called", 
-		"original_model", model, 
-		"route_model", routeModel, 
+
+	slog.Info("provider.GetCandidates called",
+		"original_model", model,
+		"route_model", routeModel,
 		"profile", profile)
 
 	key := routeModel
@@ -331,7 +331,7 @@ func (c *Client) GetCandidates(ctx context.Context, model, profile string) ([]Ca
 
 	policy, _ := c.getPolicyCached(ctx)
 	cands := c.enrichWithAPIKeys(ctx, v.(*resolveResponse))
-	slog.Info("provider.GetCandidates: final result", 
+	slog.Info("provider.GetCandidates: final result",
 		"count_after_enrich", len(cands),
 		"candidate_details", func() []string {
 			details := make([]string, 0, len(cands))
@@ -629,12 +629,12 @@ func (c *Client) loadCandidatesDB(ctx context.Context, clientModel string) ([]Ca
 	if c.dbPool == nil {
 		return nil, nil
 	}
-	
+
 	// 2026-06-26: Multi-tier fallback strategy for quality gate.
 	// Try strict threshold first (0.3), then relaxed (0.0) if no candidates.
 	// This prevents "no available provider" when only low-quality candidates exist.
 	thresholds := []float64{0.3, 0.0}
-	
+
 	for i, threshold := range thresholds {
 		candidates, err := c.loadCandidatesDBWithThreshold(ctx, clientModel, threshold)
 		if err != nil {
@@ -658,7 +658,7 @@ func (c *Client) loadCandidatesDB(ctx context.Context, clientModel string) ([]Ca
 				"threshold", threshold)
 		}
 	}
-	
+
 	// No candidates even with relaxed threshold
 	RecordRoutingCandidates(clientModel, 0)
 	return nil, nil
@@ -693,18 +693,18 @@ func (c *Client) loadCandidatesDBWithThreshold(ctx context.Context, clientModel 
 			COALESCE(mo.unit_price_out_per_1m, 0)::float8 AS unit_price_out_per_1m,
 			COALESCE(mo.cache_read_price_per_1m, 0)::float8 AS cache_read_price_per_1m,
 			COALESCE(mo.cache_write_price_per_1m, 0)::float8 AS cache_write_price_per_1m,
-			-- is_routable comes from the unified VIEW (manual > auto priority).
-			-- Spec: 2026-06-12-credential-availability-audit-design §3.1.
-			-- 2026-07-03 v738: also project the manual_disabled flags so
-			-- Candidate.UnavailableReason can return the precise reason
-			-- string. The SQL WHERE clause above already filters on these,
-			-- so they should always be FALSE on routable candidates — the
-			-- projections are kept for diagnostics and admin resolve
-			-- endpoint parity.
-			COALESCE(v.is_routable, FALSE) AS runtime_routable,
-			v.unavailable_reason,
-			COALESCE(v.provider_manual_disabled, COALESCE(p.manual_disabled, FALSE)) AS provider_manual_disabled,
-			COALESCE(v.credential_manual_disabled, COALESCE(c.manual_disabled, FALSE)) AS credential_manual_disabled,
+		-- is_routable comes from the unified VIEW (manual > auto priority).
+		-- Spec: 2026-06-12-credential-availability-audit-design §3.1.
+		-- 2026-07-03 v738: also project the manual_disabled flags so
+		-- Candidate.UnavailableReason can return the precise reason
+		-- string. The SQL WHERE clause above already filters on these,
+		-- so they should always be FALSE on routable candidates — the
+		-- projections are kept for diagnostics and admin resolve
+		-- endpoint parity.
+		COALESCE(v.is_routable, FALSE) AS runtime_routable,
+		v.unavailable_reason,
+		COALESCE(p.manual_disabled, FALSE) AS provider_manual_disabled,
+		COALESCE(c.manual_disabled, FALSE) AS credential_manual_disabled,
 			CASE WHEN cc.capability = 'prompt_caching' AND cc.supported IS TRUE THEN TRUE ELSE FALSE END AS supports_prompt_cache,
 			COALESCE(cc.evidence_json->>'cache_mode', '') AS cache_mode,
 			COALESCE(mo.manual_priority, 99)::int AS manual_priority,
@@ -853,6 +853,8 @@ func (c *Client) loadCandidatesDBWithThreshold(ctx context.Context, clientModel 
 			&cand.CacheWritePricePer1M,
 			&cand.Routable,
 			&cand.BlockReason,
+			&cand.ProviderManualDisabled,
+			&cand.CredentialManualDisabled,
 			&cand.SupportsPromptCache,
 			&cand.CacheMode,
 			&cand.ManualPriority,
@@ -865,8 +867,6 @@ func (c *Client) loadCandidatesDBWithThreshold(ctx context.Context, clientModel 
 			&cand.QualityFixMode,
 			&cand.RecentSuccessRate,
 			&cand.RecentSamples,
-			&cand.ProviderManualDisabled,
-			&cand.CredentialManualDisabled,
 		); err != nil {
 			return nil, err
 		}
