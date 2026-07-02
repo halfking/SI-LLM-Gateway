@@ -300,6 +300,178 @@ export function dataLifecycleMetrics() {
   return req<DataLifecycleMetricsResponse>('GET', '/api/admin/data-lifecycle/metrics')
 }
 
+// ── Storage management (2026-07-02 V2.3.3) ─────────────────────────────
+//
+// Endpoints mounted by admin/storage_stats.go + admin/attachments_cleanup.go
+// + admin/logs_cleanup.go:
+//
+//   GET  /api/admin/data-lifecycle/storage-stats       — disk + DB + attachments + logs
+//   POST /api/admin/data-lifecycle/cleanup-attachments — {dry_run,older_than_days,orphaned_only}
+//   POST /api/admin/data-lifecycle/cleanup-logs        — {dry_run,older_than_days,compressed_only}
+//   POST /api/admin/data-lifecycle/config              — LifecycleConfig JSON
+//   POST /api/admin/data-lifecycle/log-config          — {max_size_mb,max_backups,max_age_days,compress}
+
+export interface DiskStats {
+  total_bytes: number
+  used_bytes: number
+  available_bytes: number
+  usage_percent: number
+  mount_path: string
+  filesystem: string
+}
+
+export interface TableSizeInfo {
+  table_name: string
+  size_bytes: number
+  size_human: string
+  row_count?: number
+}
+
+export interface DatabaseStats {
+  total_size_bytes: number
+  total_size_human: string
+  request_logs_bytes: number
+  request_logs_human: string
+  attachments_meta_bytes: number
+  attachments_meta_human: string
+  other_tables_bytes: number
+  other_tables_human: string
+  table_sizes?: TableSizeInfo[]
+}
+
+export interface MediaTypeStats {
+  media_type: string
+  count: number
+  size_bytes: number
+  size_human: string
+}
+
+export interface AttachmentStorageStats {
+  storage_path: string
+  total_files: number
+  total_size_bytes: number
+  total_size_human: string
+  by_media_type: MediaTypeStats[]
+  orphaned_files?: number
+}
+
+export interface LogFileInfo {
+  name: string
+  path: string
+  size_bytes: number
+  size_human: string
+  modified_at: string
+  is_compressed: boolean
+  is_active: boolean
+}
+
+export interface LogConfig {
+  file: string
+  max_size_mb: number
+  max_backups: number
+  max_age_days: number
+  compress: boolean
+}
+
+export interface LogFilesStorageStats {
+  log_directory: string
+  total_files: number
+  total_size_bytes: number
+  total_size_human: string
+  active_log_file?: LogFileInfo
+  rotated_files: LogFileInfo[]
+  config: LogConfig
+}
+
+export interface LifecycleConfig {
+  retention_days: number
+  auto_cleanup_enabled: boolean
+  cleanup_schedule: string
+  last_cleanup_at?: string
+  attachment_storage_path: string
+  max_attachment_size_mb: number
+}
+
+export interface StorageStatsResponse {
+  disk: DiskStats | null
+  database: DatabaseStats | null
+  attachments_storage: AttachmentStorageStats | null
+  log_files_storage: LogFilesStorageStats | null
+  lifecycle_config: LifecycleConfig | null
+}
+
+export function getStorageStats() {
+  return req<StorageStatsResponse>('GET', '/api/admin/data-lifecycle/storage-stats')
+}
+
+export interface CleanupAttachmentsRequest {
+  dry_run: boolean
+  older_than_days: number
+  orphaned_only: boolean
+}
+
+export interface CleanupAttachmentsResponse {
+  affected_files: number
+  affected_db_rows: number
+  estimated_freed_bytes: number
+  estimated_freed_human: string
+  orphaned_files: number
+  orphaned_size_bytes: number
+  warning_message?: string
+  executed_at?: string
+}
+
+export function cleanupAttachments(req: CleanupAttachmentsRequest) {
+  return req<CleanupAttachmentsResponse>(
+    'POST',
+    '/api/admin/data-lifecycle/cleanup-attachments',
+    req
+  )
+}
+
+export interface CleanupLogsRequest {
+  dry_run: boolean
+  older_than_days: number
+  compressed_only: boolean
+}
+
+export interface CleanupLogsResponse {
+  affected_files: number
+  estimated_freed_bytes: number
+  estimated_freed_human: string
+  warning_message?: string
+  executed_at?: string
+}
+
+export function cleanupLogs(req: CleanupLogsRequest) {
+  return req<CleanupLogsResponse>(
+    'POST',
+    '/api/admin/data-lifecycle/cleanup-logs',
+    req
+  )
+}
+
+export function updateLifecycleConfig(cfg: LifecycleConfig) {
+  return req<{ success: boolean; message: string; config: LifecycleConfig }>(
+    'POST',
+    '/api/admin/data-lifecycle/config',
+    cfg
+  )
+}
+
+export function updateLogConfig(cfg: {
+  max_size_mb: number
+  max_backups: number
+  max_age_days: number
+  compress: boolean
+}) {
+  return req<{ success: boolean; message: string; config: unknown }>(
+    'POST',
+    '/api/admin/data-lifecycle/log-config',
+    cfg
+  )
+}
+
 // ── Tuning proposals + accuracy (Phase 5) ──────────────────────────────
 //
 // Three endpoints are mounted by admin/auto_route_tuning.go:
