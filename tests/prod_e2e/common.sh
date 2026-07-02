@@ -108,7 +108,7 @@ call_chat() {
     # takes up to ~130s before returning 503; -m 90 was too tight and caused
     # the test harness to report HTTP 000 (curl timeout). 150s comfortably
     # covers both healthy and fixed-but-bounded error paths.
-    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 150 \
+    code=$(curl --http1.1 -sL -o "$tmp" -w "%{http_code}" -m 150 \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -X POST "$API_BASE/v1/chat/completions" \
@@ -126,7 +126,7 @@ call_chat_with_body() {
     local tmp
     tmp=$(mktemp)
     local code
-    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 150 \
+    code=$(curl --http1.1 -sL -o "$tmp" -w "%{http_code}" -m 150 \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -X POST "$API_BASE/v1/chat/completions" \
@@ -143,7 +143,7 @@ call_messages() {
     local tmp
     tmp=$(mktemp)
     local code
-    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 150 \
+    code=$(curl --http1.1 -sL -o "$tmp" -w "%{http_code}" -m 150 \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -H "anthropic-version: 2023-06-01" \
@@ -161,7 +161,7 @@ call_responses() {
     local tmp
     tmp=$(mktemp)
     local code
-    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 150 \
+    code=$(curl --http1.1 -sL -o "$tmp" -w "%{http_code}" -m 150 \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -X POST "$API_BASE/v1/responses" \
@@ -177,7 +177,7 @@ call_health() {
     local tmp
     tmp=$(mktemp)
     local code
-    code=$(curl --http1.1 -s -o "$tmp" -w "%{http_code}" -m 10 "$API_BASE/healthz" 2>&1)
+    code=$(curl --http1.1 -sL -o "$tmp" -w "%{http_code}" -m 10 "$API_BASE/healthz" 2>&1)
     local body_content
     body_content=$(cat "$tmp")
     rm -f "$tmp"
@@ -186,13 +186,13 @@ call_health() {
 
 # call_models
 call_models() {
-    curl --http1.1 -s -m 30 "$API_BASE/v1/models" \
+    curl --http1.1 -sL -m 30 "$API_BASE/v1/models" \
         -H "Authorization: Bearer $API_KEY"
 }
 
 # call_metrics
 call_metrics() {
-    curl --http1.1 -s -m 30 "$API_BASE/metrics" 2>&1 | head -200
+    curl --http1.1 -sL -m 30 "$API_BASE/metrics" 2>&1 | head -200
 }
 
 # call_chat_stream <body_json> <output_file> <max_seconds>
@@ -201,7 +201,7 @@ call_chat_stream() {
     local body="$1" outfile="$2" max_seconds="${3:-60}"
     local start end
     start=$(date +%s.%N)
-    curl --http1.1 -s --no-buffer -N -m "$max_seconds" \
+    curl --http1.1 -sL --no-buffer -N -m "$max_seconds" \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -X POST "$API_BASE/v1/chat/completions" \
