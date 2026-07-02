@@ -143,6 +143,7 @@ func (h *Handler) listCredentials(w http.ResponseWriter, r *http.Request, provid
 		       COALESCE(c.notes,''),
 		       c.secret_ciphertext,
 		       COALESCE(c.manual_disabled, false),
+		       c.plan_type,                                  -- v735: route-side plan
 		       c.created_at,
 		       c.updated_at
 		FROM credentials c
@@ -196,6 +197,9 @@ func (h *Handler) listCredentials(w http.ResponseWriter, r *http.Request, provid
 		FpSlotsFree            *int       `json:"fp_slots_free"`
 		EffectiveFpSlotLimit   *int       `json:"effective_fp_slot_limit"`
 		ManualDisabled         bool       `json:"manual_disabled"`
+		// v735: route-side plan type. NULL/empty means "no subscription
+		// plan, behaves like 'token'" for v_routable_credential_models.
+		PlanType *string `json:"plan_type"`
 		CreatedAt              *time.Time `json:"created_at"`
 		UpdatedAt              *time.Time `json:"updated_at"`
 	}
@@ -240,6 +244,7 @@ func (h *Handler) listCredentials(w http.ResponseWriter, r *http.Request, provid
 			&c.Notes,
 			&ciphertext,
 			&c.ManualDisabled,
+			&c.PlanType,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		); err != nil {
@@ -318,6 +323,9 @@ func (h *Handler) updateCredential(w http.ResponseWriter, r *http.Request, provi
 		Status           *string  `json:"status"`
 		ConcurrencyLimit *int     `json:"concurrency_limit"`
 		FpSlotLimit      *int     `json:"fp_slot_limit"`
+		// v735: route-side plan type. Mirrors credentials.plan_type.
+		// Empty string clears the field (DB NULL).
+		PlanType *string `json:"plan_type"`
 		EffectiveAt      *string  `json:"effective_at"`
 		ExpiresAt        *string  `json:"expires_at"`
 		Tags             []string `json:"tags"`
@@ -384,6 +392,64 @@ func (h *Handler) updateCredential(w http.ResponseWriter, r *http.Request, provi
 	if req.Status != nil {
 		//nolint:errcheck // best-effort exec, non-critical
 		h.db.Exec(ctx, `UPDATE credentials SET status = $1 WHERE id = $2 AND provider_id = $3`, *req.Status, credID, providerID)
+	}
+	if req.PlanType != nil {
+		// v735: validate against credentials.plan_type CHECK constraint
+		// (see pricing_plans migration). Empty string clears the column
+		// (NULL). Any other value must be one of the supported plan
+		// types; an invalid value would otherwise crash the UPDATE with
+		// SQLSTATE 23514.
+		allowed := map[string]bool{
+			"":            true, // empty → NULL (clears the field)
+			"token":       true,
+			"token_plan":  true,
+			"code_plan":   true,
+			"agent_plan":  true,
+			"request":     true,
+			"seat":        true,
+			"compute_time": true,
+			"flat_quota":  true,
+			"free":        true,
+		}
+		if !allowed[*req.PlanType] {
+			writeError(w, http.StatusBadRequest,
+				"invalid plan_type '"+*req.PlanType+"'; expected one of token|token_plan|code_plan|agent_plan|request|seat|compute_time|flat_quota|free (or empty to clear)")
+			return
+		}
+		// Empty string → SQL NULL.
+		var planVal interface{}
+		if *req.PlanType != "" {
+			planVal = *req.PlanType
+		}
+		if _, err := h.db.Exec(ctx,
+			`UPDATE credentials SET plan_type = $1, updated_at = now()
+			 WHERE id = $2 AND provider_id = $3`,
+			planVal, credID, providerID); err != nil {
+			writeError(w, http.StatusInternalServerError, "plan_type update failed: "+err.Error())
+			return
+		}
+		// Re-derive cmb.billing_mode for every binding of this credential
+		// so v_routable_credential_models rule 8 (plan_type ↔ billing_mode
+		// parity) immediately reflects the change. Discovery will also
+		// re-derive on next sync, but we don't want to wait for it —
+		// and discovery may not be scheduled for every provider.
+		//
+		// The WHERE clause `billing_mode <> $1` is intentionally broad:
+		// it rewrites every row that disagrees with the new plan_type,
+		// including legacy 'per_token' values left over from the v734
+		// incident. This is the desired uniform-billing_mode behavior
+		// — admin/pricing paths can override individual rows afterwards
+		// (pricingBulkUpdate writes via model_offers UPDATE).
+		if planVal != nil {
+			if _, derr := h.db.Exec(ctx,
+				`UPDATE credential_model_bindings
+				 SET billing_mode = $1, updated_at = now()
+				 WHERE credential_id = $2 AND billing_mode <> $1`,
+				*req.PlanType, credID); derr != nil {
+				slog.Warn("plan_type update: cmb re-derive failed",
+					"credential_id", credID, "plan_type", *req.PlanType, "error", derr)
+			}
+		}
 	}
 	if req.ConcurrencyLimit != nil {
 		//nolint:errcheck // best-effort exec, non-critical

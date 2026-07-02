@@ -15,6 +15,10 @@ export interface Provider {
   catalog_code: string
   display_name: string
   enabled: boolean
+  // 2026-07-03: surfaced in /api/providers so the list view can render a
+  // "manual disabled" badge and filter manually-disabled rows out of the
+  // default "healthy" chip.
+  manual_disabled?: boolean
   base_url: string | null
   header_profile_code?: string | null
   notes: string | null
@@ -23,7 +27,7 @@ export interface Provider {
   warning_credential_count?: number
   unreachable_credential_count?: number
   free_model_count?: number
-  health_status?: 'unknown' | 'healthy' | 'warning' | 'unreachable'
+  health_status?: 'unknown' | 'healthy' | 'warning' | 'unreachable' | 'manual_disabled'
   health_checked_at?: string | null
   created_at: string
   // Optional fields populated by /api/providers/.../{id} (ProviderDetail)
@@ -75,11 +79,17 @@ export interface DiagnoseProviderResponse {
   results: CredentialCheckResult[]
 }
 
-export function getProviders(params?: { search?: string; health_status?: string; has_free_model?: boolean }) {
+export function getProviders(params?: {
+  search?: string
+  health_status?: string
+  has_free_model?: boolean
+  manual_disabled?: boolean
+}) {
   const query = new URLSearchParams()
   if (params?.search) query.set('search', params.search)
   if (params?.health_status && params.health_status !== 'all') query.set('health_status', params.health_status)
   if (params?.has_free_model != null) query.set('has_free_model', String(params.has_free_model))
+  if (params?.manual_disabled != null) query.set('manual_disabled', String(params.manual_disabled))
   const qs = query.toString()
   return req<Provider[]>('GET', `/api/providers${qs ? '?' + qs : ''}`)
 }
@@ -208,6 +218,11 @@ export interface ProviderCredential {
   balance_usd?: number | string | null
   quotas: CredentialQuota[]
   quota_summary: CredentialQuotaSummary | null
+  // v735: route-side plan type. Drives v_routable_credential_models
+  // rule 8 (plan_type ↔ cmb.billing_mode parity). Editable via the
+  // /providers/{id} → creds drawer. NULL/empty means "no plan, behaves
+  // like 'token'" for routing purposes.
+  plan_type?: string | null
 }
 
 export interface CredentialUsage {
@@ -252,6 +267,8 @@ export function updateCredential(providerId: number, credId: number, data: Parti
   effective_at: string | null
   expires_at: string | null
   balance_usd: number | null
+  // v735: route-side plan. Empty string clears (DB NULL).
+  plan_type: string | null
   tags: string[]
   notes: string
 }>) {

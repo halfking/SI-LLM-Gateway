@@ -147,6 +147,21 @@ export default {
       suspended: 'suspended (تعليق)',
       retired: 'retired (تقاعد)',
     },
+    // v735: route-side plan type (credentials.plan_type)
+    drawerFieldPlanType: 'نوع الخطة',
+    planTypeUnset: 'غير محدد (يُعامل كـ token)',
+    planTypeHint: 'يستخدمه التوجيه؛ يُشتق cmb.billing_mode منه',
+    planTypes: {
+      token: 'token (حسب الاستخدام)',
+      token_plan: 'token_plan (اشتراك)',
+      code_plan: 'code_plan (خطة برمجية)',
+      agent_plan: 'agent_plan (خطة وكيل)',
+      request: 'request (لكل طلب)',
+      seat: 'seat (لكل مقعد)',
+      compute_time: 'compute_time (لكل حوسبة)',
+      flat_quota: 'flat_quota (حصة ثابتة)',
+      free: 'free (مجاني)',
+    },
     health: {
       healthy: 'عادي',
       warning: 'تحذير',
@@ -188,6 +203,7 @@ export default {
     expired: 'منتهي الصلاحية',
     checkFailed: 'فشل الفحص',
     lifecycleFailed: 'فشل الإعداد',
+    planTypeFailed: 'فشل تعيين plan_type',
   },
   models: {
     title: 'قائمة النماذج ({n})',

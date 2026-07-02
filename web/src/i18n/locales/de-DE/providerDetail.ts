@@ -148,6 +148,21 @@ export default {
       suspended: 'suspended (ausgesetzt)',
       retired: 'retired (ausgemustert)',
     },
+    // v735: route-side plan type (credentials.plan_type)
+    drawerFieldPlanType: 'Plan-Typ',
+    planTypeUnset: 'Nicht gesetzt (als token behandelt)',
+    planTypeHint: 'Vom Routing verwendet; cmb.billing_mode wird daraus abgeleitet',
+    planTypes: {
+      token: 'token (nutzungsbasiert)',
+      token_plan: 'token_plan (Abonnement)',
+      code_plan: 'code_plan (Code-Tarif)',
+      agent_plan: 'agent_plan (Agent-Tarif)',
+      request: 'request (pro Anfrage)',
+      seat: 'seat (pro Platz)',
+      compute_time: 'compute_time (pro Compute)',
+      flat_quota: 'flat_quota (festes Kontingent)',
+      free: 'free (kostenlos)',
+    },
     health: {
       healthy: 'Fehlerfrei',
       warning: 'Warnung',
@@ -189,6 +204,7 @@ export default {
     expired: 'Abgelaufen',
     checkFailed: 'Prüfung fehlgeschlagen',
     lifecycleFailed: 'Vorgang fehlgeschlagen',
+    planTypeFailed: 'plan_type konnte nicht gesetzt werden',
   },
   models: {
     title: 'Modelle ({n})',

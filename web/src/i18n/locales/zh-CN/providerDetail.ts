@@ -146,6 +146,21 @@ export default {
       suspended: 'suspended (挂起)',
       retired: 'retired (退役)',
     },
+    // v735: route-side plan type (credentials.plan_type)
+    drawerFieldPlanType: '计费套餐',
+    planTypeUnset: '未设置（按 token 处理）',
+    planTypeHint: '路由适配时，cmb.billing_mode 将自动从此派生',
+    planTypes: {
+      token: 'token (按量)',
+      token_plan: 'token_plan (订阅套餐)',
+      code_plan: 'code_plan (代码套餐)',
+      agent_plan: 'agent_plan (Agent 套餐)',
+      request: 'request (按请求)',
+      seat: 'seat (按席位)',
+      compute_time: 'compute_time (按算力)',
+      flat_quota: 'flat_quota (固定配额)',
+      free: 'free (免费)',
+    },
     health: {
       healthy: '正常',
       warning: '警示',
@@ -187,6 +202,7 @@ export default {
     expired: '已过期',
     checkFailed: '检测失败',
     lifecycleFailed: '设置失败',
+    planTypeFailed: '设置 plan_type 失败',
   },
   models: {
     title: '模型清单 ({n})',

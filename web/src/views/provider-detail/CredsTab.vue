@@ -131,6 +131,24 @@ const lifecycleStatuses = computed(() => [
   { value: 'retired', label: pd('creds.lifecycleLabel.retired') },
 ])
 
+// v735: route-side plan type. Empty string means "no plan" (DB NULL).
+// The empty option is rendered first so users see "unset" as the
+// default state for credentials that have never been assigned a plan.
+// Order roughly tracks "most common → least common" so the dropdown
+// is scannable for routine operations on /providers/14.
+const planTypes = computed(() => [
+  { value: '', label: pd('creds.planTypeUnset') },
+  { value: 'token', label: pd('creds.planTypes.token') },
+  { value: 'token_plan', label: pd('creds.planTypes.tokenPlan') },
+  { value: 'code_plan', label: pd('creds.planTypes.codePlan') },
+  { value: 'agent_plan', label: pd('creds.planTypes.agentPlan') },
+  { value: 'request', label: pd('creds.planTypes.request') },
+  { value: 'seat', label: pd('creds.planTypes.seat') },
+  { value: 'compute_time', label: pd('creds.planTypes.computeTime') },
+  { value: 'flat_quota', label: pd('creds.planTypes.flatQuota') },
+  { value: 'free', label: pd('creds.planTypes.free') },
+])
+
 function statusBadge(s: string, manualDisabled?: boolean) {
   if (manualDisabled) return 'badge-red'
   if (s === 'active') return 'badge-green'
@@ -470,6 +488,24 @@ async function setLifecycle(value: string) {
   }
 }
 
+// v735: route-side plan type — fires immediately on select change so
+// the cmb re-derive + candCache invalidation kick in without waiting
+// for the drawer's saveSelected flow. Empty string maps to NULL on
+// the server side, mirroring how the backend handles clear.
+async function setPlanType(value: string) {
+  const c = selected.value
+  if (!c) return
+  const newVal = value === '' ? null : value
+  if ((c.plan_type ?? null) === newVal) return // no-op
+  try {
+    await updateCredential(props.provider.id, c.id, { plan_type: newVal })
+    c.plan_type = newVal
+    emit('refresh')
+  } catch (e: unknown) {
+    alert(e instanceof Error ? e.message : pd('creds.planTypeFailed'))
+  }
+}
+
 async function resetAvailability() {
   const c = selected.value
   if (!c || !confirm(pd('creds.resetAvailConfirm', { name: c.label }))) return
@@ -712,6 +748,17 @@ function onTagsInput(ev: Event) {
                   <option v-for="s in lifecycleStatuses" :key="s.value" :value="s.value">{{ s.label }}</option>
                 </select>
               </div>
+            </div>
+            <div style="margin-top:8px">
+              <label class="field-label">{{ pd('creds.drawerFieldPlanType') }}</label>
+              <select
+                :value="selected.plan_type ?? ''"
+                class="field-input"
+                @change="(e: Event) => setPlanType((e.target as HTMLSelectElement).value)"
+              >
+                <option v-for="p in planTypes" :key="p.value" :value="p.value">{{ p.label }}</option>
+              </select>
+              <div class="cell-sub">{{ pd('creds.planTypeHint') }}</div>
             </div>
             <label class="manual-toggle">
               <input type="checkbox" :checked="!!selected.manual_disabled" @change="toggleManualDisabled" />
