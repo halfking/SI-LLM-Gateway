@@ -104,7 +104,7 @@ onMounted(loadTags)
         class="btn btn-ghost btn-sm"
         @click="nsHint(ns)"
       >{{ ns }}:</button>
-      <span v-if="locked" class="badge badge-yellow" style="margin-left:8px">已锁定</span>
+      <span v-if="locked" class="badge badge-yellow tag-locked-badge">已锁定</span>
       <button
         v-if="locked"
         type="button"
@@ -140,4 +140,5 @@ onMounted(loadTags)
 }
 .suggest li { padding: 4px 10px; cursor: pointer; font-size: 12px; }
 .suggest li:hover { background: var(--bg); }
+.tag-locked-badge { margin-inline-start: 8px; }
 </style>
