@@ -19,6 +19,11 @@ type Manager struct {
 	l2Redis *redis.Client
 	l3DB    *sql.DB
 	metrics atomic.Value // *Metrics
+
+	// Lifecycle management for the background metrics updater
+	stop chan struct{}  // closed by Close() to signal shutdown
+	done chan struct{}  // closed by metricsUpdater() when it exits
+	once sync.Once      // ensures stop is closed only once
 }
 
 // NewManager creates a new CCR manager with the given configuration.
@@ -27,6 +32,8 @@ func NewManager(config Config, redisClient *redis.Client, db *sql.DB) (*Manager,
 		config:  config,
 		l2Redis: redisClient,
 		l3DB:    db,
+		stop:     make(chan struct{}),
+		done:     make(chan struct{}),
 	}
 
 	// Initialize L1 cache (simple sync.Map for now)
@@ -50,13 +57,36 @@ func NewManager(config Config, redisClient *redis.Client, db *sql.DB) (*Manager,
 	return m, nil
 }
 
+// Close stops the background metrics updater and releases resources.
+// Safe to call multiple times (idempotent via sync.Once).
+func (m *Manager) Close() error {
+	m.once.Do(func() {
+		close(m.stop)
+	})
+	// Wait for the goroutine to exit (with a sane upper bound so we
+	// don't hang forever in tests).
+	select {
+	case <-m.done:
+	case <-time.After(2 * time.Second):
+		slog.Warn("ccr: metricsUpdater did not exit within 2s")
+	}
+	return nil
+}
+
 // metricsUpdater runs in the background and periodically updates Prometheus gauge metrics.
+// Exits cleanly when Close() is called.
 func (m *Manager) metricsUpdater() {
+	defer close(m.done)
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		m.UpdateMetrics()
+	for {
+		select {
+		case <-m.stop:
+			return
+		case <-ticker.C:
+			m.UpdateMetrics()
+		}
 	}
 }
 
@@ -168,6 +198,8 @@ func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]
 			RecordCacheHit("L1")
 			return val.([]byte), nil
 		}
+		// Only count miss if L1 is actually enabled AND cache is non-nil.
+		// (Previous bug: miss was counted when L1 was disabled but m.l1Cache was non-nil.)
 		atomic.AddInt64(&metrics.L1Misses, 1)
 		RecordCacheMiss("L1")
 	}
@@ -259,12 +291,6 @@ func (m *Manager) GetMetrics() Metrics {
 // ResetMetrics resets all metrics to zero.
 func (m *Manager) ResetMetrics() {
 	m.metrics.Store(&Metrics{})
-}
-
-// Close closes the CCR manager and releases resources.
-func (m *Manager) Close() error {
-	// sync.Map doesn't need closing
-	return nil
 }
 
 // getMetrics returns the current metrics pointer.
