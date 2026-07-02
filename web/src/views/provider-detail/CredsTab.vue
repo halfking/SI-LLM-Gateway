@@ -24,7 +24,13 @@ const props = defineProps<{
   provider: any
   creds: ProviderCredential[]
 }>()
-const emit = defineEmits<{ refresh: [] }>()
+// 2026-07-03: `refresh` triggers a full parent reload (loading state +
+// component unmount), which silently destroys the open drawer. Use
+// `silentRefresh` for inline edits that must keep the drawer mounted —
+// plan type, immediate probe check, manual disable toggle, lifecycle
+// change, default probe model pick — so the operator can keep working
+// without losing context or half-typed fields.
+const emit = defineEmits<{ refresh: []; silentRefresh: [] }>()
 
 const selected = ref<ProviderCredential | null>(null)
 const saving = ref(false)
@@ -414,6 +420,13 @@ function recoverFromRejection(side: 'edit' | 'add') {
   saveMsgRejectCtx.value = null
 }
 
+// 2026-07-03: emit `silentRefresh` (not `refresh`) so the drawer stays
+// mounted after a successful probe. The previous behaviour re-fetched
+// provider+creds with `loading=true`, which unmounted CredsTab and
+// closed the drawer mid-edit — operators then lost their pending
+// label/status/plan_type edits. We keep the local selected.health_*
+// state fresh (already updated above) and let the parent quietly sync
+// the creds list badge.
 async function checkSelected() {
   const c = selected.value
   if (!c) return
@@ -428,7 +441,7 @@ async function checkSelected() {
       if (r.health_probe_model != null) c.health_probe_model = r.health_probe_model
     }
     checkMsg.value = probeResultMsg(r)
-    emit('refresh')
+    emit('silentRefresh')
   } catch (e: unknown) {
     checkMsg.value = e instanceof Error ? e.message : pd('creds.checkFailed')
   } finally {
@@ -492,6 +505,10 @@ async function setLifecycle(value: string) {
 // the cmb re-derive + candCache invalidation kick in without waiting
 // for the drawer's saveSelected flow. Empty string maps to NULL on
 // the server side, mirroring how the backend handles clear.
+//
+// 2026-07-03: emit `silentRefresh` (not `refresh`) so the parent does
+// NOT flip `loading=true` and unmount this component — the user is
+// still mid-edit in the drawer and would otherwise lose their changes.
 async function setPlanType(value: string) {
   const c = selected.value
   if (!c) return
@@ -500,7 +517,7 @@ async function setPlanType(value: string) {
   try {
     await updateCredential(props.provider.id, c.id, { plan_type: newVal })
     c.plan_type = newVal
-    emit('refresh')
+    emit('silentRefresh')
   } catch (e: unknown) {
     alert(e instanceof Error ? e.message : pd('creds.planTypeFailed'))
   }
