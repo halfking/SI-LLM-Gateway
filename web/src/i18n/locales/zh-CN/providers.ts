@@ -10,10 +10,26 @@ export default {
   filter: {
     searchPlaceholder: '搜索显示名…',
     freeModelGroup: '免费模型',
+    // 2026-07-03 v738: split into two orthogonal filter dimensions to fix
+    // the "全部 should show everything" + "可用 should mean routable"
+    // conflation. healthChipHealthy is now scoped to "credential probe
+    // health" only; routability is the new dimension that maps to the
+    // "可用 / 不可用 / 无模型 / 已禁用" chips.
+    healthChipGroup: '凭据健康',
     healthChipAll: '全部',
-    healthChipHealthy: '可用',
+    healthChipHealthy: '凭据正常',
     healthChipWarning: '警告',
-    healthChipUnreachable: '不可用',
+    healthChipUnreachable: '不可达',
+    routabilityChipGroup: '可路由性',
+    routabilityChipAll: '全部',
+    routabilityChipAvailable: '可用',
+    routabilityChipUnavailable: '不可用',
+    routabilityChipNoModels: '无模型',
+    routabilityChipManualDisabled: '已禁用',
+    routabilityBadgeAvailable: '可路由',
+    routabilityBadgeUnavailable: '不可路由',
+    routabilityBadgeNoModels: '无模型',
+    routabilityBadgeManualDisabled: '已禁用',
     freeChipAll: '全部',
     freeChipYes: '含免费',
     freeChipNo: '不含免费',

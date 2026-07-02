@@ -542,7 +542,14 @@ func (h *Handler) listProviders(w http.ResponseWriter, r *http.Request) {
 		       -- 2026-06-19 quality fix mode (017_quality_fix_mode.sql).
 		       -- Surface in the list response so the admin UI can render
 		       -- the per-provider switch without a second round-trip.
-		       COALESCE(p.quality_fix_mode, 'off') AS quality_fix_mode
+		       COALESCE(p.quality_fix_mode, 'off') AS quality_fix_mode,
+		       -- 2026-07-03 v738: surface manual_disabled on the list
+		       -- endpoint. The /api/providers/{id} endpoint already
+		       -- projects this column; the list endpoint was missing it,
+		       -- forcing the UI to rely on a client-side .filter() that
+		       -- raced with stale candidate caches (see
+		       -- ProvidersView.vue visibleProviders comment).
+		       COALESCE(p.manual_disabled, FALSE) AS manual_disabled
 		FROM providers p
 		LEFT JOIN provider_catalog pc ON pc.code = COALESCE(NULLIF(p.catalog_code, ''), p.code)
 		LEFT JOIN credentials c ON c.provider_id = p.id
@@ -555,7 +562,7 @@ func (h *Handler) listProviders(w http.ResponseWriter, r *http.Request) {
 		    GROUP BY provider_id
 		) rs ON rs.provider_id = p.id
 		WHERE %s
-		GROUP BY p.id, pc.code, pc.header_profile_code, pc.vendor_name, rs.routable_count, rs.total_count
+		GROUP BY p.id, pc.code, pc.header_profile_code, pc.vendor_name, rs.routable_count, rs.total_count, p.manual_disabled
 		ORDER BY p.display_name ASC NULLS LAST, p.id ASC
 	`, whereSQL)
 
@@ -595,9 +602,17 @@ func (h *Handler) listProviders(w http.ResponseWriter, r *http.Request) {
 		HealthCheckedAt      *time.Time `json:"health_checked_at"`
 		FreeModelCount       int        `json:"free_model_count"`
 		HealthStatus         string     `json:"health_status"`
-		RoutableBindingCount int        `json:"routable_binding_count"`
-		TotalBindingCount    int        `json:"total_binding_count"`
-		QualityFixMode       string     `json:"quality_fix_mode"`
+		// Routability (2026-07-03 v738): orthogonal to health_status. A
+		// healthy credential pool can still produce routability=unavailable
+		// (e.g. all credentials stuck in quota_exhausted), and a
+		// routability=available provider can have health_status=warning
+		// (one credential degraded but the rest usable). The /providers
+		// page filters on this column.
+		Routability          string `json:"routability"`
+		RoutableBindingCount int    `json:"routable_binding_count"`
+		TotalBindingCount    int    `json:"total_binding_count"`
+		QualityFixMode       string `json:"quality_fix_mode"`
+		ManualDisabled       bool   `json:"manual_disabled"`
 	}
 	providers := make([]provider, 0)
 	for rows.Next() {
@@ -613,12 +628,20 @@ func (h *Handler) listProviders(w http.ResponseWriter, r *http.Request) {
 			&p.HealthCheckedAt,
 			&p.RoutableBindingCount, &p.TotalBindingCount,
 			&p.QualityFixMode,
+			&p.ManualDisabled,
 		); err != nil {
 			slog.Warn("listProviders scan failed", "error", err)
 			continue
 		}
-		// Compute health_status from counts (same as Python)
-		if p.HealthyCredCount > 0 {
+		// Compute health_status from counts (same as Python).
+		// 2026-07-03 v738: manual_disabled overrides credential-derived
+		// status so a "manually disabled but healthy" provider is
+		// reported as manual_disabled, not healthy. This mirrors the
+		// route-side invariant (admin/routing.go handleRoutingResolve:
+		// provider_manual_disabled → not routable).
+		if p.ManualDisabled {
+			p.HealthStatus = "manual_disabled"
+		} else if p.HealthyCredCount > 0 {
 			p.HealthStatus = "healthy"
 		} else if p.WarningCredCount > 0 {
 			p.HealthStatus = "warning"
@@ -629,9 +652,66 @@ func (h *Handler) listProviders(w http.ResponseWriter, r *http.Request) {
 		}
 		p.FreeModelCount = 0 // TODO: join model_offers when table exists
 
-		// Apply health_status filter (post-query like Python)
-		if hs := queryString(r, "health_status"); hs != "" && hs != "all" {
-			if p.HealthStatus != hs {
+		// Compute routability (2026-07-03 v738). The order matters:
+		// manual_disabled wins over routable counts because a
+		// manually-disabled provider is by definition not routable
+		// even if it has routable bindings in the view (the view itself
+		// filters on the flag, but we double-check here so a view
+		// regression cannot surface a disabled provider as available).
+		switch {
+		case p.ManualDisabled:
+			p.Routability = "manual_disabled"
+		case p.RoutableBindingCount > 0:
+			p.Routability = "available"
+		case p.TotalBindingCount > 0:
+			p.Routability = "unavailable"
+		default:
+			p.Routability = "no_models"
+		}
+
+		// Apply health_status filter (post-query like Python).
+		// 2026-07-03 v738: "healthy" tab now means "healthy AND not
+		// manually disabled". Previously a manually-disabled provider
+		// with healthy credentials would surface in this tab —
+		// confusing because the status column showed "enabled" but
+		// routing had blocked it.
+		hsFilter := queryString(r, "health_status")
+		if hsFilter == "healthy" && p.ManualDisabled {
+			continue
+		}
+		if hsFilter != "" && hsFilter != "all" {
+			if p.HealthStatus != hsFilter {
+				continue
+			}
+		}
+
+		// Apply routability filter (2026-07-03 v738). This is the
+		// semantic the /providers page "可用/不可用/无模型/已禁用"
+		// chips map to. Defaults to "all" (no filter).
+		rbFilter := queryString(r, "routability")
+		if rbFilter != "" && rbFilter != "all" {
+			if p.Routability != rbFilter {
+				continue
+			}
+		}
+
+		// Apply manual_disabled filter (2026-07-03 v738). Four-state
+		// parameter to avoid the bool trap that an earlier version
+		// hit (where true=only, false=include, missing=exclude was
+		// ambiguous). UI surface:
+		//   omitted / "all"  → return all rows
+		//   "false"          → exclude manual_disabled=true rows
+		//   "true"           → include only manual_disabled=true rows
+		//                      (kept for forward-compat with the existing
+		//                      boolean API the frontend already sends)
+		//   "only"           → alias of "true" (more readable in URLs)
+		switch queryString(r, "manual_disabled") {
+		case "false":
+			if p.ManualDisabled {
+				continue
+			}
+		case "true", "only":
+			if !p.ManualDisabled {
 				continue
 			}
 		}

@@ -602,6 +602,14 @@ func (h *Handler) handleRoutingOverview(w http.ResponseWriter, r *http.Request) 
 		JOIN credentials c ON c.id = mo.credential_id
 		JOIN providers p ON p.id = c.provider_id
 		WHERE p.tenant_id = 'default'
+		  -- 2026-07-03 v738: exclude manually-disabled provider/credential
+		  -- pairs so the overview does not list them as routable. The
+		  -- view v_routable_credential_models already encodes this
+		  -- (migration 065) but this handler reads model_offers directly,
+		  -- so we mirror the gate here. Matches handleRoutingResolve
+		  -- in-memory gate.
+		  AND COALESCE(p.manual_disabled, FALSE) = FALSE
+		  AND COALESCE(c.manual_disabled, FALSE) = FALSE
 	`
 	args := []any{}
 	if featuredOnly && len(featured) > 0 {
@@ -759,6 +767,11 @@ func (h *Handler) handleRoutingModelTree(w http.ResponseWriter, r *http.Request)
 		LEFT JOIN models_canonical mc ON mc.id = mo.canonical_id
 		WHERE p.tenant_id = 'default'
 		  AND COALESCE(mc.status, 'active') = 'active'
+		  -- 2026-07-03 v738: gate out manually-disabled provider/credential
+		  -- pairs. Mirrors the change in handleRoutingOverview and the
+		  -- view-level fix in migration 065.
+		  AND COALESCE(p.manual_disabled, FALSE) = FALSE
+		  AND COALESCE(c.manual_disabled, FALSE) = FALSE
 		ORDER BY canonical_name, tier ASC, weight DESC, success_rate DESC
 	`)
 	if err != nil {
@@ -1250,6 +1263,12 @@ func (h *Handler) handleRoutingAvailableModels(w http.ResponseWriter, r *http.Re
 		  AND c.status = 'active'
 		  AND p.enabled = TRUE
 		  AND COALESCE(mc.status, 'active') = 'active'
+		  -- 2026-07-03 v738: exclude manually-disabled provider/credential
+		  -- pairs from the available-models picker. Without this clause the
+		  -- admin UI would surface a disabled provider's models under
+		  -- "available". Mirrors handleRoutingAvailableModelsRaw + migration 065.
+		  AND COALESCE(p.manual_disabled, FALSE) = FALSE
+		  AND COALESCE(c.manual_disabled, FALSE) = FALSE
 		GROUP BY mo.raw_model_name, mo.standardized_name, mc.canonical_name, mc.display_name,
 		         mc.family, mc.modality, mc.context_window, mc.parameters_b,
 		         mf.display_name, mf.vendor
@@ -1443,6 +1462,12 @@ func (h *Handler) handleRoutingAvailableModelsRaw(w http.ResponseWriter, r *http
 		JOIN credentials c ON c.id = mo.credential_id
 		JOIN providers p ON p.id = c.provider_id
 		WHERE mo.available = TRUE AND c.status = 'active' AND p.enabled = TRUE
+		  -- 2026-07-03 v738: exclude manually-disabled bindings. This
+		  -- endpoint powers the /api/routing/available-models picker on
+		  -- the admin UI; without this gate, a disabled provider would
+		  -- still appear as a routable choice.
+		  AND COALESCE(p.manual_disabled, FALSE) = FALSE
+		  AND COALESCE(c.manual_disabled, FALSE) = FALSE
 		ORDER BY mo.raw_model_name
 	`)
 	if err != nil {
@@ -1789,6 +1814,10 @@ func (h *Handler) handleRoutingProbe(w http.ResponseWriter, r *http.Request) {
 		  AND lower(mo.raw_model_name) = lower($1)
 		  AND COALESCE(c.lifecycle_status,'active') = 'active'
 		  AND COALESCE(c.availability_state,'ready') = 'ready'
+		  -- 2026-07-03 v738: refuse probe targets on manually-disabled
+		  -- provider/credential pairs (mirrors migration 065 view fix).
+		  AND COALESCE(p.manual_disabled, FALSE) = FALSE
+		  AND COALESCE(c.manual_disabled, FALSE) = FALSE
 		ORDER BY mo.manual_priority NULLS LAST,
 		         CASE p.category
 		             WHEN 'official' THEN 1

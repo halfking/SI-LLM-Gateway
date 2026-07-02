@@ -10,10 +10,26 @@ export default {
   filter: {
     searchPlaceholder: 'Search display name…',
     freeModelGroup: 'Free models',
+    // 2026-07-03 v738: split into two orthogonal filter dimensions. The
+    // healthStatus dimension now only tracks credential probe health
+    // (healthy / warning / unreachable); routability is the new
+    // dimension that maps to "Available / Unavailable / No models /
+    // Manually disabled" chips on the /providers page.
+    healthChipGroup: 'Credential health',
     healthChipAll: 'All',
-    healthChipHealthy: 'Healthy',
+    healthChipHealthy: 'Credential healthy',
     healthChipWarning: 'Warning',
     healthChipUnreachable: 'Unreachable',
+    routabilityChipGroup: 'Routability',
+    routabilityChipAll: 'All',
+    routabilityChipAvailable: 'Available',
+    routabilityChipUnavailable: 'Unavailable',
+    routabilityChipNoModels: 'No models',
+    routabilityChipManualDisabled: 'Manually disabled',
+    routabilityBadgeAvailable: 'Routable',
+    routabilityBadgeUnavailable: 'Not routable',
+    routabilityBadgeNoModels: 'No models',
+    routabilityBadgeManualDisabled: 'Manually disabled',
     freeChipAll: 'All',
     freeChipYes: 'Has free',
     freeChipNo: 'No free',

@@ -11,10 +11,24 @@ export default {
   filter: {
     searchPlaceholder: '搜尋顯示名…',
     freeModelGroup: '免費模型',
+    // 2026-07-03 v738: split into two orthogonal filter dimensions to fix
+    // the "全部 should show everything" + "可用 should mean routable"
+    // conflation. See zh-CN/providers.ts for the long-form rationale.
+    healthChipGroup: '憑證健康',
     healthChipAll: '全部',
-    healthChipHealthy: '可用',
+    healthChipHealthy: '憑證正常',
     healthChipWarning: '警告',
-    healthChipUnreachable: '不可用',
+    healthChipUnreachable: '不可達',
+    routabilityChipGroup: '可路由性',
+    routabilityChipAll: '全部',
+    routabilityChipAvailable: '可用',
+    routabilityChipUnavailable: '不可用',
+    routabilityChipNoModels: '無模型',
+    routabilityChipManualDisabled: '已停用',
+    routabilityBadgeAvailable: '可路由',
+    routabilityBadgeUnavailable: '不可路由',
+    routabilityBadgeNoModels: '無模型',
+    routabilityBadgeManualDisabled: '已停用',
     freeChipAll: '全部',
     freeChipYes: '含免費',
     freeChipNo: '不含免費',
