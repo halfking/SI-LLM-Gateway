@@ -75,6 +75,7 @@ func (m *Manager) Put(ctx context.Context, hash string, data []byte, sessionID s
 				data = EXCLUDED.data,
 				session_id = EXCLUDED.session_id,
 				updated_at = EXCLUDED.updated_at
+			WHERE ccr_cache.updated_at <= EXCLUDED.updated_at
 		`
 		now := time.Now()
 		_, err := m.l3DB.ExecContext(ctx, query, hash, data, sessionID, now, now, now)

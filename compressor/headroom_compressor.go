@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/kaixuan/llm-gateway-go/compressor/ccr"
 	"github.com/kaixuan/llm-gateway-go/compressor/headroom"
@@ -15,25 +16,30 @@ type HeadroomCompressor struct {
 	crusher    *headroom.SmartCrusher
 	ccrManager *ccr.Manager
 	enabled    bool
+	timeout    time.Duration
 }
 
 // NewHeadroomCompressor creates a new Headroom compressor.
 func NewHeadroomCompressor(ccrManager *ccr.Manager) *HeadroomCompressor {
 	config := headroom.DefaultSmartCrusherConfig()
+	fullConfig := headroom.LoadConfigFromEnv()
 	
 	return &HeadroomCompressor{
 		crusher:    headroom.NewSmartCrusher(config),
 		ccrManager: ccrManager,
 		enabled:    true,
+		timeout:    fullConfig.Timeout,
 	}
 }
 
 // NewHeadroomCompressorWithConfig creates a Headroom compressor with custom config.
 func NewHeadroomCompressorWithConfig(config headroom.SmartCrusherConfig, ccrManager *ccr.Manager) *HeadroomCompressor {
+	fullConfig := headroom.LoadConfigFromEnv()
 	return &HeadroomCompressor{
 		crusher:    headroom.NewSmartCrusher(config),
 		ccrManager: ccrManager,
 		enabled:    true,
+		timeout:    fullConfig.Timeout,
 	}
 }
 
@@ -47,6 +53,13 @@ func (hc *HeadroomCompressor) CompressMessageArrays(
 ) ([]byte, *HeadroomCompressionResult, error) {
 	if !hc.enabled {
 		return body, nil, nil
+	}
+
+	// Apply timeout to prevent compression from blocking indefinitely
+	if hc.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, hc.timeout)
+		defer cancel()
 	}
 
 	// Extract messages from body
@@ -72,6 +85,15 @@ func (hc *HeadroomCompressor) CompressMessageArrays(
 	ccrHashes := []string{}
 
 	for _, arrayInfo := range arraysToCompress {
+		// Check context cancellation before each compression
+		select {
+		case <-ctx.Done():
+			slog.Warn("headroom: compression timeout exceeded, returning original body",
+				"session", sessionID, "timeout", hc.timeout)
+			return body, nil, ctx.Err()
+		default:
+		}
+
 		result := hc.crusher.CrushArray(arrayInfo.Items, "")
 		
 		if result.DidCompress {
@@ -213,10 +235,10 @@ func findJSONArraysInMessages(messages []json.RawMessage) []*ArrayInfo {
 }
 
 // rebuildBodyWithCompressedArrays replaces arrays in body with compressed versions.
+// Uses ArrayPath to locate and replace the exact array field, then optionally
+// appends a CCR marker. Handles both Anthropic (tool_result.content string)
+// and OpenAI (tool_calls[].function.arguments string) formats.
 func rebuildBodyWithCompressedArrays(body []byte, arrays []*ArrayInfo) ([]byte, error) {
-	// For simplicity, we'll reconstruct the entire body
-	// In production, you might want to do more efficient in-place replacement
-	
 	var req map[string]interface{}
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, err
@@ -227,12 +249,11 @@ func rebuildBodyWithCompressedArrays(body []byte, arrays []*ArrayInfo) ([]byte, 
 		return body, nil
 	}
 
-	// Apply replacements
+	// Apply replacements by parsing ArrayPath
 	for _, arrayInfo := range arrays {
 		if arrayInfo.ReplacementItems == nil {
 			continue
 		}
-
 		if arrayInfo.MessageIndex >= len(messages) {
 			continue
 		}
@@ -242,17 +263,54 @@ func rebuildBodyWithCompressedArrays(body []byte, arrays []*ArrayInfo) ([]byte, 
 			continue
 		}
 
-		// Replace array and add CCR marker if present
-		// This is a simplified implementation - production code would need
-		// to handle the exact path replacement based on ArrayPath
-		
-		// For now, just update the message with a marker in content
-		if arrayInfo.CCRMarker != "" && len(arrayInfo.CCRMarker) > 0 {
-			// Add CCR marker to message content
-			if content, ok := msgMap["content"].(string); ok {
-				msgMap["content"] = content + "\n\n" + arrayInfo.CCRMarker
+		// Parse ArrayPath: "messages[i].content[j].content" or "messages[i].tool_calls[j].function.arguments"
+		// We know MessageIndex and ContentIndex, so we can directly navigate.
+		// Case 1: Anthropic tool_result — content[ContentIndex].content is a JSON string
+		if content, ok := msgMap["content"].([]interface{}); ok && arrayInfo.ContentIndex < len(content) {
+			blockMap, ok := content[arrayInfo.ContentIndex].(map[string]interface{})
+			if ok && blockMap["type"] == "tool_result" {
+				// Marshal ReplacementItems back to JSON string
+				replacementJSON, err := json.Marshal(arrayInfo.ReplacementItems)
+				if err != nil {
+					continue
+				}
+				blockMap["content"] = string(replacementJSON)
+
+				// Append CCR marker if present (Anthropic allows appending to content string)
+				if arrayInfo.CCRMarker != "" {
+					blockMap["content"] = string(replacementJSON) + "\n\n" + arrayInfo.CCRMarker
+				}
+				content[arrayInfo.ContentIndex] = blockMap
+				msgMap["content"] = content
 			}
 		}
+
+		// Case 2: OpenAI tool_calls — tool_calls[ContentIndex].function.arguments is a JSON string
+		if toolCalls, ok := msgMap["tool_calls"].([]interface{}); ok && arrayInfo.ContentIndex < len(toolCalls) {
+			callMap, ok := toolCalls[arrayInfo.ContentIndex].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			function, ok := callMap["function"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			// Marshal ReplacementItems back to JSON string
+			replacementJSON, err := json.Marshal(arrayInfo.ReplacementItems)
+			if err != nil {
+				continue
+			}
+			function["arguments"] = string(replacementJSON)
+
+			// OpenAI doesn't have a natural place to append CCR marker in arguments JSON,
+			// so we skip it here (or could add a synthetic "__ccr_marker" field if needed).
+			callMap["function"] = function
+			toolCalls[arrayInfo.ContentIndex] = callMap
+			msgMap["tool_calls"] = toolCalls
+		}
+
+		messages[arrayInfo.MessageIndex] = msgMap
 	}
 
 	req["messages"] = messages
