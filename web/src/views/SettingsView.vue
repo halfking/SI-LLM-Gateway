@@ -310,14 +310,24 @@ const filteredCount = computed(() => items.value.length)
           <!-- Enum type with known options: Select -->
           <div v-else-if="selectedKey === 'compression.mode'" class="editor-select">
             <select v-model="editBuffer" class="select-input">
-              <option value="0">{{ s('compression.selectLabels.off') }}</option>
-              <option value="1">{{ s('compression.selectLabels.auto') }}</option>
-              <option value="2">{{ s('compression.selectLabels.on4xx') }}</option>
+              <option value="off">{{ s('compression.selectLabels.off') }}</option>
+              <option value="auto_threshold">{{ s('compression.selectLabels.auto') }}</option>
+              <option value="on_4xx">{{ s('compression.selectLabels.on4xx') }}</option>
+              <option value="delta_only">{{ s('compression.selectLabels.deltaOnly') }}</option>
+              <option value="smart">{{ s('compression.selectLabels.smart') }}</option>
+              <option value="aggressive">{{ s('compression.selectLabels.aggressive') }}</option>
+              <option value="headroom">{{ s('compression.selectLabels.headroom') }}</option>
+              <option value="headroom_aggressive">{{ s('compression.selectLabels.headroomAggressive') }}</option>
             </select>
             <div class="select-hint">
-              <div v-if="editBuffer === '0'" class="hint-item">{{ s('compression.hint.off') }}</div>
-              <div v-else-if="editBuffer === '1'" class="hint-item">{{ s('compression.hint.auto') }}</div>
-              <div v-else-if="editBuffer === '2'" class="hint-item">{{ s('compression.hint.on4xx') }}</div>
+              <div v-if="editBuffer === 'off'" class="hint-item">{{ s('compression.hint.off') }}</div>
+              <div v-else-if="editBuffer === 'auto_threshold'" class="hint-item">{{ s('compression.hint.auto') }}</div>
+              <div v-else-if="editBuffer === 'on_4xx'" class="hint-item">{{ s('compression.hint.on4xx') }}</div>
+              <div v-else-if="editBuffer === 'delta_only'" class="hint-item">{{ s('compression.hint.deltaOnly') }}</div>
+              <div v-else-if="editBuffer === 'smart'" class="hint-item">{{ s('compression.hint.smart') }}</div>
+              <div v-else-if="editBuffer === 'aggressive'" class="hint-item">{{ s('compression.hint.aggressive') }}</div>
+              <div v-else-if="editBuffer === 'headroom'" class="hint-item">{{ s('compression.hint.headroom') }}</div>
+              <div v-else-if="editBuffer === 'headroom_aggressive'" class="hint-item">{{ s('compression.hint.headroomAggressive') }}</div>
             </div>
           </div>
 
