@@ -180,7 +180,7 @@ export default {
       online: 'オンラインを確認',
     },
     toggleCredentialPrefix: '認証情報 #',
-    toggleToggleCredentialSep: ' - ',
+    toggleCredentialSep: ' - ',
     toggleNoLabel: 'ラベルなし',
     toggleOfflineBody: 'オフラインにすると、自動プローブはこのモデルに触れなくなります（理由 = {code}）。手動での復元が必要です。',
     toggleOnlineBody: '復元後、次の自動プローブサイクル（~10分）で再評価されます。',
