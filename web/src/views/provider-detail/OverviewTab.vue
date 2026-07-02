@@ -34,7 +34,7 @@ const unavailableModels = computed(() => props.models.filter(m => !m.available))
       <div class="metric-value">{{ provider.active_cred_count }}</div>
       <div class="metric-sub">
         <span class="dot dot-green"></span> {{ pd('overview.healthySuffix', { n: provider.healthy_cred_count }) }}
-        <span class="dot dot-amber" style="margin-left:8px"></span> {{ pd('overview.warningSuffix', { n: provider.warning_cred_count }) }}
+        <span class="dot dot-amber dot-amber--gapped"></span> {{ pd('overview.warningSuffix', { n: provider.warning_cred_count }) }}
       </div>
     </div>
     <div class="metric-card">
@@ -129,10 +129,11 @@ const unavailableModels = computed(() => props.models.filter(m => !m.available))
 .text-danger { color: #f44336; }
 .dot {
   width: 8px; height: 8px; border-radius: 50%;
-  display: inline-block; vertical-align: middle; margin-right: 2px;
+  display: inline-block; vertical-align: middle; margin-inline-end: 2px;
 }
 .dot-green { background: #4caf50; }
 .dot-amber { background: #f0b429; }
+.dot-amber--gapped { margin-inline-start: 8px; }
 .info-section { margin-top: 8px; }
 .info-section h4 { margin: 0 0 8px; font-size: 14px; color: var(--text); }
 .info-grid {
@@ -144,7 +145,7 @@ const unavailableModels = computed(() => props.models.filter(m => !m.available))
 }
 .info-label {
   color: var(--muted);
-  margin-right: 8px;
+  margin-inline-end: 8px;
   font-size: 12px;
 }
 code { font-size: 12px; }

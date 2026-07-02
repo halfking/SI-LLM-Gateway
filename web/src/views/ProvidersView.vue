@@ -828,19 +828,19 @@ onUnmounted(() => {
           <div v-if="addProbeResult" style="margin-top:6px;font-size:12px">
             <template v-if="addProbeResult.reachable">
               <span style="color:var(--success)">{{ pm('create.probeOk') }}</span>
-              <span v-if="addProbeResult.protocol" style="margin-left:8px;color:var(--muted)">
+              <span v-if="addProbeResult.protocol" class="probe-detail probe-muted">
                 {{ pm('create.probeOkProtocol') }}{{ addProbeResult.protocol }}
               </span>
-              <span v-if="addProbeResult.models_count != null" style="margin-left:8px;color:var(--muted)">
+              <span v-if="addProbeResult.models_count != null" class="probe-detail probe-muted">
                 {{ pm('create.probeOkModels') }}{{ addProbeResult.models_count }}
               </span>
-              <span v-if="addProbeResult.auth_ok === false" style="margin-left:8px;color:var(--warning)">
+              <span v-if="addProbeResult.auth_ok === false" class="probe-detail probe-warning">
                 {{ pm('create.probeWarn') }}
               </span>
             </template>
             <template v-else>
               <span style="color:var(--danger)">{{ pm('create.probeFail') }}</span>
-              <span v-if="addProbeResult.error" style="margin-left:8px;color:var(--muted)">{{ addProbeResult.error }}</span>
+              <span v-if="addProbeResult.error" class="probe-detail probe-muted">{{ addProbeResult.error }}</span>
             </template>
           </div>
         </div>
@@ -904,19 +904,19 @@ onUnmounted(() => {
           <div v-if="editProbeResult" style="margin-top:6px;font-size:12px">
             <template v-if="editProbeResult.reachable">
               <span style="color:var(--success)">{{ pm('edit.probeOk') }}</span>
-              <span v-if="editProbeResult.protocol" style="margin-left:8px;color:var(--muted)">
+              <span v-if="editProbeResult.protocol" class="probe-detail probe-muted">
                 {{ pm('edit.probeOkProtocol') }}{{ editProbeResult.protocol }}
               </span>
-              <span v-if="editProbeResult.models_count != null" style="margin-left:8px;color:var(--muted)">
+              <span v-if="editProbeResult.models_count != null" class="probe-detail probe-muted">
                 {{ pm('edit.probeOkModels', { n: editProbeResult.models_count }) }}
               </span>
-              <span v-if="editProbeResult.auth_ok === false" style="margin-left:8px;color:var(--warning)">
+              <span v-if="editProbeResult.auth_ok === false" class="probe-detail probe-warning">
                 {{ pm('edit.probeWarn') }}
               </span>
             </template>
             <template v-else>
               <span style="color:var(--danger)">{{ pm('edit.probeFail') }}</span>
-              <span v-if="editProbeResult.error" style="margin-left:8px;color:var(--muted)">{{ editProbeResult.error }}</span>
+              <span v-if="editProbeResult.error" class="probe-detail probe-muted">{{ editProbeResult.error }}</span>
             </template>
           </div>
         </div>
@@ -1139,7 +1139,7 @@ onUnmounted(() => {
                     <div v-if="r.returned_models && r.returned_models.length" class="diag-section" style="margin-top:12px">
                       <h4>{{ pm('diagnose.modelsHeader', { n: r.returned_models.length }) }}</h4>
                       <div style="font-size:11px;line-height:1.6">
-                        <code v-for="m in r.returned_models.slice(0, 30)" :key="m" style="margin-right:6px;display:inline-block;padding:2px 6px;background:rgba(0,255,128,0.1);border-radius:3px">{{ m }}</code>
+                        <code v-for="m in r.returned_models.slice(0, 30)" :key="m" class="diag-model-chip">{{ m }}</code>
                         <span v-if="r.returned_models.length > 30" class="muted">{{ pm('diagnose.modelsTruncated', { n: r.returned_models.length }) }}</span>
                       </div>
                     </div>
@@ -1366,7 +1366,7 @@ onUnmounted(() => {
 .dot-red { background: #f44336; }
 .bg-label {
   font-weight: 500;
-  margin-right: 2px;
+  margin-inline-end: 2px;
 }
 .bg-muted {
   color: var(--muted);
@@ -1398,5 +1398,23 @@ onUnmounted(() => {
     flex-direction: column;
     gap: 8px;
   }
+}
+
+.probe-detail {
+  margin-inline-start: 8px;
+}
+.probe-muted {
+  color: var(--muted);
+}
+.probe-warning {
+  color: var(--warning);
+}
+
+.diag-model-chip {
+  margin-inline-end: 6px;
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(0, 255, 128, 0.1);
+  border-radius: 3px;
 }
 </style>

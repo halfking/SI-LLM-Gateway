@@ -964,9 +964,9 @@ onMounted(async () => {
         <p style="margin:0 0 6px"><strong>{{ t('requests.list.compress.strategyTitle') }}</strong>：</p>
         <table style="width:100%;border-collapse:collapse;font-size:11px">
           <tr>
-            <th style="text-align:left;padding:3px 6px;border:1px solid var(--border,#444);background:var(--surface-primary,#16213e);white-space:nowrap">{{ t('requests.list.compress.tableHeaderStrategy') }}</th>
-            <th style="text-align:left;padding:3px 6px;border:1px solid var(--border,#444);background:var(--surface-primary,#16213e)">{{ t('requests.list.compress.tableHeaderTrigger') }}</th>
-            <th style="text-align:left;padding:3px 6px;border:1px solid var(--border,#444);background:var(--surface-primary,#16213e)">{{ t('requests.list.compress.tableHeaderEffect') }}</th>
+            <th class="compress-table-head compress-table-head--nowrap">{{ t('requests.list.compress.tableHeaderStrategy') }}</th>
+            <th class="compress-table-head">{{ t('requests.list.compress.tableHeaderTrigger') }}</th>
+            <th class="compress-table-head">{{ t('requests.list.compress.tableHeaderEffect') }}</th>
           </tr>
           <tr>
             <td style="padding:3px 6px;border:1px solid var(--border,#444);white-space:nowrap;color:var(--success,#22c55e)">{{ t('requests.list.compress.strategies.delta_append') }}</td>
@@ -1084,7 +1084,7 @@ onMounted(async () => {
       <span v-if="taskSummary.pending" style="color:var(--warning, #f59e0b)">{{ t('requests.list.trace.pendingLabel', { n: taskSummary.pending }) }}</span>
       <span v-if="gwTaskFilter" style="color:var(--muted)">{{ t('requests.list.trace.taskFilter', { id: gwTaskFilter }) }}</span>
       <span v-if="gwSessionFilter" style="color:var(--muted)">{{ t('requests.list.trace.sessionFilter', { id: shortHash(gwSessionFilter) }) }}</span>
-      <button class="btn btn-ghost btn-sm" style="margin-left:auto" @click="clearTraceFilter">{{ t('requests.list.trace.clear') }}</button>
+      <button class="btn btn-ghost btn-sm trace-clear-btn" @click="clearTraceFilter">{{ t('requests.list.trace.clear') }}</button>
     </div>
 
     <div v-if="canSummarizeSession" class="card" style="margin-bottom:12px;padding:12px">
@@ -1120,7 +1120,7 @@ onMounted(async () => {
           {{ t('requests.list.trace.summaryRange', { from: fmtTs(summaryResult.meta.data_from), to: fmtTs(summaryResult.meta.data_to), n: summaryResult.meta.log_count }) }}
         </div>
         <div style="white-space:pre-wrap;line-height:1.6">{{ summaryResult.summary }}</div>
-        <ul v-if="summaryResult.key_points?.length" style="margin:8px 0 0;padding-left:18px">
+        <ul v-if="summaryResult.key_points?.length" class="summary-key-points">
           <li v-for="(p, i) in summaryResult.key_points" :key="i">{{ p }}</li>
         </ul>
       </div>
@@ -1392,7 +1392,7 @@ onMounted(async () => {
                    upstream LLM after delta-append / sliding-window summary. -->
               <div v-if="detail.outbound_body" style="margin-bottom:8px;padding:6px 10px;background:var(--surface-primary, #16213e);border-radius:4px;color:var(--text-secondary);font-size:11px">
                 <strong>v3 {{ t('requests.detail_extra.outboundMsgsTab') }}</strong> · {{ t('requests.detail_extra.outboundMsgCount') }} {{ detail.outbound_msg_count }} · {{ t('requests.detail_extra.outboundTokenEstLabel', { n: detail.outbound_token_est }) }}
-                <span v-if="outboundSummaryMarker(detail)" style="margin-left:8px">
+                <span v-if="outboundSummaryMarker(detail)" class="outbound-marker-gap">
                   <span class="summary-marker-badge">{{ truncate(outboundSummaryMarker(detail), 24) }}</span>
                   <span style="color:var(--muted);font-size:10px">{{ t('requests.detail_extra.containsSummaryMarker') }}</span>
                 </span>
@@ -1401,7 +1401,7 @@ onMounted(async () => {
                 <div v-for="(msg, i) in extractMessagesFromBody(detail.outbound_body)" :key="i" style="margin-bottom:12px">
                   <div style="margin-bottom:4px">
                     <span :style="{ color: roleColor(msg.role || ''), fontWeight: 600 }">[{{ msg.role || 'unknown' }}]</span>
-                    <span v-if="isSummaryMarkerMessage(msg)" style="margin-left:6px;font-size:10px;color:#1d4ed8">{{ t('requests.detail_extra.summaryMarkerBadge') }}</span>
+                    <span v-if="isSummaryMarkerMessage(msg)" class="summary-marker-label">{{ t('requests.detail_extra.summaryMarkerBadge') }}</span>
                   </div>
                   <pre style="margin:0;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;font-size:11px;line-height:1.5">{{ formatJson(msg.content ?? msg) }}</pre>
                   <div v-if="msg.tool_calls" style="margin-top:6px">
@@ -1467,7 +1467,7 @@ onMounted(async () => {
                   <div v-for="(choice, i) in detail.response_body.choices" :key="i" style="margin-bottom:12px">
                     <div style="margin-bottom:4px">
                       <span style="font-weight:600">Choice {{ i }}</span>
-                      <span v-if="choice.finish_reason" style="color:var(--muted);margin-left:8px">finish: {{ choice.finish_reason }}</span>
+                      <span v-if="choice.finish_reason" class="choice-finish-reason">finish: {{ choice.finish_reason }}</span>
                     </div>
                     <div v-if="choice.message" style="margin-bottom:6px">
                       <span :style="{ color: roleColor(choice.message.role || ''), fontWeight: 600 }">[{{ choice.message.role || 'unknown' }}]</span>
@@ -1650,7 +1650,41 @@ onMounted(async () => {
   overflow-wrap: anywhere;
 }
 .trace-summary {
-  border-left: 3px solid var(--accent, #3b82f6);
+  border-inline-start: 3px solid var(--accent, #3b82f6);
+}
+
+.compress-table-head {
+  text-align: start;
+  padding: 3px 6px;
+  border: 1px solid var(--border, #444);
+  background: var(--surface-primary, #16213e);
+}
+.compress-table-head--nowrap {
+  white-space: nowrap;
+}
+
+.trace-clear-btn {
+  margin-inline-start: auto;
+}
+
+.summary-key-points {
+  margin: 8px 0 0;
+  padding-inline-start: 18px;
+}
+
+.outbound-marker-gap {
+  margin-inline-start: 8px;
+}
+
+.summary-marker-label {
+  margin-inline-start: 6px;
+  font-size: 10px;
+  color: #1d4ed8;
+}
+
+.choice-finish-reason {
+  color: var(--muted);
+  margin-inline-start: 8px;
 }
 .tenant-badge {
   display: inline-flex;
@@ -1729,7 +1763,7 @@ onMounted(async () => {
   border-radius: 6px;
   font-size: 10px;
   font-weight: 500;
-  margin-left: 6px;
+  margin-inline-start: 6px;
   background: rgba(20, [SERVER], 166, 0.1);
   color: #0f766e;
 }
@@ -1743,7 +1777,7 @@ onMounted(async () => {
   border-radius: 6px;
   font-size: 10px;
   font-weight: 500;
-  margin-left: 6px;
+  margin-inline-start: 6px;
   background: rgba(59, 130, 246, 0.1);
   color: #1d4ed8;
   font-family: var(--mono-font, ui-monospace, monospace);

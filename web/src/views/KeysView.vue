@@ -722,11 +722,11 @@ onBeforeUnmount(() => {
             </td>
             <td>{{ k.budget_usd != null ? fmtCost(k.budget_usd) : t('keys.common.unlimited') }}</td>
             <td>{{ rateLimitLabel(k) }}</td>
-            <td style="font-size:12px;color:var(--muted);text-align:right">{{ formatRequests(k.total_requests) }}</td>
-            <td style="font-size:12px;color:var(--muted);text-align:right" :title="t('keys.list.row.tokenTooltip', { in: formatTokens(k.total_prompt_tokens), out: formatTokens(k.total_completion_tokens) })">
+            <td class="kv-num-cell text-muted-end">{{ formatRequests(k.total_requests) }}</td>
+            <td class="kv-num-cell text-muted-end" :title="t('keys.list.row.tokenTooltip', { in: formatTokens(k.total_prompt_tokens), out: formatTokens(k.total_completion_tokens) })">
               {{ formatTokens(k.total_prompt_tokens + k.total_completion_tokens) }}
             </td>
-            <td style="font-size:12px;text-align:right" :class="{ 'has-cost': k.total_cost_usd > 0 }">
+            <td class="kv-cost-cell" :class="{ 'has-cost': k.total_cost_usd > 0 }">
               {{ k.total_cost_usd > 0 ? fmtCost(k.total_cost_usd) : '—' }}
             </td>
             <td style="font-size:12px;color:var(--muted)">{{ fmtDate(k.expires_at) }}</td>
@@ -867,7 +867,7 @@ onBeforeUnmount(() => {
             </button>
             <span class="hint">{{ createdKey.api_key ? t('keys.list.create.copyHintOk') : t('keys.list.create.copyHintErr') }}</span>
           </div>
-          <div style="text-align:right;margin-top:16px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+          <div class="modal-actions">
             <button
               v-if="redirectAfter && createdKey.api_key"
               class="btn btn-primary"
@@ -991,6 +991,25 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.kv-num-cell {
+  font-size: 12px;
+  text-align: end;
+}
+.text-muted-end {
+  color: var(--muted);
+}
+.kv-cost-cell {
+  font-size: 12px;
+  text-align: end;
+}
+.modal-actions {
+  text-align: end;
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
 .status-tabs {
   display: flex;
   flex-wrap: wrap;

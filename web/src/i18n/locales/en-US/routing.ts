@@ -291,6 +291,7 @@ export default {
     featuredOnly: '★ Featured only',
     featuredOnlyOff: '☆ Featured only',
     refreshTitle: 'Refresh',
+    loading: 'Loading…',
     readonlyBanner: '📖 Tenant admin view: credential details (provider, price, status) are hidden.',
     modelSelect: 'Model selection',
     searchPlaceholder: 'Search series, variant, provider…',

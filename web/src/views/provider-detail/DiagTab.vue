@@ -137,7 +137,7 @@ function scoreColor(score: number): string {
         <h4 style="margin:0 0 8px;font-size:14px">{{ pdg('credDetailTitle') }}</h4>
         <table style="width:100%;border-collapse:collapse;font-size:12px">
           <thead>
-            <tr style="text-align:left;border-bottom:1px solid var(--border)">
+            <tr class="diag-cred-header">
               <th style="padding:6px">{{ pdg('credCol') }}</th>
               <th style="padding:6px">{{ pdg('credColStatus') }}</th>
               <th style="padding:6px">{{ pdg('credColCircuit') }}</th>
@@ -169,3 +169,10 @@ function scoreColor(score: number): string {
     </template>
   </div>
 </template>
+
+<style scoped>
+.diag-cred-header {
+  text-align: start;
+  border-bottom: 1px solid var(--border);
+}
+</style>

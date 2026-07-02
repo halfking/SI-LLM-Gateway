@@ -290,6 +290,7 @@ export default {
     featuredOnly: '★ Solo destacados',
     featuredOnlyOff: '☆ Solo destacados',
     refreshTitle: 'Actualizar',
+    loading: 'Cargando…',
     readonlyBanner: '📖 Vista de administrador de inquilino: los detalles de credenciales (proveedor, precio, estado) están ocultos.',
     modelSelect: 'Selección de modelo',
     searchPlaceholder: 'Buscar serie, variante, proveedor…',
