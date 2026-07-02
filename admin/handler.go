@@ -325,6 +325,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/data-lifecycle/stats", admin(h.handleDataLifecycleStats))
 	mux.HandleFunc("/api/admin/data-lifecycle/cleanup/preview", admin(h.handleDataLifecycleCleanupPreview))
 	mux.HandleFunc("/api/admin/data-lifecycle/metrics", admin(h.handleDataLifecycleMetrics))
+	// 2026-07-02 storage management: disk + DB + attachments + logs stats/cleanup
+	mux.HandleFunc("/api/admin/data-lifecycle/storage-stats", admin(h.handleStorageStats))
+	mux.HandleFunc("/api/admin/data-lifecycle/cleanup-attachments", admin(h.handleCleanupAttachments))
+	mux.HandleFunc("/api/admin/data-lifecycle/cleanup-logs", admin(h.handleCleanupLogs))
+	mux.HandleFunc("/api/admin/data-lifecycle/config", admin(h.handleUpdateLifecycleConfig))
+	mux.HandleFunc("/api/admin/data-lifecycle/log-config", admin(h.handleUpdateLogConfig))
 
 	// settings-management (Q1: B, Q2: A, Q3: B): 4 platform + 4 tenant endpoints.
 	// Tenant endpoints require super_admin (enforced inside the handler).

@@ -102,8 +102,11 @@ func (h *Handler) cleanupOldAttachments(ctx context.Context, olderThanDays int, 
 	// First, get the list of attachments to clean up
 	cutoffDate := time.Now().UTC().Add(-time.Duration(olderThanDays) * 24 * time.Hour)
 
+	// 2026-07-02: column is `file_path`, not `storage_path` (per the
+	// attachments table schema; `storage_path` was a pre-existing field
+	// name used by an earlier draft of this handler).
 	rows, err := h.db.Query(ctx, `
-		SELECT id, storage_path, file_size
+		SELECT id, file_path, file_size
 		FROM attachments
 		WHERE created_at < $1
 		ORDER BY created_at
@@ -139,8 +142,8 @@ func (h *Handler) cleanupOldAttachments(ctx context.Context, olderThanDays int, 
 	resp.EstimatedFreedHuman = formatBytes(totalSize)
 
 	if dryRun {
-		slog.Info("cleanup preview: old attachments", 
-			"count", len(toDelete), 
+		slog.Info("cleanup preview: old attachments",
+			"count", len(toDelete),
 			"size", formatBytes(totalSize),
 			"older_than_days", olderThanDays)
 		return nil
@@ -202,7 +205,7 @@ func (h *Handler) cleanupOrphanedAttachments(ctx context.Context, dryRun bool, r
 	}
 
 	// Get all attachment IDs and paths from database
-	rows, err := h.db.Query(ctx, `SELECT id, storage_path FROM attachments`)
+	rows, err := h.db.Query(ctx, `SELECT id, file_path FROM attachments`)
 	if err != nil {
 		return fmt.Errorf("failed to query attachments: %w", err)
 	}

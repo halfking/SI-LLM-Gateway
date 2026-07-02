@@ -239,6 +239,12 @@ func main() {
 			// (HTTP 500, "failed to read attachment"). We now anchor
 			// to the absolute path the systemd unit bind-mounts
 			// into the container (`/opt/llm-gateway-go/data`).
+			//
+			// 2026-07-02 V2.3.3: same bind-mount point as logs;
+			// both must be on a host-bind-mounted volume so files
+			// survive container restarts. See
+			// scripts/deploy-71-data-bindmounts.sh for the
+			// systemd unit + env-file update that wires this in.
 			storagePath = "/opt/llm-gateway-go/data/attachments"
 		}
 		attachmentEnabled := os.Getenv("ATTACHMENT_ENABLED")

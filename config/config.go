@@ -241,10 +241,18 @@ func Load() *Config {
 
 	// Log file rotation defaults. The process always logs to
 	// stderr; the file sink is opt-in via LLM_GATEWAY_LOG_FILE.
-	// Defaults: ./logs/gateway.log, 100 MiB, 10 backups, no
-	// time-based expiry, gzip ON. Matches operator spec
+	// Default: /opt/llm-gateway-go/logs/gateway.log (absolute path
+	// anchored to the systemd bind-mount point — see
+	// scripts/deploy-71-data-bindmounts.sh). 100 MiB, 10 backups,
+	// no time-based expiry, gzip ON. Matches operator spec
 	// "最大 1G 的 log,过期删除" (≈ 1 GiB worst-case disk).
-	cfg.Log.File = envOrDefault("LLM_GATEWAY_LOG_FILE", "logs/gateway.log")
+	//
+	// 2026-07-02 fix: previous default `./logs/gateway.log` was
+	// relative; inside the systemd-launched Docker container (cwd=/)
+	// it resolved to /logs/gateway.log on the alpine rootfs, so log
+	// files were lost on every container restart. Now we default to
+	// the bind-mount target so logs survive container restarts.
+	cfg.Log.File = envOrDefault("LLM_GATEWAY_LOG_FILE", "/opt/llm-gateway-go/logs/gateway.log")
 	cfg.Log.MaxSizeMB = 100
 	cfg.Log.MaxBackups = 10
 	cfg.Log.MaxAgeDays = 0

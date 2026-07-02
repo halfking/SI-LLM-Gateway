@@ -137,6 +137,9 @@ func (h *Handler) handleStorageStats(w http.ResponseWriter, r *http.Request) {
 	// Get attachments storage stats
 	attachmentPath := os.Getenv("ATTACHMENT_STORAGE_PATH")
 	if attachmentPath == "" {
+		// 2026-07-02: anchor to bind-mount target so this matches
+		// the path used by attachments.Manager and survives container
+		// restarts. See scripts/deploy-71-data-bindmounts.sh.
 		attachmentPath = "/opt/llm-gateway-go/data/attachments"
 	}
 	attachStats, err := h.getAttachmentStorageStats(ctx, attachmentPath)
@@ -311,45 +314,41 @@ func (h *Handler) getAttachmentStorageStats(ctx context.Context, storagePath str
 	return stats, nil
 }
 
-// countOrphanedAttachments counts files in storage directory that have no database record
+// countOrphanedAttachments counts files in storage directory that have no database record.
+// 2026-07-02: the actual on-disk layout is {YYYY}/{MM}/{DD}/{uuid}.{ext}
+// (see attachments.Manager.ArchiveFromRequest); the previous version of
+// this function compared the bare filename to the row id, which always
+// mismatched because the stored path includes the date directories.
+// We now build the full relative path of each file on disk and look it
+// up in the set of `file_path` values from the attachments table.
 func (h *Handler) countOrphanedAttachments(ctx context.Context, storagePath string) (int, error) {
-	// Get all attachment IDs from database
-	rows, err := h.db.Query(ctx, `SELECT id FROM attachments`)
+	// Get all attachment file paths from database
+	rows, err := h.db.Query(ctx, `SELECT file_path FROM attachments`)
 	if err != nil {
 		return 0, err
 	}
 	defer rows.Close()
 
-	dbIDs := make(map[string]bool)
+	dbPaths := make(map[string]bool)
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
+		var p string
+		if err := rows.Scan(&p); err != nil {
 			continue
 		}
-		dbIDs[id] = true
+		dbPaths[p] = true
 	}
 
-	// Count files in directory that are not in database
+	// Walk storage directory and check each file's relative path
 	orphanedCount := 0
 	err = filepath.WalkDir(storagePath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil
 		}
-		
-		// Extract attachment ID from filename (assuming format: {tenant_id}/{id})
 		relPath, err := filepath.Rel(storagePath, path)
 		if err != nil {
 			return nil
 		}
-		
-		// Get the filename part (after last /)
-		filename := filepath.Base(relPath)
-		if filename == "." || filename == ".." {
-			return nil
-		}
-
-		// Check if this ID exists in database
-		if !dbIDs[filename] {
+		if !dbPaths[relPath] {
 			orphanedCount++
 		}
 		return nil
