@@ -212,7 +212,16 @@ func (c *Checker) markDegraded(ctx context.Context, credentialID int, model stri
 // NOT touch availability_state, on the assumption that the router reads
 // only cmb. That assumption was wrong — v_routable_credential_models.is_routable
 // also requires availability_state='ready' (see 2026-06-22 defect 4).
-func RecoverExpired(ctx context.Context, db DBQuerier) (int, error) {
+//
+// invalidateCache (optional, may be nil) is invoked once after all three
+// writes succeed if at least one row was restored. Without this call, the
+// provider.Client.candCache in-memory cache (TTL 30s, see provider/client.go)
+// keeps serving the previously-empty candidate list for up to 30s after a
+// recovery, producing "no available provider" 503s for the recovered
+// (cred, model) pair. This was the root cause of the 2026-07-03 incident
+// where minimax-prod-1/minimax-m3 was healthy in the session but the
+// router kept reporting "no available route" (request a69a71a05e6610adcf55df32f2618797).
+func RecoverExpired(ctx context.Context, db DBQuerier, invalidateCache func()) (int, error) {
 	cmbTag, err := db.Exec(ctx, `
 		UPDATE credential_model_bindings cmb
 		SET available              = TRUE,
@@ -294,6 +303,14 @@ func RecoverExpired(ctx context.Context, db DBQuerier) (int, error) {
 			"model_offers_count", moTag.RowsAffected(),
 			"credentials_availability_count", credTag.RowsAffected(),
 		)
+		// Invalidate the in-memory candidate cache so the very next request
+		// re-reads from DB and observes the restored cmb.available=TRUE.
+		// Without this, candCache (TTL 30s) keeps serving the stale empty
+		// list for up to 30s, masking the recovery. Caller may pass nil
+		// in tests / older wiring.
+		if invalidateCache != nil {
+			invalidateCache()
+		}
 	}
 
 	return rowsAffected, nil

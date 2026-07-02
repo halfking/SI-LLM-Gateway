@@ -1156,7 +1156,13 @@ func main() {
 			callHistoryAggregator.Start(context.Background())
 
 			slog.Info("CHECKPOINT: before healthAutoRecover")
-			healthAutoRecover = bg.NewHealthAutoRecover(dbConn.Pool(), 1*time.Minute)
+			// 2026-07-03: wire provider.InvalidateAllCandidateCache so a
+			// recovery tick (cmb.available=TRUE) immediately flushes the
+			// in-memory candCache. Without this, restored bindings stay
+			// invisible to the router for up to 30s (candCache TTL),
+			// reproducing the "no available provider" symptom after the
+			// cooldown expires.
+			healthAutoRecover = bg.NewHealthAutoRecover(dbConn.Pool(), 1*time.Minute, provider.InvalidateAllCandidateCache)
 			healthAutoRecover.Start(context.Background())
 			slog.Info("CHECKPOINT: after healthAutoRecover.Start")
 		}
@@ -1235,7 +1241,14 @@ func main() {
 			// v2.0.1: realtime listener for sub-second index refresh
 			// (PG LISTEN/NOTIFY trigger on credential_model_bindings /
 			// credentials / api_keys / model_offers).
-			autoRouteListener := bg.NewAutoRouteRealtimeListener(dbConn.Pool(), autoIndexRefresher)
+			//
+			// 2026-07-03: pass provider.InvalidateAllCandidateCache so a
+			// NOTIFY synchronously flushes the in-memory candCache. This
+			// is the propagation path that was missing in the minimax-m3
+			// incident (request a69a71a05e6610adcf55df32f2618797) where
+			// the autoroute.Index refreshed but the hot-path cache kept
+			// returning the stale empty list for up to 30s.
+			autoRouteListener := bg.NewAutoRouteRealtimeListener(dbConn.Pool(), autoIndexRefresher, provider.InvalidateAllCandidateCache)
 			autoRouteListener.Start(context.Background())
 
 			// v2.1 (P7.5): TuningViewRefresher keeps the materialised
