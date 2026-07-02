@@ -178,12 +178,11 @@ type ChatHandler struct {
 	// compressed data by CCR hash. When non-nil and HeadroomCompressor is active,
 	// the tool definition is automatically injected into every request's tools
 	// array so the LLM can call headroom_retrieve when it sees <<ccr:HASH>> markers.
+	//
+	// NOTE: The tool is optional. Headroom compression works without it by sending
+	// the compressed (smaller) array directly. The LLM only calls this tool if it
+	// decides it needs the full original data.
 	ccrRetrievalTool *CCRRetrievalTool
-
-	// ccrToolInterceptor (Headroom, 2026-07-02) intercepts headroom_retrieve tool
-	// calls in LLM responses and executes them server-side, replacing the tool call
-	// with the actual retrieved data. This makes CCR retrieval transparent to clients.
-	ccrToolInterceptor *CCRToolInterceptor
 
 	// toolRegistry (Phase 3, 2026-06-21) provides centralized tool definitions.
 	// When non-nil, requests with tool_ids expand to full tool definitions.
@@ -279,12 +278,11 @@ func (h *ChatHandler) SetMetaToolInterceptor(i *MetaToolInterceptor) {
 // When set, the headroom_retrieve tool definition is automatically injected
 // into every request's tools array so the LLM can retrieve compressed data
 // when it encounters <<ccr:HASH>> markers in the conversation.
+//
+// The tool is optional: compression works without it by sending smaller arrays.
+// LLMs only call it if they decide they need the full original data.
 func (h *ChatHandler) SetCCRRetrievalTool(t *CCRRetrievalTool) {
 	h.ccrRetrievalTool = t
-	// Auto-create interceptor when tool is set
-	if t != nil {
-		h.ccrToolInterceptor = NewCCRToolInterceptor(t)
-	}
 }
 
 // SetToolRegistry wires the Phase 3 tool registry.
