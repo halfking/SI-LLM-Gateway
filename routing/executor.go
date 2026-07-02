@@ -1498,11 +1498,19 @@ func (e *Executor) coolBindingOnMnfStreak(ctx context.Context, credentialID int,
 		return
 	}
 
+	// 2026-07-03 fix (P0-2): Write unavailable_recover_at so RecoverExpired
+	// uses the intended coolMins (default 2 minutes) instead of the 30-second
+	// fallback (credentialhealth/checker.go:238). Without this, mnf_cooling
+	// is cleared after 30s instead of 2min, allowing model_not_found storms
+	// to keep hitting the just-recovered credential.
+	recoverAt := time.Now().Add(time.Duration(coolMins) * time.Minute)
 	_, err = e.DB.Pool().Exec(ctx, `
 		UPDATE credential_model_bindings cmb
 		SET available = FALSE,
 		    unavailable_reason = 'mnf_cooling',
-		    unavailable_at = now()
+		    unavailable_at = now(),
+		    unavailable_recover_at = $3,
+		    updated_at = now()
 		FROM model_offers mo
 		WHERE mo.id = cmb.provider_model_id
 		  AND cmb.credential_id = $1
@@ -1510,7 +1518,7 @@ func (e *Executor) coolBindingOnMnfStreak(ctx context.Context, credentialID int,
 		  AND cmb.available = TRUE
 		  AND COALESCE(cmb.unavailable_reason, '') NOT LIKE 'manual%'
 		  AND COALESCE(cmb.admin_protected, FALSE) = FALSE
-	`, credentialID, rawModel)
+	`, credentialID, rawModel, recoverAt)
 	if err != nil {
 		slog.Warn("cool_binding_mnf: update failed",
 			"credential_id", credentialID,
@@ -1537,6 +1545,14 @@ func (e *Executor) restoreCredentialState(ctx context.Context, credentialID int,
 }
 
 func (e *Executor) disableModelOffer(ctx context.Context, credentialID int, rawModel string, kind errorsx.ErrorKind, detail string) {
+	// 2026-07-03 (DEPRECATED): This function is no longer used and has been
+	// superseded by coolBindingOnMnfStreak (executor.go:1468) and the
+	// credentialhealth/anti_flap package. It writes credentials.availability_state
+	// which causes cross-model pollution (PR-3 T3, 2026-06-23 audit). Any call
+	// to this function is a regression. Panic to catch accidental re-introduction.
+	panic("disableModelOffer is DEPRECATED and must not be called — use coolBindingOnMnfStreak or credentialhealth package instead")
+
+	// Original guard (kept for context):
 	// 2026-06-13: IsClientBug kinds (model_not_found, tool_call_id_mismatch,
 	// canceled, unsupported_feature) are NOT the credential's fault. Without
 	// this guard, a single upstream 404 (e.g. Zhipu/Aliyun intermittent

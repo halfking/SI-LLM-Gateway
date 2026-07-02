@@ -418,7 +418,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/free-pool/quick-entry", h.superAdmin(h.handleFreePoolQuickEntry))
 	mux.HandleFunc("/api/free-pool/keys", h.superAdmin(h.handleFreePoolKeysRouter))
 	mux.HandleFunc("/api/free-pool/keys/", h.superAdmin(h.handleFreePoolKeysSubRouter))
-	mux.HandleFunc("/api/pricing/", admin(h.handlePricing))
+	// v741 audit HIGH-9: restrict /api/pricing/ to super_admin.
+	// Previously this was admin-tier (any valid JWT or admin key),
+	// meaning a tenant_admin could PATCH model_offers.billing_mode
+	// and break the plan_type parity invariant by overwriting
+	// credentials.plan_type's derived cmb.billing_mode. The plan_type
+	// PATCH path on /api/providers/{id}/credentials/{cid} is already
+	// super_admin-only (line 361), so this restores symmetry.
+	mux.HandleFunc("/api/pricing/", h.superAdmin(h.handlePricing))
 	mux.HandleFunc("/api/config/default-limits", admin(h.handleDefaultLimits))
 
 	// V3.1 (2026-06-26): credential slot info endpoint for admin dashboard.

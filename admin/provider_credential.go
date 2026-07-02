@@ -514,6 +514,19 @@ func (h *Handler) updateCredential(w http.ResponseWriter, r *http.Request, provi
 			OldValue:     prevJSON,
 			NewValue:     newJSON,
 		})
+		// v741 audit HIGH-5: emit a one-line slog.Info per plan_type
+		// PATCH so an operator tailing gateway.log in real time sees
+		// the change with old + new + operator + cred_id + client_ip.
+		// settings.WriteAudit persists the same data into DB but is
+		// invisible to log-only tooling; this line closes that gap.
+		slog.Info("plan_type updated",
+			"credential_id", credID,
+			"provider_id", providerID,
+			"old", prevJSON,
+			"new", newJSON,
+			"operator", actorFromRequest(r),
+			"client_ip", clientIPFromRequest(r),
+		)
 	}
 	if req.ConcurrencyLimit != nil {
 		//nolint:errcheck // best-effort exec, non-critical

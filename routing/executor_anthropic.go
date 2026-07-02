@@ -805,7 +805,7 @@ func (e *Executor) executeAnthropicOnce(
 		} else if errKind == errorsx.KindRateLimit {
 			e.Limiter.Shrink(cand.ProviderID, cand.CredentialID)
 		} else if errKind == errorsx.KindConcurrent {
-			e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, errorsx.KindConcurrent)
+			// 2026-07-03 fix (P0-3): Removed duplicate Circuit.RecordFailure.
 			e.writeCredentialStateOnError(params.R.Context(), cand.CredentialID, cand.RawModel, errorsx.KindConcurrent,
 				fmt.Errorf("upstream %d concurrent overload: %s", resp.StatusCode, string(body[:min(n, 200)])))
 			e.forceUnpinOnFatalKind(params.R.Context(), fpLease.Holder, cand.CredentialID, errorsx.KindConcurrent)
@@ -856,13 +856,12 @@ func (e *Executor) executeAnthropicOnce(
 				streamKind = errorsx.KindConcurrent
 			}
 			isResumable := outcome.Resumable && outcome.ChunkCount < e.StreamRetryThreshold
-			isBenignEOF := outcome.Reason == "eof_without_done" && outcome.ChunkCount > 0
 
-			if !isBenignEOF && isResumable {
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
-			} else if !isBenignEOF {
-				e.Circuit.RecordFailure(cand.ProviderID, cand.CredentialID, cand.RawModel, streamKind)
-			}
+			// 2026-07-03 fix (P0-3): Removed duplicate Circuit.RecordFailure calls.
+			// The outer executor.go:1187 handles all failures uniformly.
+			// Keeping these here caused double-counting for stream interruptions.
+			// isBenignEOF check removed since circuit recording is now unified.
+
 			return &ExecuteResult{
 				Response:    resp,
 				Candidate:   cand,
