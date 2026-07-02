@@ -341,9 +341,9 @@ function dateWindow(c: RoutingCandidate): string {
 
     <div v-if="probeErr" class="alert alert-danger">{{ probeErr }}</div>
     <div class="card" v-if="probeResult" style="margin-bottom:20px">
-      <h4 style="margin:0 0 12px">
+      <h4 class="probe-result-title">
         {{ rt('probeResult') }}
-        <span class="badge" :class="probeResult.success ? 'badge-green' : 'badge-red'" style="margin-left:8px">
+        <span class="badge probe-result-badge" :class="probeResult.success ? 'badge-green' : 'badge-red'">
           {{ probeResult.success ? rt('shared.success') : rt('shared.failed') }}
         </span>
       </h4>
@@ -395,5 +395,15 @@ function dateWindow(c: RoutingCandidate): string {
 .score-normal {
   background: #f3f4f6;
   color: #374151;
+}
+.edit-pencil {
+  font-size: 10px;
+  margin-inline-start: 4px;
+}
+.probe-result-title {
+  margin: 0 0 12px;
+}
+.probe-result-badge {
+  margin-inline-start: 8px;
 }
 </style>
