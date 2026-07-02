@@ -7,16 +7,37 @@ package ccr
 
 import (
 	"context"
+	"errors"
 	"time"
+)
+
+// Sentinel errors returned by Manager.GetForSession. Callers (especially
+// tool handlers like relay/CCRRetrievalTool) MUST distinguish ErrNotFound
+// from ErrUnauthorized so they can return 404 vs 403 to the LLM — never
+// leak the existence of a hash to an unauthorized caller.
+var (
+	ErrNotFound      = errors.New("ccr: entry not found")
+	ErrUnauthorized  = errors.New("ccr: caller session does not match entry owner")
 )
 
 // Store is the interface for CCR storage backends.
 type Store interface {
-	// Put stores data under the given hash.
+	// Put stores data under the given hash, attributed to sessionID.
+	// A later GetForSession(hash, sessionID) call must succeed when the
+	// sessionID matches; with an empty sessionID the entry is shared.
 	Put(ctx context.Context, hash string, data []byte, sessionID string) error
 
-	// Get retrieves data by hash. Returns nil if not found.
+	// Get retrieves data by hash without any session check. Use only when
+	// the caller has already authorized the lookup through other means
+	// (e.g. when replaying from a CCR marker embedded in the same
+	// session's outbound body, which the gateway already serialized).
 	Get(ctx context.Context, hash string) ([]byte, error)
+
+	// GetForSession retrieves data by hash AND verifies the caller is the
+	// same session that originally wrote the entry. Returns ErrNotFound
+	// if the row doesn't exist OR exists but belongs to a different
+	// session (no leak of existence). sessionID="" skips the check.
+	GetForSession(ctx context.Context, hash, sessionID string) ([]byte, error)
 
 	// Delete removes data by hash.
 	Delete(ctx context.Context, hash string) error

@@ -46,6 +46,11 @@ type SessionCompressorDeps struct {
 	// compressor falls back to mechanical trim.
 	CompactionDeps *Dependencies
 
+	// HeadroomCompressor is the JSON-array compressor for ModeHeadroom /
+	// ModeHeadroomAggressive. When nil and the mode requires it, the
+	// compressor is silently skipped (graceful degradation).
+	HeadroomCompressor *HeadroomCompressor
+
 	// Disabled completely disables the session compressor when true.
 	// Reads LLM_GATEWAY_SESSION_COMPRESSOR_DISABLE env var at startup.
 	Disabled bool
@@ -171,6 +176,32 @@ func (sc *SessionCompressor) Prepare(
 		}
 		sc.updateCache(ctx, tenantID, gwSessionID, state, outboundBody, res, false)
 		return res
+	}
+
+	// For headroom modes: apply JSON-array compression before further phases.
+	// This is independent of strip/summary because Headroom replaces large
+	// tool_result arrays with CCR markers (lossless path on the server side).
+	if mode == ModeHeadroom || mode == ModeHeadroomAggressive {
+		if sc.deps.HeadroomCompressor != nil {
+			newBody, hrStats, err := sc.deps.HeadroomCompressor.CompressMessageArrays(ctx, outboundBody, gwSessionID, protocol)
+			if err != nil {
+				slog.Warn("session_compressor: headroom compression failed, forwarding client body",
+					"session", gwSessionID, "error", err)
+			} else if hrStats != nil {
+				outboundBody = newBody
+				res.MsgCount = countMessages(outboundBody)
+				res.TokenEst = estimateBodyTokens(outboundBody)
+				res.MsgHashes = marshalHashes(computeHashes(mustExtractMessages(outboundBody)))
+				if !diffResult.Unchanged && !diffResult.IsNewSess {
+					res.OutboundBody = outboundBody
+				}
+				if mode == ModeHeadroomAggressive {
+					res.CompressionStrategy = "headroom_aggressive"
+				} else {
+					res.CompressionStrategy = "headroom"
+				}
+			}
+		}
 	}
 
 	// For smart/aggressive modes: apply tool/thinking stripping + task analysis
