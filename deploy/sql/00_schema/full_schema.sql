@@ -2405,6 +2405,7 @@ CREATE TABLE public.credentials (
     default_probe_model_picked_at timestamp with time zone,
     concurrency_limit_auto integer,
     fp_slot_limit integer NOT NULL,
+    plan_type text,
     CONSTRAINT chk_credentials_health_source CHECK (((health_source IS NULL) OR (health_source = ANY (ARRAY['models'::text, 'probe'::text, 'mixed'::text, 'none'::text, 'fast_reprobe'::text])))),
     CONSTRAINT chk_credentials_health_status CHECK ((health_status = ANY (ARRAY['unknown'::text, 'healthy'::text, 'warning'::text, 'unreachable'::text]))),
     CONSTRAINT credentials_availability_state_check CHECK ((availability_state = ANY (ARRAY['ready'::text, 'cooling'::text, 'rate_limited'::text, 'auth_failed'::text, 'unreachable'::text, 'suspended'::text]))),
@@ -2412,6 +2413,7 @@ CREATE TABLE public.credentials (
     CONSTRAINT credentials_fp_slot_limit_check CHECK (((fp_slot_limit >= 0) AND (fp_slot_limit <= 10000))),
     CONSTRAINT credentials_fp_slot_vs_concurrency CHECK (((concurrency_limit IS NULL) OR (fp_slot_limit IS NULL) OR (fp_slot_limit <= concurrency_limit))),
     CONSTRAINT credentials_lifecycle_status_check CHECK ((lifecycle_status = ANY (ARRAY['active'::text, 'disabled'::text, 'suspended'::text, 'retired'::text]))),
+    CONSTRAINT credentials_plan_type_check CHECK ((plan_type IS NULL) OR (plan_type = ANY (ARRAY['token'::text, 'token_plan'::text, 'code_plan'::text, 'agent_plan'::text, 'request'::text, 'seat'::text, 'compute_time'::text, 'flat_quota'::text, 'free'::text])))),
     CONSTRAINT credentials_status_check CHECK ((status = ANY (ARRAY['active'::text, 'cooling'::text, 'degraded'::text, 'quarantine'::text, 'quota_expired'::text, 'disabled'::text]))),
     CONSTRAINT credentials_trust_level_check CHECK ((trust_level = ANY (ARRAY['trusted'::text, 'cooling'::text, 'degraded'::text, 'quarantine'::text])))
 );
@@ -7064,36 +7066,45 @@ CREATE VIEW public.v_routable_credential_models AS
  SELECT cmb.id AS binding_id,
     cmb.credential_id,
     cmb.provider_model_id,
-    c.tenant_id,
-    p.id AS provider_id,
-    c.label AS credential_label,
     pm.raw_model_name,
-    pm.canonical_id,
+    cmb.available AS binding_available,
+    c.status AS credential_status,
+    c.lifecycle_status AS credential_lifecycle_status,
+    c.availability_state,
+    c.availability_recover_at,
+    c.quota_state,
+    c.quota_recover_at,
+    c.plan_type,
+    mo.billing_mode,
+    c.tenant_id,
+    c.provider_id,
         CASE
-            WHEN (NOT p.enabled) THEN 'provider_disabled'::text
-            WHEN COALESCE(p.manual_disabled, false) THEN 'provider_manual_disabled'::text
-            WHEN (c.status <> 'active'::text) THEN ('credential_status_'::text || c.status)
-            WHEN (c.lifecycle_status <> 'active'::text) THEN ('lifecycle_'::text || c.lifecycle_status)
-            WHEN COALESCE(c.manual_disabled, false) THEN 'credential_manual_disabled'::text
-            WHEN (c.availability_state = 'cooling'::text) THEN 'availability_cooling'::text
-            WHEN (c.availability_state = 'rate_limited'::text) THEN 'availability_rate_limited'::text
-            WHEN (c.availability_state = 'auth_failed'::text) THEN 'availability_auth_failed'::text
-            WHEN (c.availability_state = 'unreachable'::text) THEN 'availability_unreachable'::text
-            WHEN (c.availability_state = 'suspended'::text) THEN 'availability_suspended'::text
-            WHEN (c.quota_state = ANY (ARRAY['permanently_exhausted'::text, 'balance_exhausted'::text])) THEN ('quota_'::text || c.quota_state)
-            WHEN ((c.health_status = 'unreachable'::text) AND (c.health_checked_at > (now() - '01:00:00'::interval))) THEN 'recent_probe_unreachable'::text
-            WHEN (NOT pm.available) THEN 'model_unavailable'::text
-            WHEN (cmb.unavailable_reason = 'manual'::text) THEN 'model_manual_disabled'::text
-            WHEN (NOT cmb.available) THEN 'binding_unavailable'::text
+            WHEN c.status <> ALL (ARRAY['active'::text, 'cooling'::text, 'degraded'::text]) THEN false
+            WHEN c.lifecycle_status <> 'active'::text THEN false
+            WHEN cmb.available IS NOT TRUE THEN false
+            WHEN c.quota_state = 'periodic_exhausted'::text THEN false
+            WHEN c.quota_state = 'exhausted'::text AND (c.quota_recover_at IS NULL OR c.quota_recover_at > now()) THEN false
+            WHEN c.availability_state = 'unavailable'::text AND (c.availability_recover_at IS NULL OR c.availability_recover_at > now()) THEN false
+            WHEN (c.plan_type = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (mo.billing_mode <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN false
+            WHEN (mo.billing_mode = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (c.plan_type <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN false
+            ELSE true
+        END AS is_routable,
+        CASE
+            WHEN c.status <> ALL (ARRAY['active'::text, 'cooling'::text, 'degraded'::text]) THEN 'credential_status_'::text || c.status
+            WHEN c.lifecycle_status <> 'active'::text THEN 'lifecycle_'::text || c.lifecycle_status
+            WHEN cmb.available IS NOT TRUE THEN 'binding_unavailable'::text
+            WHEN c.quota_state = 'periodic_exhausted'::text THEN 'quota_periodic_exhausted'::text
+            WHEN c.quota_state = 'exhausted'::text THEN 'quota_exhausted'::text
+            WHEN c.availability_state = 'unavailable'::text THEN 'availability_unavailable'::text
+            WHEN (c.plan_type = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (mo.billing_mode <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN 'plan_incompatible_model_requires_'::text || COALESCE(mo.billing_mode, 'token'::text)
+            WHEN (mo.billing_mode = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (c.plan_type <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN 'plan_incompatible_credential_not_'::text || mo.billing_mode
             ELSE NULL::text
-        END AS unavailable_reason,
-    (p.enabled AND (COALESCE(p.manual_disabled, false) = false) AND (c.status = 'active'::text) AND (c.lifecycle_status = 'active'::text) AND (COALESCE(c.manual_disabled, false) = false) AND (c.availability_state = 'ready'::text) AND (c.quota_state <> ALL (ARRAY['permanently_exhausted'::text, 'balance_exhausted'::text])) AND (pm.available = true) AND (cmb.available = true) AND (cmb.unavailable_reason IS DISTINCT FROM 'manual'::text) AND (COALESCE(c.health_status, 'unknown'::text) = ANY (ARRAY['healthy'::text, 'unknown'::text]))) AS is_routable,
-    (((((cmb.manual_priority * 100))::numeric + (COALESCE(cmb.success_rate, 0.5) * (50)::numeric)) - (COALESCE(cmb.unit_price_in_per_1m, (0)::numeric) * 0.001)) - ((COALESCE(cmb.p95_latency_ms, 1000))::numeric * 0.01)) AS routing_score
-   FROM (((public.credential_model_bindings cmb
-     JOIN public.credentials c ON ((c.id = cmb.credential_id)))
-     JOIN public.providers p ON ((p.id = c.provider_id)))
-     JOIN public.provider_models pm ON ((pm.id = cmb.provider_model_id)));
-
+        END AS unavailable_reason
+   FROM credential_model_bindings cmb
+     JOIN credentials c ON c.id = cmb.credential_id
+     JOIN provider_models pm ON pm.id = cmb.provider_model_id
+     LEFT JOIN model_offers mo ON mo.credential_id = cmb.credential_id AND mo.raw_model_name = pm.raw_model_name
+  WHERE c.tenant_id = 'default'::text;
 
 --
 -- Name: v_suspicious_probe_targets; Type: VIEW; Schema: public; Owner: -
