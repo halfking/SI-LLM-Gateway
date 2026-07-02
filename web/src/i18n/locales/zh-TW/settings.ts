@@ -1,4 +1,5 @@
 // Auto-translated draft (zh-TW/ja-JP) · 2026-07-02 · please review
+// Updated to include settings.compression.* for Headroom modes (2026-07-02).
 // settings.ts — SettingsView 文案。命名空間：category / list / detail / editor / docs / errors。
 // 技術欄位名（JSON / RPM / TPM / WebSocket 等）保持不譯。
 export default {
@@ -67,21 +68,41 @@ export default {
       off: '0 - 關閉 (off)',
       auto: '1 - 自動閾值 (auto_threshold)',
       on4xx: '2 - 4xx時壓縮 (on_4xx) 【推薦】',
+      deltaOnly: '僅差異 (delta_only)',
+      smart: '智慧壓縮 (smart) 【預設】',
+      aggressive: '激進壓縮 (aggressive)',
+      headroom: 'Headroom 壓縮 (headroom)',
+      headroomAggressive: 'Headroom 激進 (headroom_aggressive)',
     },
     enumLabels: {
       off: '0 - 關閉 (off)',
       auto: '1 - 自動閾值 (auto_threshold)',
       on4xx: '2 - 4xx時壓縮 (on_4xx)',
+      deltaOnly: '僅差異 (delta_only)',
+      smart: '智慧壓縮 (smart)',
+      aggressive: '激進壓縮 (aggressive)',
+      headroom: 'Headroom 壓縮 (headroom)',
+      headroomAggressive: 'Headroom 激進 (headroom_aggressive)',
     },
     enumDescriptions: {
       off: '完全關閉訊息壓縮功能',
       auto: '當訊息長度超過context window閾值時自動壓縮',
       on4xx: '收到4xx錯誤（如context_length_exceeded）時觸發壓縮並重試',
+      deltaOnly: '僅保留訊息增量，不進行會話壓縮',
+      smart: 'v4 智慧壓縮：工具裁剪 + 滑動視窗',
+      aggressive: 'v4 激進壓縮：任務分析 + 主動壓縮',
+      headroom: 'v7 Headroom 壓縮：智慧 JSON 陣列壓縮',
+      headroomAggressive: 'v7 Headroom 激進：更激進的陣列壓縮 + CCR 儲存',
     },
     hint: {
       off: '完全關閉訊息壓縮功能',
       auto: '當訊息長度超過context window閾值時自動壓縮',
       on4xx: '收到4xx錯誤（如context_length_exceeded）時觸發壓縮並重試',
+      deltaOnly: '僅保留訊息增量，不進行會話壓縮（適用於無狀態場景）',
+      smart: 'v4 智慧壓縮：包含工具定義裁剪和滑動視窗最佳化（預設推薦）',
+      aggressive: 'v4 激進壓縮：包含任務分析和主動壓縮策略（高壓縮比）',
+      headroom: 'v7 Headroom 壓縮：智慧壓縮 JSON 陣列（如大量結構化資料），保持語意完整性',
+      headroomAggressive: 'v7 Headroom 激進模式：更激進的陣列壓縮演算法 + CCR 三級快取儲存（最高壓縮比）',
     },
     strategyEnum: {
       naive: 'naive - 樸素壓縮',

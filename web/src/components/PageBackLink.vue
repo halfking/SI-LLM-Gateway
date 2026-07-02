@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter, type RouteLocationRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   to?: RouteLocationRaw
@@ -8,8 +9,9 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const { t } = useI18n()
 
-const displayLabel = computed(() => props.label || '返回')
+const displayLabel = computed(() => props.label || t('common.button.back'))
 
 function goBack() {
   if (props.to) {

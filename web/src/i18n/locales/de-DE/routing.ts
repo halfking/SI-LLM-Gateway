@@ -179,6 +179,14 @@ export default {
       routable: 'Routing-fähig',
       unroutable: 'Nicht verfügbar',
       l2Funnel: 'Aktueller L2-Trichter',
+      funnelStages: {
+        candidates: 'Gesamtkandidaten',
+        candidatesHint: 'In dieser Auflösung analysierte Kandidaten',
+        routable: 'Routing-fähig',
+        routableHint: 'Verfügbarkeitsprüfung bestanden',
+        success: 'Top-Anmeldedaten',
+        successHint: 'Top routing-fähige Anmeldedaten',
+      },
       runLogTitle: 'Ausführungsprotokoll',
       clear: 'Leeren',
       colTime: 'Zeit',
@@ -190,6 +198,7 @@ export default {
     live: {
       simulatorTitle: 'Routing-Simulation',
       simulatorPlaceholder: 'Prompt eingeben, um L1→L2 zu testen…',
+      simulatorPromptDefault: 'Schreibe einen Quick-Sort in Python',
       simulate: 'Simulieren',
       distTask: 'Aufgabe',
       recentDecisionsTitle: 'Letzte Entscheidungen',

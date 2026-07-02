@@ -178,6 +178,14 @@ export default {
       routable: '可路由',
       unroutable: '不可用',
       l2Funnel: '本次 L2 漏斗',
+      funnelStages: {
+        candidates: '總候選',
+        candidatesHint: '本次解析候選數',
+        routable: '可路由',
+        routableHint: '通過可用性檢查',
+        success: '首選憑證',
+        successHint: 'Top 可路由憑證',
+      },
       runLogTitle: '執行記錄',
       clear: '清空',
       colTime: '時間',
@@ -189,6 +197,7 @@ export default {
     live: {
       simulatorTitle: '路由模擬',
       simulatorPlaceholder: '輸入 prompt 測試 L1→L2…',
+      simulatorPromptDefault: '用 Python 寫一個快速排序',
       simulate: '模擬',
       distTask: '任務',
       recentDecisionsTitle: '最近決策',

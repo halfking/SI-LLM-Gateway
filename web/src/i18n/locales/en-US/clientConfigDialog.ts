@@ -78,4 +78,6 @@ export default {
   error: {
     applyFailed: 'Application failed',
   },
+  // Added 2026-07-02 — Cursor fallback note (used by ClientConfigDialog when tool === 'cursor').
+  cursorNotSupported: 'Cursor does not support file writes — please configure manually in the Settings UI',
 }

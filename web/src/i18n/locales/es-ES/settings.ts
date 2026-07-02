@@ -1,4 +1,5 @@
 // Auto-translated draft (es-ES) · 2026-07-02 · please review
+// Updated to include settings.compression.* for Headroom modes (2026-07-02).
 // settings.ts — Vista de ajustes.
 export default {
   category: {
@@ -66,21 +67,41 @@ export default {
       off: '0 - Desactivado',
       auto: '1 - Umbral automático',
       on4xx: '2 - En 4xx (recomendado)',
+      deltaOnly: 'Solo delta (delta_only)',
+      smart: 'Inteligente (por defecto)',
+      aggressive: 'Agresivo (aggressive)',
+      headroom: 'Headroom (headroom)',
+      headroomAggressive: 'Headroom agresivo (headroom_aggressive)',
     },
     enumLabels: {
       off: '0 - Desactivado',
       auto: '1 - Umbral automático',
       on4xx: '2 - En 4xx',
+      deltaOnly: 'Solo delta',
+      smart: 'Inteligente',
+      aggressive: 'Agresivo',
+      headroom: 'Headroom',
+      headroomAggressive: 'Headroom agresivo',
     },
     enumDescriptions: {
       off: 'La compresión está completamente desactivada.',
       auto: 'Comprime automáticamente cuando la longitud del mensaje supera el umbral de la ventana de contexto.',
       on4xx: 'Comprime y reintenta al recibir un error 4xx (p. ej. context_length_exceeded).',
+      deltaOnly: 'Solo conserva el delta del mensaje, sin compresión de sesión.',
+      smart: 'Compresión inteligente v4: recorte de herramientas + ventana deslizante.',
+      aggressive: 'Compresión agresiva v4: análisis de tareas + compresión proactiva.',
+      headroom: 'Compresión Headroom v7: compresión inteligente de matrices JSON.',
+      headroomAggressive: 'Headroom agresivo v7: compresión de matrices más agresiva + almacenamiento CCR.',
     },
     hint: {
       off: 'La compresión está completamente desactivada.',
       auto: 'Comprime automáticamente cuando la longitud del mensaje supera el umbral de la ventana de contexto.',
       on4xx: 'Comprime y reintenta al recibir un error 4xx (p. ej. context_length_exceeded).',
+      deltaOnly: 'Solo conserva el delta del mensaje, sin compresión de sesión (apto para escenarios sin estado).',
+      smart: 'Compresión inteligente v4: incluye recorte de definiciones de herramientas y optimización por ventana deslizante (por defecto recomendado).',
+      aggressive: 'Compresión agresiva v4: incluye análisis de tareas y estrategias de compresión proactivas (alta tasa de compresión).',
+      headroom: 'Compresión Headroom v7: comprime matrices JSON de forma inteligente (p. ej. datos estructurados grandes) manteniendo la integridad semántica.',
+      headroomAggressive: 'Modo Headroom agresivo v7: algoritmo de compresión de matrices más agresivo + almacenamiento en caché de tres niveles CCR (mayor tasa de compresión).',
     },
     strategyEnum: {
       naive: 'naive - Compresión ingenua',

@@ -1,4 +1,5 @@
 // Auto-translated draft (ar-SA) · 2026-07-02 · please review
+// Updated to include settings.compression.* for Headroom modes (2026-07-02).
 // settings.ts — نصوص SettingsView. فضاء الأسماء: category / list / detail / editor / docs / errors.
 // أسماء الحقول التقنية (JSON / RPM / TPM / WebSocket، إلخ) تبقى كما هي.
 export default {
@@ -67,21 +68,41 @@ export default {
       off: '0 - إيقاف (off)',
       auto: '1 - عتبة تلقائية (auto_threshold)',
       on4xx: '2 - ضغط عند 4xx (on_4xx) 【موصى به】',
+      deltaOnly: 'فروقات فقط (delta_only)',
+      smart: 'ضغط ذكي (smart) 【افتراضي】',
+      aggressive: 'ضغط هجومي (aggressive)',
+      headroom: 'هامش (headroom)',
+      headroomAggressive: 'هامش هجومي (headroom_aggressive)',
     },
     enumLabels: {
       off: '0 - إيقاف (off)',
       auto: '1 - عتبة تلقائية (auto_threshold)',
       on4xx: '2 - ضغط عند 4xx (on_4xx)',
+      deltaOnly: 'فروقات فقط (delta_only)',
+      smart: 'ضغط ذكي (smart)',
+      aggressive: 'ضغط هجومي (aggressive)',
+      headroom: 'هامش (headroom)',
+      headroomAggressive: 'هامش هجومي (headroom_aggressive)',
     },
     enumDescriptions: {
       off: 'إيقاف وظيفة ضغط الرسائل تمامًا',
       auto: 'ضغط تلقائي عندما يتجاوز طول الرسالة عتبة نافذة السياق',
       on4xx: 'تشغيل الضغط وإعادة المحاولة عند استلام خطأ 4xx (مثل context_length_exceeded)',
+      deltaOnly: 'الاحتفاظ فقط بفروقات الرسائل، دون ضغط الجلسة',
+      smart: 'الضغط الذكي v4: تقليص الأدوات + نافذة منزلقة',
+      aggressive: 'الضغط الهجومي v4: تحليل المهمة + ضغط استباقي',
+      headroom: 'ضغط الهامش v7: ضغط ذكي لمصفوفات JSON',
+      headroomAggressive: 'الهامش الهجومي v7: ضغط أكثر هجومية للمصفوفات + تخزين CCR',
     },
     hint: {
       off: 'إيقاف وظيفة ضغط الرسائل تمامًا',
       auto: 'ضغط تلقائي عندما يتجاوز طول الرسالة عتبة نافذة السياق',
       on4xx: 'تشغيل الضغط وإعادة المحاولة عند استلام خطأ 4xx (مثل context_length_exceeded)',
+      deltaOnly: 'الاحتفاظ فقط بفروقات الرسائل، دون ضغط الجلسة (مناسب للسيناريوهات عديمة الحالة)',
+      smart: 'الضغط الذكي v4: يتضمن تقليص تعريفات الأدوات وتحسين النافذة المنزلقة (موصى به افتراضيًا)',
+      aggressive: 'الضغط الهجومي v4: يتضمن تحليل المهمة واستراتيجيات الضغط الاستباقية (نسبة ضغط عالية)',
+      headroom: 'ضغط الهامش v7: يضغط مصفوفات JSON بذكاء (مثل البيانات المنظمة الكبيرة) مع الحفاظ على السلامة الدلالية',
+      headroomAggressive: 'وضع الهامش الهجومي v7: خوارزمية ضغط مصفوفات أكثر هجومية + تخزين ذاكرة التخزين المؤقت ثلاثي المستويات CCR (أعلى نسبة ضغط)',
     },
     strategyEnum: {
       naive: 'naive - ضغط بسيط',

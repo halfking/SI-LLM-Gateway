@@ -78,4 +78,6 @@ export default {
   error: {
     applyFailed: 'فشل الطلب',
   },
+  // Added 2026-07-02 — Cursor fallback note (used by ClientConfigDialog when tool === 'cursor').
+  cursorNotSupported: 'لا يدعم Cursor الكتابة إلى الملفات — يرجى التهيئة يدويًا عبر واجهة Settings',
 }

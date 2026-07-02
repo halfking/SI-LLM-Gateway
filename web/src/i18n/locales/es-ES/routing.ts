@@ -177,6 +177,14 @@ export default {
       routable: 'Enrutable',
       unroutable: 'No disponible',
       l2Funnel: 'Embudo L2 de esta consulta',
+      funnelStages: {
+        candidates: 'Candidatos totales',
+        candidatesHint: 'Candidatos analizados en esta resolución',
+        routable: 'Enrutables',
+        routableHint: 'Pasaron la verificación de disponibilidad',
+        success: 'Credencial principal',
+        successHint: 'Mejor credencial enrutable',
+      },
       runLogTitle: 'Registro de ejecuciones',
       clear: 'Limpiar',
       colTime: 'Hora',
@@ -188,6 +196,7 @@ export default {
     live: {
       simulatorTitle: 'Simulador de enrutamiento',
       simulatorPlaceholder: 'Introduzca un prompt para probar L1 → L2…',
+      simulatorPromptDefault: 'Escribe un ordenamiento rápido en Python',
       simulate: 'Simular',
       distTask: 'Tarea',
       recentDecisionsTitle: 'Decisiones recientes',

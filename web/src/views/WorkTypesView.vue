@@ -107,8 +107,9 @@ const syncOk = ref<boolean | null>(null)
 const syncMeta = ref<WorkTypeSyncMeta | null>(null)
 
 const showCreateModal = ref(false)
+const DEFAULT_CATEGORY = CATEGORIES[0]
 const createForm = ref({
-  key: '', label: '', category: '通用', l1_task_type: 'chat',
+  key: '', label: '', category: DEFAULT_CATEGORY, l1_task_type: 'chat',
   default_profile: 'smart' as 'smart' | 'speed_first' | 'cost_first',
   tags: '', prompt_keywords: '', sort_order: 0, enabled: true,
 })
@@ -116,7 +117,7 @@ const createError = ref('')
 
 const detail = ref<WorkTypeConfig | null>(null)
 const detailForm = ref({
-  label: '', category: '通用', l1_task_type: 'chat',
+  label: '', category: DEFAULT_CATEGORY, l1_task_type: 'chat',
   default_profile: 'smart' as 'smart' | 'speed_first' | 'cost_first',
   tags: '', prompt_keywords: '', sort_order: 0,
 })
@@ -166,7 +167,7 @@ async function loadSettings() {
 
 function openCreate() {
   createForm.value = {
-    key: '', label: '', category: '通用', l1_task_type: 'chat',
+    key: '', label: '', category: DEFAULT_CATEGORY, l1_task_type: 'chat',
     default_profile: 'smart', tags: '', prompt_keywords: '',
     sort_order: workTypes.value.length + 1, enabled: true,
   }

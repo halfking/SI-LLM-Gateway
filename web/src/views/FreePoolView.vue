@@ -533,11 +533,11 @@ onMounted(load)
         <div class="form-item">
           <label>{{ fp('keyForm.source') }}</label>
           <select v-model="newKey.source" class="input">
-            <option value="signup">signup（官方注册）</option>
-            <option value="env">env（环境变量导入）</option>
-            <option value="manual">manual（手动）</option>
-            <option value="oauth">oauth</option>
-            <option value="mirrored">mirrored</option>
+            <option value="signup">{{ fp('keyForm.sourceOptions.signup') }}</option>
+            <option value="env">{{ fp('keyForm.sourceOptions.env') }}</option>
+            <option value="manual">{{ fp('keyForm.sourceOptions.manual') }}</option>
+            <option value="oauth">{{ fp('keyForm.sourceOptions.oauth') }}</option>
+            <option value="mirrored">{{ fp('keyForm.sourceOptions.mirrored') }}</option>
           </select>
         </div>
         <div class="form-item" style="grid-column:1/-1">
@@ -673,10 +673,10 @@ onMounted(load)
             <div class="form-item">
               <label>{{ fp('assistant.source') }}</label>
               <select v-model="quickEntry.source" class="input">
-                <option value="signup">signup（官方注册）</option>
-                <option value="manual">manual（中转/手动）</option>
-                <option value="env">env</option>
-                <option value="discovered">discovered</option>
+                <option value="signup">{{ fp('assistant.sourceOptions.signup') }}</option>
+                <option value="manual">{{ fp('assistant.sourceOptions.manual') }}</option>
+                <option value="env">{{ fp('assistant.sourceOptions.env') }}</option>
+                <option value="discovered">{{ fp('assistant.sourceOptions.discovered') }}</option>
               </select>
             </div>
             <div class="form-item">

@@ -1,4 +1,5 @@
 // Auto-translated draft (de-DE) · 2026-07-02 · please review
+// Updated to include settings.compression.* for Headroom modes (2026-07-02).
 // settings.ts — SettingsView copy. Namespace: category / list / detail / editor / docs / errors.
 // Technical field names (JSON / RPM / TPM / WebSocket) remain untranslated.
 export default {
@@ -67,21 +68,41 @@ export default {
       off: '0 - Aus',
       auto: '1 - Auto-Schwelle',
       on4xx: '2 - Bei 4xx (empfohlen)',
+      deltaOnly: 'Nur Delta (delta_only)',
+      smart: 'Smart (Standard)',
+      aggressive: 'Aggressiv (aggressive)',
+      headroom: 'Headroom (headroom)',
+      headroomAggressive: 'Headroom Aggressiv (headroom_aggressive)',
     },
     enumLabels: {
       off: '0 - Aus',
       auto: '1 - Auto-Schwelle',
       on4xx: '2 - Bei 4xx',
+      deltaOnly: 'Nur Delta (delta_only)',
+      smart: 'Smart',
+      aggressive: 'Aggressiv',
+      headroom: 'Headroom',
+      headroomAggressive: 'Headroom Aggressiv',
     },
     enumDescriptions: {
       off: 'Komprimierung vollständig deaktiviert.',
       auto: 'Automatisch komprimieren, wenn die Nachrichtenlänge die Kontextfenster-Schwelle überschreitet.',
       on4xx: 'Bei einem 4xx-Fehler komprimieren und erneut versuchen (z. B. context_length_exceeded).',
+      deltaOnly: 'Nur Nachrichtendelta beibehalten, keine Sitzungskomprimierung.',
+      smart: 'v4 Smart-Komprimierung: Tool-Trimming + Sliding Window.',
+      aggressive: 'v4 aggressive Komprimierung: Aufgabenanalyse + proaktive Komprimierung.',
+      headroom: 'v7 Headroom-Komprimierung: intelligente JSON-Array-Komprimierung.',
+      headroomAggressive: 'v7 Headroom Aggressiv: aggressivere Array-Komprimierung + CCR-Speicherung.',
     },
     hint: {
       off: 'Komprimierung vollständig deaktiviert.',
       auto: 'Automatisch komprimieren, wenn die Nachrichtenlänge die Kontextfenster-Schwelle überschreitet.',
       on4xx: 'Bei einem 4xx-Fehler komprimieren und erneut versuchen (z. B. context_length_exceeded).',
+      deltaOnly: 'Nur Nachrichtendelta beibehalten, keine Sitzungskomprimierung (geeignet für zustandslose Szenarien).',
+      smart: 'v4 Smart-Komprimierung: enthält Tool-Definitions-Trimming und Sliding-Window-Optimierung (empfohlener Standard).',
+      aggressive: 'v4 aggressive Komprimierung: enthält Aufgabenanalyse und proaktive Komprimierungsstrategien (hohe Komprimierungsrate).',
+      headroom: 'v7 Headroom-Komprimierung: komprimiert JSON-Arrays intelligent (z. B. große strukturierte Daten) unter Beibehaltung der semantischen Integrität.',
+      headroomAggressive: 'v7 Headroom Aggressiv-Modus: aggressiverer Array-Komprimierungsalgorithmus + CCR-Drei-Stufen-Cache-Speicherung (höchste Komprimierungsrate).',
     },
     strategyEnum: {
       naive: 'naive - Naive Komprimierung',

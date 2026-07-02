@@ -59,6 +59,7 @@ export default {
     noData: 'No data',
     noResults: 'No matching results',
     copied: 'Copied',
+    clickToCopy: 'Click to copy',
     confirmDelete: 'Confirm delete?',
     confirmAction: 'Are you sure you want to continue?',
   },
@@ -91,5 +92,19 @@ export default {
   error: {
     unknown: 'An unknown error occurred',
     network: 'Network error, please check your connection',
+  },
+  // Shared cell/component labels (added 2026-07-02 to remove hardcoded Chinese from src/components/**)
+  activeFilters: {
+    label: 'Selected filters',
+    removeHint: 'Remove {label}',
+  },
+  filterInput: {
+    noMatch: 'No matches',
+  },
+  clientConfigGenerator: {
+    configure: 'Configure',
+  },
+  feeCostCell: {
+    costLabel: 'Cost',
   },
 }

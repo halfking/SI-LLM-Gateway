@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { TOOLS, type ToolId } from '../composables/useClientConfig'
 import ClientConfigDialog from './ClientConfigDialog.vue'
 
 const emit = defineEmits<{ (e: 'openDialog', tool: ToolId): void }>()
+
+const { t } = useI18n()
 
 const dialogTool = ref<ToolId | null>(null)
 const dialogOpen = ref(false)
@@ -26,7 +29,7 @@ function openDialog(tool: ToolId) {
       </div>
       <div class="tool-card-actions">
         <button class="btn btn-primary btn-sm" @click="openDialog(tool.id)">
-          配置
+          {{ t('common.clientConfigGenerator.configure') }}
         </button>
       </div>
     </div>

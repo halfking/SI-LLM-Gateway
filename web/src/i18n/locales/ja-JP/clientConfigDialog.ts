@@ -78,4 +78,6 @@ export default {
   error: {
     applyFailed: '申請に失敗しました',
   },
+  // Added 2026-07-02 — Cursor fallback note (used by ClientConfigDialog when tool === 'cursor').
+  cursorNotSupported: 'Cursor はファイル書き込みをサポートしていないため、Settings UI で手動設定してください',
 }
