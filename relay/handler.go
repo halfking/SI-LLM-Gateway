@@ -180,6 +180,11 @@ type ChatHandler struct {
 	// array so the LLM can call headroom_retrieve when it sees <<ccr:HASH>> markers.
 	ccrRetrievalTool *CCRRetrievalTool
 
+	// ccrToolInterceptor (Headroom, 2026-07-02) intercepts headroom_retrieve tool
+	// calls in LLM responses and executes them server-side, replacing the tool call
+	// with the actual retrieved data. This makes CCR retrieval transparent to clients.
+	ccrToolInterceptor *CCRToolInterceptor
+
 	// toolRegistry (Phase 3, 2026-06-21) provides centralized tool definitions.
 	// When non-nil, requests with tool_ids expand to full tool definitions.
 	// nil disables Phase 3 tool registry (tool_ids are ignored).
@@ -276,6 +281,10 @@ func (h *ChatHandler) SetMetaToolInterceptor(i *MetaToolInterceptor) {
 // when it encounters <<ccr:HASH>> markers in the conversation.
 func (h *ChatHandler) SetCCRRetrievalTool(t *CCRRetrievalTool) {
 	h.ccrRetrievalTool = t
+	// Auto-create interceptor when tool is set
+	if t != nil {
+		h.ccrToolInterceptor = NewCCRToolInterceptor(t)
+	}
 }
 
 // SetToolRegistry wires the Phase 3 tool registry.
