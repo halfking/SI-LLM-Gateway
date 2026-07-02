@@ -105,10 +105,17 @@ func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]
 	metrics := m.getMetrics()
 	atomic.AddInt64(&metrics.GetTotal, 1)
 
-	// L3 first when sessionID is set: L1/L2 don't carry sessionID, so
-	// they can't satisfy a scoped lookup. Read straight from PG, then
-	// backfill L1.
-	if sessionID != "" && m.config.L3Enabled && m.l3DB != nil {
+	// SECURITY: When sessionID is provided, we MUST enforce session isolation.
+	// L1 and L2 don't store sessionID, so they can't validate ownership.
+	// Therefore, when sessionID != "", we skip L1/L2 and go straight to L3.
+	if sessionID != "" {
+		if !m.config.L3Enabled || m.l3DB == nil {
+			// L3 disabled but caller requires session-scoped lookup.
+			// Refuse to serve data from L1/L2 as they can't enforce isolation.
+			return nil, fmt.Errorf("ccr: session-scoped lookup requires L3 (PostgreSQL)")
+		}
+
+		// L3 query with session validation
 		query := `SELECT data, session_id FROM ccr_cache WHERE hash = $1`
 		var data []byte
 		var rowSessionID string
@@ -126,13 +133,14 @@ func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]
 			return nil, ErrUnauthorized
 		}
 		atomic.AddInt64(&metrics.L3Hits, 1)
-		// Backfill L1 (session-agnostic; the row is content-only).
+		// Backfill L1 (content only; future unscoped lookups can use it)
 		if m.config.L1Enabled && m.l1Cache != nil {
 			m.l1Cache.Store(hash, data)
 		}
 		return data, nil
 	}
 
+	// Unscoped lookup: try L1 → L2 → L3 (no session validation)
 	// L1: sync.Map
 	if m.config.L1Enabled && m.l1Cache != nil {
 		if val, ok := m.l1Cache.Load(hash); ok {
