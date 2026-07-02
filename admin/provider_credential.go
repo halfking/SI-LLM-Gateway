@@ -416,21 +416,23 @@ func (h *Handler) updateCredential(w http.ResponseWriter, r *http.Request, provi
 				"invalid plan_type '"+*req.PlanType+"'; expected one of token|token_plan|code_plan|agent_plan|request|seat|compute_time|flat_quota|free (or empty to clear)")
 			return
 		}
-		// Empty string → SQL NULL.
-		var planVal interface{}
-		cmbTarget := *req.PlanType
-		if *req.PlanType == "" {
-			planVal = nil
-			// H4 (audit fix): when clearing plan_type, also reset
-			// cmb.billing_mode to the column default ('per_token').
-			// Otherwise the cmb row keeps the stale value while the
-			// credential is no longer on a plan — fine for routing
-			// (rule 8 requires plan_type in the allow-list to be
-			// triggered) but breaks the invariant "cmb.billing_mode
-			// is derived from credential.plan_type" and confuses
-			// downstream billing/quoting that reads cmb.billing_mode.
-			cmbTarget = "" // sentinel meaning "reset to column default"
-		}
+// Empty string → SQL NULL.
+			var planVal interface{}
+			cmbTarget := *req.PlanType
+			if *req.PlanType == "" {
+				planVal = nil
+				// H4 (audit fix): when clearing plan_type, also reset
+				// cmb.billing_mode to the column default ('per_token').
+				// Otherwise the cmb row keeps the stale value while the
+				// credential is no longer on a plan — fine for routing
+				// (rule 8 requires plan_type in the allow-list to be
+				// triggered) but breaks the invariant "cmb.billing_mode
+				// is derived from credential.plan_type" and confuses
+				// downstream billing/quoting that reads cmb.billing_mode.
+				cmbTarget = "" // sentinel meaning "reset to column default"
+			} else {
+				planVal = *req.PlanType
+			}
 		// H2 (audit fix): wrap cred + cmb UPDATEs in a single tx so a
 		// concurrent admin/pricing UPDATE between the two UPDATEs
 		// cannot land on a half-applied state. The credential UPDATE
