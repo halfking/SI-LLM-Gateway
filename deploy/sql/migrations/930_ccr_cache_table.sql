@@ -30,7 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_ccr_session ON ccr_cache(session_id);
 CREATE INDEX IF NOT EXISTS idx_ccr_created ON ccr_cache(created_at);
 
 -- Index for LRU eviction (added in migration 950)
--- CREATE INDEX IF NOT EXISTS idx_ccr_accessed ON ccr_cache(accessed_at);
+-- CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ccr_cache_accessed_at ON ccr_cache(accessed_at);
 
 COMMENT ON TABLE ccr_cache IS 
     'CCR L3 storage for Headroom-compressed JSON arrays. Session-scoped for security.';
