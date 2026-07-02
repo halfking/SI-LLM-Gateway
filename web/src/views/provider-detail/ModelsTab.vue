@@ -619,7 +619,7 @@ load()
         </div>
         <div class="metric" v-if="Object.keys(routable.unavailable_breakdown).length > 0">
           <b>细分</b>
-          <div style="font-size:10px;text-align:left;max-height:80px;overflow-y:auto">
+          <div class="routable-breakdown">
             <div v-for="(count, code) in routable.unavailable_breakdown" :key="code">
               <code>{{ code }}</code>: {{ count }}
             </div>
@@ -1176,5 +1176,11 @@ load()
   justify-content: space-between;
   align-items: center;
   width: 100%;
+}
+.routable-breakdown {
+  font-size: 10px;
+  text-align: start;
+  max-height: 80px;
+  overflow-y: auto;
 }
 </style>

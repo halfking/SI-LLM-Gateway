@@ -292,8 +292,8 @@ onMounted(load)
         <thead>
           <tr>
             <th>{{ tdash('tableColModel') }}</th>
-            <th style="text-align:right">{{ tdash('tableColRequests') }}</th>
-            <th style="text-align:right">{{ tdash('tableColCredits') }}</th>
+            <th class="text-end">{{ tdash('tableColRequests') }}</th>
+            <th class="text-end">{{ tdash('tableColCredits') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -322,7 +322,7 @@ onMounted(load)
             <th>{{ tdash('detailColTime') }}</th>
             <th>{{ tdash('detailColModel') }}</th>
             <th>{{ tdash('detailColStatus') }}</th>
-            <th style="text-align:right">{{ tdash('detailColCredits') }}</th>
+            <th class="text-end">{{ tdash('detailColCredits') }}</th>
             <th>{{ tdash('detailColRequestId') }}</th>
           </tr>
         </thead>
@@ -483,7 +483,7 @@ onMounted(load)
   font-weight: 400;
   font-size: 12px;
   color: var(--muted);
-  margin-left: 8px;
+  margin-inline-start: 8px;
 }
 .bar-chart {
   display: flex;
@@ -501,7 +501,7 @@ onMounted(load)
   padding: 6px 8px;
   cursor: pointer;
   color: inherit;
-  text-align: left;
+  text-align: start;
 }
 .bar-row:hover,
 .bar-row.active {
@@ -530,7 +530,7 @@ onMounted(load)
 }
 .bar-meta {
   font-size: 12px;
-  text-align: right;
+  text-align: end;
   color: var(--muted);
 }
 .model-table {
@@ -551,7 +551,7 @@ onMounted(load)
   background: rgba(99, 102, 241, 0.06);
 }
 .num {
-  text-align: right;
+  text-align: end;
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
 .num.credits {
@@ -657,5 +657,8 @@ onMounted(load)
 }
 .onboarding {
   margin-top: 24px;
+}
+.text-end {
+  text-align: end;
 }
 </style>

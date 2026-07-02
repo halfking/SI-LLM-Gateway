@@ -838,7 +838,7 @@ onUnmounted(() => {
 
         <div style="padding:8px 16px 0;display:flex;align-items:center;gap:8px">
           <SegTabs v-model="detailActiveTab" :tabs="detailTabs" />
-          <span class="cell-sub" style="margin-left:auto">
+          <span class="cell-sub cell-sub--push-end">
             {{ cm('drawer.credentialIdPrefix') }}<code class="mono-sm">{{ selectedCred.id }}</code>
           </span>
         </div>
@@ -931,7 +931,7 @@ onUnmounted(() => {
               <div class="model-list-panel">
                 <div class="drawer-section-title">
                   {{ cm('drawer.modelsTab.listTitle', { n: (selectedCred.models || []).length }) }}
-                  <span class="cell-sub" style="margin-left:8px;font-weight:400">{{ cm('drawer.modelsTab.clickHint') }}</span>
+                  <span class="cell-sub cell-hint-inline">{{ cm('drawer.modelsTab.clickHint') }}</span>
                 </div>
                 <div v-if="!(selectedCred.models || []).length" class="cell-muted" style="padding:12px">{{ cm('drawer.modelsTab.empty') }}</div>
                 <div v-else class="model-list">
@@ -1081,9 +1081,8 @@ onUnmounted(() => {
                 {{ cm('drawer.requestsTab.historySectionTitle') }}
                 <span v-if="historyEvents.length" class="cell-sub">({{ historyEvents.length }})</span>
                 <button
-                  class="btn btn-xs btn-ghost"
+                  class="btn btn-xs btn-ghost cell-sub--push-end"
                   :disabled="historyLoading || !selectedModel"
-                  style="margin-left:auto"
                   @click="loadHistory"
                 >{{ cm('drawer.requestsTab.historyRefresh') }}</button>
               </div>
@@ -1165,7 +1164,7 @@ onUnmounted(() => {
                       <td>
                         <span v-if="d.success" class="badge badge-green">✓</span>
                         <span v-else class="badge badge-red">✗</span>
-                        <span v-if="d.sticky_hit" class="badge badge-blue" style="margin-left:4px;font-size:9px">sticky</span>
+                        <span v-if="d.sticky_hit" class="badge badge-blue badge-sticky">sticky</span>
                       </td>
                       <td class="mono-sm">{{ d.latency_ms != null ? d.latency_ms + cm('drawer.requestsTab.msUnit') : '—' }}</td>
                       <td class="cell-sub" style="font-size:10px">{{ d.error_class || '—' }}</td>
@@ -1526,7 +1525,7 @@ onUnmounted(() => {
   font-size: 12px;
 }
 .model-table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   color: var(--muted);
@@ -1587,7 +1586,7 @@ onUnmounted(() => {
 /* Sliding window source tag */
 .source-tag {
   display: inline-block;
-  margin-left: 8px;
+  margin-inline-start: 8px;
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 10px;
@@ -1638,7 +1637,7 @@ onUnmounted(() => {
   border-collapse: collapse;
 }
 .history-table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   color: var(--muted);
   padding: 4px 6px;
@@ -1672,7 +1671,7 @@ onUnmounted(() => {
   margin-top: 8px;
 }
 .decision-table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   color: var(--muted);
   padding: 6px 8px;
@@ -1715,8 +1714,8 @@ onUnmounted(() => {
 
 /* 左侧：模型列表 */
 .model-list-panel {
-  border-right: 1px solid var(--border);
-  padding-right: 12px;
+  border-inline-end: 1px solid var(--border);
+  padding-inline-end: 12px;
 }
 .model-list {
   display: flex;
@@ -1783,7 +1782,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-right: 4px;
+  padding-inline-end: 4px;
 }
 .model-detail-panel.empty {
   align-items: center;
@@ -1932,5 +1931,17 @@ onUnmounted(() => {
   .model-stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+.cell-sub--push-end {
+  margin-inline-start: auto;
+}
+.cell-hint-inline {
+  margin-inline-start: 8px;
+  font-weight: 400;
+}
+.badge-sticky {
+  margin-inline-start: 4px;
+  font-size: 9px;
 }
 </style>

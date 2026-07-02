@@ -147,7 +147,7 @@ onMounted(load)
     >
       <h2 style="margin:0">
         {{ t('keys.applications.title') }}
-        <span v-if="pendingCount" class="badge badge-yellow" style="margin-left:8px;font-size:13px">
+        <span v-if="pendingCount" class="badge badge-yellow pending-count-badge">
           {{ pendingCount }}{{ t('keys.applications.pendingBadge') }}
         </span>
       </h2>
@@ -209,8 +209,7 @@ onMounted(load)
               <!-- Pending: approve / reject -->
               <template v-if="app.status === 'pending'">
                 <button
-                  class="btn btn-sm btn-primary"
-                  style="margin-right:6px"
+                  class="btn btn-sm btn-primary approve-btn-spacing"
                   @click="openReview(app, 'approve')"
                 >{{ t('keys.applications.action.approve') }}</button>
                 <button

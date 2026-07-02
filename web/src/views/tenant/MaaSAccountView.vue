@@ -181,8 +181,8 @@ onMounted(load)
             <th>时间</th>
             <th>类型</th>
             <th>池</th>
-            <th style="text-align:right">变动</th>
-            <th style="text-align:right">余额</th>
+            <th class="text-end">变动</th>
+            <th class="text-end">余额</th>
             <th>备注</th>
           </tr>
         </thead>
@@ -191,8 +191,8 @@ onMounted(load)
             <td class="mono">{{ fmtTime(e.created_at) }}</td>
             <td>{{ ledgerTypeLabel(e.entry_type) }}</td>
             <td>{{ poolLabel(e.pool) }}</td>
-            <td class="mono" style="text-align:right">{{ e.amount > 0 ? '+' : '' }}{{ fmtCredits(e.amount) }}</td>
-            <td class="mono" style="text-align:right">{{ fmtCredits(e.balance_after) }}</td>
+            <td class="mono text-end">{{ e.amount > 0 ? '+' : '' }}{{ fmtCredits(e.amount) }}</td>
+            <td class="mono text-end">{{ fmtCredits(e.balance_after) }}</td>
             <td>{{ e.note || '—' }}</td>
           </tr>
         </tbody>
@@ -207,6 +207,7 @@ onMounted(load)
 </template>
 
 <style scoped>
+.text-end { text-align: end; }
 .page-header-actions {
   display: flex;
   align-items: center;

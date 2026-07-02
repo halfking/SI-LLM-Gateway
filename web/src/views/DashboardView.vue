@@ -353,7 +353,7 @@ function scheduleProbeFailuresPoll() {
       <div class="stat-card" v-if="compStats">
         <div class="label">
           {{ t('dashboard.compression.title') }}
-          <span class="badge" style="font-size:9px;margin-left:4px">24h</span>
+          <span class="badge ml-4 fs-9">24h</span>
         </div>
         <div class="value">
           {{ compStats.compressed_total }}
@@ -386,9 +386,9 @@ function scheduleProbeFailuresPoll() {
             <th>{{ t('dashboard.table.colKey') }}</th>
             <th>{{ t('dashboard.table.colApplication') }}</th>
             <th>{{ t('dashboard.table.colOwner') }}</th>
-            <th style="text-align:right">{{ t('dashboard.table.colRequests') }}</th>
-            <th style="text-align:right">{{ t('dashboard.table.colTokens') }}</th>
-            <th style="text-align:right">{{ t('dashboard.table.colCost') }}</th>
+            <th class="text-end">{{ t('dashboard.table.colRequests') }}</th>
+            <th class="text-end">{{ t('dashboard.table.colTokens') }}</th>
+            <th class="text-end">{{ t('dashboard.table.colCost') }}</th>
             <th>{{ t('dashboard.table.colLastUsed') }}</th>
           </tr>
         </thead>
@@ -397,9 +397,9 @@ function scheduleProbeFailuresPoll() {
             <td><code style="font-size:12px">{{ k.key_prefix ?? '—' }}***</code></td>
             <td>{{ k.application_code ?? '—' }}</td>
             <td>{{ k.owner_user ?? '—' }}</td>
-            <td style="text-align:right">{{ fmt(k.request_count) }}</td>
-            <td style="text-align:right">{{ fmt(k.total_tokens) }}</td>
-            <td style="text-align:right">{{ fmtCost(k.total_cost_usd) }}</td>
+            <td class="text-end">{{ fmt(k.request_count) }}</td>
+            <td class="text-end">{{ fmt(k.total_tokens) }}</td>
+            <td class="text-end">{{ fmtCost(k.total_cost_usd) }}</td>
             <td>{{ fmtDate(k.last_used_at) }}</td>
           </tr>
         </tbody>
@@ -415,18 +415,18 @@ function scheduleProbeFailuresPoll() {
           <tr>
             <th>{{ t('dashboard.table.colModel') }}</th>
             <th>{{ t('dashboard.table.colProvider') }}</th>
-            <th style="text-align:right">{{ t('dashboard.table.colRequests') }}</th>
-            <th style="text-align:right">{{ t('dashboard.table.colTokens') }}</th>
-            <th style="text-align:right">{{ t('dashboard.table.colCost') }}</th>
+            <th class="text-end">{{ t('dashboard.table.colRequests') }}</th>
+            <th class="text-end">{{ t('dashboard.table.colTokens') }}</th>
+            <th class="text-end">{{ t('dashboard.table.colCost') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="m in models" :key="m.model">
             <td><code style="font-size:12px">{{ m.model }}</code></td>
             <td><span class="badge badge-blue">{{ m.provider_code }}</span></td>
-            <td style="text-align:right">{{ fmt(m.total_requests) }}</td>
-            <td style="text-align:right">{{ fmt(m.total_tokens) }}</td>
-            <td style="text-align:right">{{ fmtCost(m.total_cost_usd) }}</td>
+            <td class="text-end">{{ fmt(m.total_requests) }}</td>
+            <td class="text-end">{{ fmt(m.total_tokens) }}</td>
+            <td class="text-end">{{ fmtCost(m.total_cost_usd) }}</td>
           </tr>
         </tbody>
       </table>
@@ -443,6 +443,10 @@ function scheduleProbeFailuresPoll() {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
+}
+
+.text-end {
+  text-align: end;
 }
 
 .tenant-badge {
@@ -496,7 +500,7 @@ function scheduleProbeFailuresPoll() {
 
 .dashboard-fail-link {
   display: inline-block;
-  margin-left: 8px;
+  margin-inline-start: 8px;
   font-size: 12px;
   color: var(--warning);
   text-decoration: underline;

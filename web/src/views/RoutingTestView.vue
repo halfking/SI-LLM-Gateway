@@ -315,7 +315,7 @@ function dateWindow(c: RoutingCandidate): string {
               </div>
               <div v-else style="cursor:pointer" @click="startEditPriority(c.credential_id, getScoreBreakdown(c.credential_id)?.manual_priority ?? c.manual_priority ?? 99)">
                 <span style="font-weight:600">{{ getScoreBreakdown(c.credential_id)?.manual_priority ?? c.manual_priority ?? 99 }}</span>
-                <span class="cell-muted" style="font-size:10px;margin-left:4px">✎</span>
+                <span class="cell-muted edit-pencil">✎</span>
               </div>
             </td>
             <td>{{ priceLabel(c) }}</td>
