@@ -77,6 +77,22 @@ CREATE OR REPLACE PROCEDURE public._999_copy_batch(
     IN p_lim int,
     IN p_off bigint
 )
+LANGUAGE plpgsql AS $$
+DECLARE
+    inserted int;
+BEGIN
+    -- Force chunk_group_row_limit = 1000 (min allowed) for THIS transaction
+    -- so the columnar writer flushes after every INSERT and never accumulates
+    -- >1000 rows worth of in-memory TupleDesc.
+    PERFORM set_config('columnar.chunk_group_row_limit', '1000', true);
+    EXECUTE format(
+        'INSERT INTO %I SELECT * FROM %I ORDER BY 1 LIMIT %s OFFSET %s',
+        p_dst, p_src, p_lim, p_off
+    );
+    GET DIAGNOSTICS inserted = ROW_COUNT;
+    RAISE NOTICE '[999] batch % offset=% rows=%', p_dst, p_off, inserted;
+END;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- 0b. Fix the database-level columnar enforcement policy.
@@ -98,22 +114,6 @@ CREATE OR REPLACE FUNCTION public.columnar_insert_only_parents()
     STABLE
 AS $$
     SELECT ARRAY['routing_decision_log']::text[];
-$$;
-LANGUAGE plpgsql AS $$
-DECLARE
-    inserted int;
-BEGIN
-    -- Force chunk_group_row_limit = 1000 (min allowed) for THIS transaction
-    -- so the columnar writer flushes after every INSERT and never accumulates
-    -- >1000 rows worth of in-memory TupleDesc.
-    PERFORM set_config('columnar.chunk_group_row_limit', '1000', true);
-    EXECUTE format(
-        'INSERT INTO %I SELECT * FROM %I ORDER BY 1 LIMIT %s OFFSET %s',
-        p_dst, p_src, p_lim, p_off
-    );
-    GET DIAGNOSTICS inserted = ROW_COUNT;
-    RAISE NOTICE '[999] batch % offset=% rows=%', p_dst, p_off, inserted;
-END;
 $$;
 
 -- 1b. Procedure: orchestrates the full heap -> columnar conversion for
