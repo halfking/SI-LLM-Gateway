@@ -378,9 +378,21 @@ func (e *Executor) prepareAnthropicRequestBody(params *ExecParams, cand provider
 		}
 		// Override model to outbound model (matching existing behavior)
 		irReq.Model = resolveOutboundModel(params, cand)
-		// Set target provider for provider-specific protocol adaptations
-		// (e.g., MiniMax uses "tool_call_id" instead of "tool_use_id")
-		irReq.TargetProvider = cand.CatalogCode
+		// Apply provider-specific adaptations via the adapter framework.
+		// The adapter stamps TargetProvider, adjusts default params, and
+		// handles tool_call_id vs tool_use_id differences.
+		// Fallback: when no AdapterFactory is wired, set TargetProvider
+		// directly from the catalog code (backward-compatible with the
+		// original MiniMax fix).
+		if e.AdapterFactory != nil {
+			pa := e.AdapterFactory.GetOrDefault(cand.CatalogCode, cand.Protocol)
+			irReq, err = pa.AdaptRequest(irReq)
+			if err != nil {
+				return nil, fmt.Errorf("adapter adapt request: %w", err)
+			}
+		} else if irReq.TargetProvider == "" {
+			irReq.TargetProvider = cand.CatalogCode
+		}
 		bodyBytes, err := e.IR.SerializeAnthropic(irReq)
 		if err != nil {
 			return nil, fmt.Errorf("ir serialize anthropic: %w", err)

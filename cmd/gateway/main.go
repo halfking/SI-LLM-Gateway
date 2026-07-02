@@ -42,6 +42,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/db"
 	"github.com/kaixuan/llm-gateway-go/discovery"
 	"github.com/kaixuan/llm-gateway-go/disguise"
+	"github.com/kaixuan/llm-gateway-go/internal/adapter"
 	"github.com/kaixuan/llm-gateway-go/internal/ir"
 	"github.com/kaixuan/llm-gateway-go/internal/modelpolicy"
 	"github.com/kaixuan/llm-gateway-go/internal/observability"
@@ -509,6 +510,14 @@ func main() {
 			routingExec.IR = &irAdapter{}
 			slog.Info("ir_converter", "enabled", true)
 		}
+
+		// Provider Adapter Factory (2026-07-02): resolves provider-specific
+		// protocol adaptations (tool_call_id vs tool_use_id, default params,
+		// etc.) via the internal/adapter package. Always wired — it's a
+		// no-op for standard providers and only activates for providers with
+		// known quirks (MiniMax, etc.).
+		routingExec.AdapterFactory = adapter.NewFactory()
+		slog.Info("adapter_factory", "registered", len(routingExec.AdapterFactory.Names()), "adapters", routingExec.AdapterFactory.Names())
 
 		// Q3 streaming: openai client -> anthropic upstream. Translates
 		// Anthropic SSE chunks to OpenAI SSE chunks so the OpenAI parser

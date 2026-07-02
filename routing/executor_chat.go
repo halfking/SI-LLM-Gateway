@@ -809,6 +809,18 @@ func (e *Executor) finalizeOpenAIUpstreamBody(params *ExecParams, cand provider.
 		}
 		// Override model to outbound model (matching existing behavior)
 		irReq.Model = resolveOutboundModel(params, cand)
+		// Apply provider-specific adaptations via the adapter framework.
+		// Even on the OpenAI-outbound path, providers like DeepSeek/Qwen
+		// may need parameter adjustments (max_tokens clamping, etc.).
+		if e.AdapterFactory != nil {
+			pa := e.AdapterFactory.GetOrDefault(cand.CatalogCode, cand.Protocol)
+			irReq, err = pa.AdaptRequest(irReq)
+			if err != nil {
+				return nil, fmt.Errorf("adapter adapt request: %w", err)
+			}
+		} else if irReq.TargetProvider == "" {
+			irReq.TargetProvider = cand.CatalogCode
+		}
 		bodyBytes, err := e.IR.SerializeOpenAI(irReq)
 		if err != nil {
 			return nil, fmt.Errorf("ir serialize openai: %w", err)
