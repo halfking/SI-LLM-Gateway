@@ -89,6 +89,10 @@ func main() {
 	var weeklyPeakRollup *bg.WeeklyPeakRollup
 	var slotSuggester *bg.SlotSuggester
 	var autoIndexRefresher *bg.AutoIndexRefresher
+	// v737 audit C1: held at function scope so the shutdown sequence
+	// (line 1648) can Stop() the LISTEN goroutine + debounce workers
+	// to avoid leaking the long-lived pgxpool conn on every restart.
+	var autoRouteListener *bg.AutoRouteRealtimeListener
 	var telemetryArchiver *bg.TelemetryArchiver
 	// memoraSink is the async write buffer for Memora persistence.
 	// Declared at the top so both the executor wiring and the
@@ -1248,7 +1252,7 @@ func main() {
 			// incident (request a69a71a05e6610adcf55df32f2618797) where
 			// the autoroute.Index refreshed but the hot-path cache kept
 			// returning the stale empty list for up to 30s.
-			autoRouteListener := bg.NewAutoRouteRealtimeListener(dbConn.Pool(), autoIndexRefresher, provider.InvalidateAllCandidateCache)
+			autoRouteListener = bg.NewAutoRouteRealtimeListener(dbConn.Pool(), autoIndexRefresher, provider.InvalidateAllCandidateCache)
 			autoRouteListener.Start(context.Background())
 
 			// v2.1 (P7.5): TuningViewRefresher keeps the materialised
@@ -1641,6 +1645,17 @@ func main() {
 	}
 	if autoIndexRefresher != nil {
 		autoIndexRefresher.Stop()
+	}
+	// v737 audit C1: close the LISTEN goroutine + debounce workers
+	// held by the auto_route realtime listener. Without this Stop()
+	// call, every container restart leaks a long-lived pgxpool conn
+	// (used by LISTEN) and the debounce goroutine stays alive until
+	// process exit. See docs/DEPLOYMENT_REPORT_v737_final_audit.md.
+	if autoRouteListener != nil {
+		autoRouteListener.Stop()
+	}
+	if healthAutoRecover != nil {
+		healthAutoRecover.Stop()
 	}
 	if telemetryArchiver != nil {
 		telemetryArchiver.Stop()
