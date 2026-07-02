@@ -479,7 +479,7 @@ async function toggleManualDisabled() {
       try {
         await setCredentialManualDisabled(props.provider.id, c.id, next, reason.trim())
         c.manual_disabled = next
-        emit('refresh')
+        emit('silentRefresh')
       } catch (e: unknown) {
         alert(e instanceof Error ? e.message : pd('creds.setFailed'))
       }
@@ -495,7 +495,7 @@ async function setLifecycle(value: string) {
   try {
     await updateCredentialLifecycle(props.provider.id, c.id, value)
     c.lifecycle_status = value as 'active' | 'disabled' | 'suspended' | 'retired' | null
-    emit('refresh')
+    emit('silentRefresh')
   } catch (e: unknown) {
     alert(e instanceof Error ? e.message : pd('creds.lifecycleFailed'))
   }
@@ -528,7 +528,7 @@ async function resetAvailability() {
   if (!c || !confirm(pd('creds.resetAvailConfirm', { name: c.label }))) return
   try {
     await resetCredentialAvailability(props.provider.id, c.id)
-    emit('refresh')
+    emit('silentRefresh')
   } catch (e: unknown) {
     alert(e instanceof Error ? e.message : pd('creds.resetFailed'))
   }
@@ -539,7 +539,7 @@ async function resetQuota() {
   if (!c || !confirm(pd('creds.resetQuotaConfirm', { name: c.label }))) return
   try {
     await resetCredentialQuota(props.provider.id, c.id)
-    emit('refresh')
+    emit('silentRefresh')
   } catch (e: unknown) {
     alert(e instanceof Error ? e.message : pd('creds.resetFailed'))
   }
@@ -550,7 +550,7 @@ async function forceRecover() {
   if (!c || !confirm(pd('creds.forceRecoverConfirm', { name: c.label }))) return
   try {
     await forceRecoverCredential(c.id)
-    emit('refresh')
+    emit('silentRefresh')
   } catch (e: unknown) {
     alert(e instanceof Error ? e.message : pd('creds.triggerFailed'))
   }
@@ -563,7 +563,7 @@ async function setDefaultModel() {
   if (v === null) return
   try {
     await setDefaultProbeModel(props.provider.id, c.id, v === '' ? null : v, 'admin UI set')
-    emit('refresh')
+    emit('silentRefresh')
   } catch (e: unknown) {
     alert(e instanceof Error ? e.message : pd('creds.setFailed'))
   }
@@ -579,7 +579,7 @@ async function repickDefault() {
     } else {
       alert(pd('creds.defaultProbeModelPicked', { model: r.model, source: r.source }))
     }
-    emit('refresh')
+    emit('silentRefresh')
   } catch (e: unknown) {
     alert(e instanceof Error ? e.message : pd('creds.repickFailed'))
   }
@@ -592,7 +592,7 @@ async function resetFpSlots() {
     const r = await resetCredentialFpSlots(props.provider.id, c.id)
     alert(pd('creds.resetFpSlotsOk', { slots: r.deleted_slots, pins: r.deleted_pins }))
     fpSlotStats.value = null
-    emit('refresh')
+    emit('silentRefresh')
   } catch (e: unknown) {
     alert(e instanceof Error ? e.message : pd('creds.resetFpSlotsFailed'))
   }
