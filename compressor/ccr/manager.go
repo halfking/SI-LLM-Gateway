@@ -44,13 +44,27 @@ func NewManager(config Config, redisClient *redis.Client, db *sql.DB) (*Manager,
 		}
 	}
 
+	// Start background metrics updater (updates Prometheus gauges every 10s)
+	go m.metricsUpdater()
+
 	return m, nil
+}
+
+// metricsUpdater runs in the background and periodically updates Prometheus gauge metrics.
+func (m *Manager) metricsUpdater() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		m.UpdateMetrics()
+	}
 }
 
 // Put stores data in all enabled cache tiers.
 func (m *Manager) Put(ctx context.Context, hash string, data []byte, sessionID string) error {
 	metrics := m.getMetrics()
 	atomic.AddInt64(&metrics.PutTotal, 1)
+	RecordPut()
 
 	// L1: sync.Map
 	if m.config.L1Enabled && m.l1Cache != nil {
@@ -63,6 +77,7 @@ func (m *Manager) Put(ctx context.Context, hash string, data []byte, sessionID s
 		if err := m.l2Redis.Set(ctx, key, data, m.config.L2TTL).Err(); err != nil {
 			slog.Warn("ccr: L2 put failed", "hash", hash, "error", err)
 			atomic.AddInt64(&metrics.Errors, 1)
+			RecordError()
 		}
 	}
 
@@ -82,6 +97,7 @@ func (m *Manager) Put(ctx context.Context, hash string, data []byte, sessionID s
 		if err != nil {
 			slog.Warn("ccr: L3 put failed", "hash", hash, "error", err)
 			atomic.AddInt64(&metrics.Errors, 1)
+			RecordError()
 		}
 	}
 
@@ -104,6 +120,7 @@ func (m *Manager) Get(ctx context.Context, hash string) ([]byte, error) {
 func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]byte, error) {
 	metrics := m.getMetrics()
 	atomic.AddInt64(&metrics.GetTotal, 1)
+	RecordGet()
 
 	// SECURITY: When sessionID is provided, we MUST enforce session isolation.
 	// L1 and L2 don't store sessionID, so they can't validate ownership.
@@ -125,14 +142,17 @@ func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]
 		}
 		if err != nil {
 			atomic.AddInt64(&metrics.Errors, 1)
+			RecordError()
 			return nil, fmt.Errorf("ccr: L3 get failed: %w", err)
 		}
 		if rowSessionID != sessionID {
 			// Treat as not-found rather than leaking that the hash exists.
 			atomic.AddInt64(&metrics.Errors, 1)
+			RecordError()
 			return nil, ErrUnauthorized
 		}
 		atomic.AddInt64(&metrics.L3Hits, 1)
+		RecordCacheHit("L3")
 		// Backfill L1 (content only; future unscoped lookups can use it)
 		if m.config.L1Enabled && m.l1Cache != nil {
 			m.l1Cache.Store(hash, data)
@@ -145,9 +165,11 @@ func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]
 	if m.config.L1Enabled && m.l1Cache != nil {
 		if val, ok := m.l1Cache.Load(hash); ok {
 			atomic.AddInt64(&metrics.L1Hits, 1)
+			RecordCacheHit("L1")
 			return val.([]byte), nil
 		}
 		atomic.AddInt64(&metrics.L1Misses, 1)
+		RecordCacheMiss("L1")
 	}
 
 	// L2: Redis
@@ -156,6 +178,7 @@ func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]
 		data, err := m.l2Redis.Get(ctx, key).Bytes()
 		if err == nil {
 			atomic.AddInt64(&metrics.L2Hits, 1)
+			RecordCacheHit("L2")
 			// Backfill L1
 			if m.config.L1Enabled && m.l1Cache != nil {
 				m.l1Cache.Store(hash, data)
@@ -165,8 +188,10 @@ func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]
 		if err != redis.Nil {
 			slog.Warn("ccr: L2 get failed", "hash", hash, "error", err)
 			atomic.AddInt64(&metrics.Errors, 1)
+			RecordError()
 		}
 		atomic.AddInt64(&metrics.L2Misses, 1)
+		RecordCacheMiss("L2")
 	}
 
 	// L3: PostgreSQL
@@ -176,6 +201,7 @@ func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]
 		err := m.l3DB.QueryRowContext(ctx, query, hash).Scan(&data)
 		if err == nil {
 			atomic.AddInt64(&metrics.L3Hits, 1)
+			RecordCacheHit("L3")
 			// Backfill L2 and L1
 			if m.config.L2Enabled && m.l2Redis != nil {
 				key := m.config.L2Prefix + hash
@@ -194,8 +220,10 @@ func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]
 		if err != sql.ErrNoRows {
 			slog.Warn("ccr: L3 get failed", "hash", hash, "error", err)
 			atomic.AddInt64(&metrics.Errors, 1)
+			RecordError()
 		}
 		atomic.AddInt64(&metrics.L3Misses, 1)
+		RecordCacheMiss("L3")
 	}
 
 	return nil, fmt.Errorf("%w: %s", ErrNotFound, hash)
