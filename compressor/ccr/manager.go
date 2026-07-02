@@ -89,8 +89,48 @@ func (m *Manager) Put(ctx context.Context, hash string, data []byte, sessionID s
 
 // Get retrieves data from cache tiers (L1 → L2 → L3).
 func (m *Manager) Get(ctx context.Context, hash string) ([]byte, error) {
+	return m.GetForSession(ctx, hash, "")
+}
+
+// GetForSession retrieves CCR data, optionally scoping to a sessionID.
+// When sessionID is non-empty, the call is rejected (returns ErrUnauthorized)
+// unless the stored row's session_id matches. This prevents a session from
+// retrieving data from a different session just by guessing the hash.
+//
+// L1/L2 caches are shared across sessions and do not carry session
+// metadata — only L3 enforces the sessionID match. Callers that need
+// strict isolation MUST use this function (never Get).
+func (m *Manager) GetForSession(ctx context.Context, hash, sessionID string) ([]byte, error) {
 	metrics := m.getMetrics()
 	atomic.AddInt64(&metrics.GetTotal, 1)
+
+	// L3 first when sessionID is set: L1/L2 don't carry sessionID, so
+	// they can't satisfy a scoped lookup. Read straight from PG, then
+	// backfill L1.
+	if sessionID != "" && m.config.L3Enabled && m.l3DB != nil {
+		query := `SELECT data, session_id FROM ccr_cache WHERE hash = $1`
+		var data []byte
+		var rowSessionID string
+		err := m.l3DB.QueryRowContext(ctx, query, hash).Scan(&data, &rowSessionID)
+		if err == sql.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		if err != nil {
+			atomic.AddInt64(&metrics.Errors, 1)
+			return nil, fmt.Errorf("ccr: L3 get failed: %w", err)
+		}
+		if rowSessionID != sessionID {
+			// Treat as not-found rather than leaking that the hash exists.
+			atomic.AddInt64(&metrics.Errors, 1)
+			return nil, ErrUnauthorized
+		}
+		atomic.AddInt64(&metrics.L3Hits, 1)
+		// Backfill L1 (session-agnostic; the row is content-only).
+		if m.config.L1Enabled && m.l1Cache != nil {
+			m.l1Cache.Store(hash, data)
+		}
+		return data, nil
+	}
 
 	// L1: sync.Map
 	if m.config.L1Enabled && m.l1Cache != nil {
@@ -149,7 +189,7 @@ func (m *Manager) Get(ctx context.Context, hash string) ([]byte, error) {
 		atomic.AddInt64(&metrics.L3Misses, 1)
 	}
 
-	return nil, fmt.Errorf("ccr: hash not found: %s", hash)
+	return nil, fmt.Errorf("%w: %s", ErrNotFound, hash)
 }
 
 // Delete removes data from all cache tiers.

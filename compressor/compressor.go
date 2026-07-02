@@ -42,6 +42,8 @@ import (
 //   ModeDeltaOnly     (3)  → v4: only delta-append, no compression
 //   ModeSmart         (4)  → v4: intelligent (strip + task-analysis + summary)
 //   ModeAggressive    (5)  → v4: always strip + compress when possible
+//   ModeHeadroom      (6)  → v4: Headroom JSON-array compression (lossless path)
+//   ModeHeadroomAggressive (7) → v4: Headroom + lossy when savings cross threshold
 type Mode int
 
 const (
@@ -51,6 +53,8 @@ const (
 	ModeDeltaOnly
 	ModeSmart
 	ModeAggressive
+	ModeHeadroom
+	ModeHeadroomAggressive
 )
 
 // String implements fmt.Stringer for logging / metrics labels.
@@ -68,6 +72,10 @@ func (m Mode) String() string {
 		return "smart"
 	case ModeAggressive:
 		return "aggressive"
+	case ModeHeadroom:
+		return "headroom"
+	case ModeHeadroomAggressive:
+		return "headroom_aggressive"
 	default:
 		return fmt.Sprintf("unknown(%d)", int(m))
 	}
@@ -77,7 +85,8 @@ func (m Mode) String() string {
 // Falls back to ModeSmart (v4 default) on parse error or unset.
 //
 // 0 → ModeOff, 1 → ModeAutoThreshold, 2 → ModeOn4xx,
-// 3 → ModeDeltaOnly, 4 → ModeSmart, 5 → ModeAggressive.
+// 3 → ModeDeltaOnly, 4 → ModeSmart, 5 → ModeAggressive,
+// 6 → ModeHeadroom, 7 → ModeHeadroomAggressive.
 func envMode() Mode {
 	raw := strings.TrimSpace(os.Getenv("LLM_GATEWAY_COMPRESSION_MODE"))
 	if raw == "" {
@@ -96,6 +105,10 @@ func envMode() Mode {
 		return ModeSmart
 	case "5":
 		return ModeAggressive
+	case "6":
+		return ModeHeadroom
+	case "7":
+		return ModeHeadroomAggressive
 	default:
 		return ModeSmart
 	}
@@ -125,6 +138,10 @@ func LoadMode() Mode {
 						return ModeSmart
 					case "aggressive":
 						return ModeAggressive
+					case "headroom":
+						return ModeHeadroom
+					case "headroom_aggressive":
+						return ModeHeadroomAggressive
 					}
 				}
 			}
