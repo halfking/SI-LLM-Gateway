@@ -1,25 +1,28 @@
 package admin
 
 import (
+	"os"
+	"regexp"
+	"strings"
 	"testing"
 )
 
 // TestDeriveModelEffectiveState_PriorityOrder covers the 5-state priority chain.
 // Priority (first match wins):
-//   1. credentialManualDisabled (整凭据被禁用) -> "manual_disabled"
-//   2. binding_unavailable_reason == "manual_offline" -> "manual_disabled"
-//   3. probe_state == "broken_confirmed" -> "probe_broken"
-//   4. offer_available == false -> "offer_missing"
-//   5. binding_available == false -> "binding_missing"
-//   6. default -> "available"
+//  1. credentialManualDisabled (整凭据被禁用) -> "manual_disabled"
+//  2. binding_unavailable_reason == "manual_offline" -> "manual_disabled"
+//  3. probe_state == "broken_confirmed" -> "probe_broken"
+//  4. offer_available == false -> "offer_missing"
+//  5. binding_available == false -> "binding_missing"
+//  6. default -> "available"
 func TestDeriveModelEffectiveState_PriorityOrder(t *testing.T) {
 	mkStr := func(s string) *string { return &s }
 
 	tests := []struct {
-		name                    string
-		ms                      *CredentialModelStatus
+		name                     string
+		ms                       *CredentialModelStatus
 		credentialManualDisabled bool
-		want                    string
+		want                     string
 	}{
 		{
 			name: "整凭据 manual_disabled 优先级最高",
@@ -29,7 +32,7 @@ func TestDeriveModelEffectiveState_PriorityOrder(t *testing.T) {
 				ProbeState:       "broken_confirmed",
 			},
 			credentialManualDisabled: true,
-			want:                    "manual_disabled",
+			want:                     "manual_disabled",
 		},
 		{
 			name: "per-model manual_offline 优先级高于 probe_broken",
@@ -40,7 +43,7 @@ func TestDeriveModelEffectiveState_PriorityOrder(t *testing.T) {
 				ProbeState:               "broken_confirmed",
 			},
 			credentialManualDisabled: false,
-			want:                    "manual_disabled",
+			want:                     "manual_disabled",
 		},
 		{
 			name: "probe_broken 优先级高于 offer_missing",
@@ -50,7 +53,7 @@ func TestDeriveModelEffectiveState_PriorityOrder(t *testing.T) {
 				ProbeState:       "broken_confirmed",
 			},
 			credentialManualDisabled: false,
-			want:                    "probe_broken",
+			want:                     "probe_broken",
 		},
 		{
 			name: "offer_missing",
@@ -60,7 +63,7 @@ func TestDeriveModelEffectiveState_PriorityOrder(t *testing.T) {
 				ProbeState:       "healthy_confirmed",
 			},
 			credentialManualDisabled: false,
-			want:                    "offer_missing",
+			want:                     "offer_missing",
 		},
 		{
 			name: "binding_missing",
@@ -71,7 +74,7 @@ func TestDeriveModelEffectiveState_PriorityOrder(t *testing.T) {
 				ProbeState:               "healthy_confirmed",
 			},
 			credentialManualDisabled: false,
-			want:                    "binding_missing",
+			want:                     "binding_missing",
 		},
 		{
 			name: "available 全部正常",
@@ -81,7 +84,7 @@ func TestDeriveModelEffectiveState_PriorityOrder(t *testing.T) {
 				ProbeState:       "healthy_confirmed",
 			},
 			credentialManualDisabled: false,
-			want:                    "available",
+			want:                     "available",
 		},
 		{
 			name: "probe unknown + binding 缺失 = binding_missing (probe 不参与后 3 档)",
@@ -92,7 +95,7 @@ func TestDeriveModelEffectiveState_PriorityOrder(t *testing.T) {
 				ProbeState:               "unknown",
 			},
 			credentialManualDisabled: false,
-			want:                    "binding_missing",
+			want:                     "binding_missing",
 		},
 	}
 
@@ -185,5 +188,56 @@ func TestHumanizeDisabledReason(t *testing.T) {
 func TestMonitorSummarySchemaVersion_NotZero(t *testing.T) {
 	if monitorSummarySchemaVersion == 0 {
 		t.Fatalf("monitorSummarySchemaVersion must be > 0; cache key would not differentiate schemas")
+	}
+}
+
+// TestMonitorSummarySchemaVersion_AtLeast5 pins the schema-version floor at 5.
+// Version 5 (2026-07-03) added the bucket-pushed LATERAL cmi predicate and
+// the empty-result cache guard. If a future refactor resets the version
+// below 5, in-flight cached responses from the previous schema would be
+// served and silently include stale p95 data.
+func TestMonitorSummarySchemaVersion_AtLeast5(t *testing.T) {
+	if monitorSummarySchemaVersion < 5 {
+		t.Fatalf("monitorSummarySchemaVersion must be >= 5; got %d", monitorSummarySchemaVersion)
+	}
+}
+
+// TestMonitorSummary_HasBucketPredicate guards the 2026-07-03 P0 fix:
+// handleMonitorSummary must push down `bucket > NOW() - INTERVAL '10 minutes'`
+// on the credential_model_index LATERAL join. Without the predicate, the
+// planner picks a citus_columnar ColumnarScan and the query blows past the
+// 15s ctx timeout, returning an empty cached result. The predicate forces
+// the planner to use the (bucket, credential_id, raw_model) btree index.
+func TestMonitorSummary_HasBucketPredicate(t *testing.T) {
+	src, err := os.ReadFile("credential_monitor.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	wantSubstr := "bucket > NOW() - INTERVAL '10 minutes'"
+	if !strings.Contains(string(src), wantSubstr) {
+		t.Fatalf("credential_monitor.go must contain %q so the planner uses the "+
+			"(bucket, credential_id, raw_model) btree index instead of the "+
+			"citus_columnar ColumnarScan. See ce16dbc1.", wantSubstr)
+	}
+}
+
+// TestMonitorSummary_DoesNotCacheEmpty guards the 2026-07-03 P0 fix:
+// handleMonitorSummary must not cache empty results. If the query hits the
+// 15s ctx timeout (or any transient DB blip) and returns zero rows, caching
+// the empty array would lock the UI on "no credentials" for 30s — exactly
+// the symptom reported on /routing-v2/credentials.
+func TestMonitorSummary_DoesNotCacheEmpty(t *testing.T) {
+	src, err := os.ReadFile("credential_monitor.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	body := string(src)
+
+	// The guard must check `len(summaries) > 0` (or equivalent) BEFORE the
+	// monitorSummaryCache.set call.
+	guardPattern := regexp.MustCompile(`if\s+len\(summaries\)\s*>\s*0\s*\{[^}]*monitorSummaryCache\.set`)
+	if !guardPattern.MatchString(body) {
+		t.Fatalf("credential_monitor.go must guard monitorSummaryCache.set with " +
+			"`if len(summaries) > 0 {` so empty results are not cached. See ce16dbc1.")
 	}
 }
