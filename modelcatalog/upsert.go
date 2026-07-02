@@ -27,7 +27,14 @@ func UpsertCredentialModel(ctx context.Context, db *pgxpool.Pool, credentialID i
 
 const upsertCredentialModelSQL = `
 WITH cred AS (
-    SELECT provider_id FROM credentials WHERE id = $1
+    -- 2026-07-03 (request a69a71a05e6610adcf55df32f2618797 follow-up):
+    -- also pull plan_type so a brand-new cmb row derives its billing_mode
+    -- from the credential's subscription plan. Without this the cmb row
+    -- falls back to the column DEFAULT 'per_token' (see
+    -- deploy/sql/objects/tables/public.credential_model_bindings.sql),
+    -- and v_routable_credential_models rule 8 then marks the binding
+    -- non-routable with reason 'plan_incompatible_model_requires_per_token'.
+    SELECT id, provider_id, plan_type FROM credentials WHERE id = $1
 ),
 upsert_pm AS (
     INSERT INTO provider_models (provider_id, raw_model_name, canonical_id, standardized_name, available, last_seen_at)
@@ -43,9 +50,23 @@ upsert_pm AS (
 INSERT INTO credential_model_bindings (
     credential_id, provider_model_id, available,
     routing_tier, weight, manual_priority,
-    success_rate, p95_latency_ms
+    success_rate, p95_latency_ms,
+    -- Derive billing_mode from the credential's plan_type on INSERT.
+    --   token_plan -> 'token_plan', code_plan -> 'code_plan',
+    --   agent_plan -> 'agent_plan', else 'token' (non-subscription).
+    -- The cmb column DEFAULT 'per_token' would otherwise fire and
+    -- trigger the v_routable_credential_models plan_incompatible branch.
+    billing_mode
 )
-SELECT $1, upsert_pm.id, TRUE, 2, 100, 99, 0.9, 0 FROM upsert_pm
+SELECT
+    $1, upsert_pm.id, TRUE, 2, 100, 99, 0.9, 0,
+    CASE cred.plan_type
+        WHEN 'token_plan' THEN 'token_plan'
+        WHEN 'code_plan'  THEN 'code_plan'
+        WHEN 'agent_plan' THEN 'agent_plan'
+        ELSE 'token'
+    END
+FROM upsert_pm, cred
 ON CONFLICT (credential_id, provider_model_id) DO UPDATE SET
     updated_at = NOW(),
     available = CASE
@@ -77,6 +98,9 @@ ON CONFLICT (credential_id, provider_model_id) DO UPDATE SET
         THEN credential_model_bindings.unavailable_at
         ELSE NULL
     END
+    -- NOTE: do NOT touch billing_mode on UPDATE — the one-time
+    -- fix_cmb-billing-mode-for-plan-creds.sql migration sets it from the
+    -- credential plan, and admin/pricing paths can override it afterwards.
 `
 
 // ClearProviderBindings hard-deletes all credential_model_bindings for a
