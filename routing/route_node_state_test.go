@@ -65,7 +65,6 @@ func TestRouteNodeState_ConsecutiveFailureStreak_Basic(t *testing.T) {
 func TestRouteNodeState_Streak_ResetAfterSuccess(t *testing.T) {
 	s := newTestState(1, "minimax-m3")
 	cfg := DefaultRouteNodeConfig()
-	now := time.Now()
 
 	// F-F-F-F-F 然后 S
 

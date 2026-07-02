@@ -33,6 +33,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kaixuan/llm-gateway-go/provider"
 )
 
 func (h *Handler) handleProviderModelOffer(w http.ResponseWriter, r *http.Request, providerID int, offerPath string) {
@@ -428,6 +430,13 @@ func (h *Handler) setProviderManualDisabled(w http.ResponseWriter, r *http.Reque
 		VALUES ('admin', $1, 0, $2, '', $3, $4)
 	`, action, providerID, reasonCode, actorCopy+": "+reqCopy.Reason)
 
+	// 2026-07-02 bug fix: provider.Client.candCache holds candidate lists for
+	// 30s; without invalidation, traffic keeps hitting the just-disabled
+	// provider's credentials until the cache TTL expires. Same for the
+	// /api/routing/available-models endpoint cache used by the admin UI.
+	provider.InvalidateAllCandidateCache()
+	InvalidateAvailableModelsCache()
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"message":         "updated",
 		"manual_disabled": req.ManualDisabled,
@@ -491,6 +500,13 @@ func (h *Handler) setCredentialManualDisabled(w http.ResponseWriter, r *http.Req
 		    (source, action, credential_id, provider_id, raw_model_name, reason_code, reason_detail)
 		VALUES ('admin', $1, $2, $3, '', $4, $5)
 	`, action, credID, providerID, reasonCode, actorCopy+": "+reqCopy.Reason)
+
+	// 2026-07-02 bug fix: same as setProviderManualDisabled — invalidate the
+	// 30s routing candidate cache + the admin available-models cache so the
+	// just-toggled credential stops being considered by the live router
+	// immediately, instead of after the next cache TTL tick.
+	provider.InvalidateAllCandidateCache()
+	InvalidateAvailableModelsCache()
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"message":         "updated",

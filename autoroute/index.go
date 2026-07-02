@@ -309,9 +309,21 @@ JOIN latest_bucket lb
  AND lb.raw_model     = cmi.raw_model
  AND lb.bucket        = cmi.bucket
 JOIN credentials cr ON cr.id = cmi.credential_id
+JOIN providers pr ON pr.id = cr.provider_id
 LEFT JOIN models_canonical mc ON mc.id = cmi.canonical_id
 WHERE COALESCE(cr.lifecycle_status, 'active') != 'suspended'
   AND COALESCE(cr.status, 'active') NOT IN ('disabled')
+  -- 2026-07-02 bug fix: mirror the live router's disable gates
+  -- (provider.Client.loadCandidatesDBWithThreshold relies on
+  -- v_routable_credential_models.is_routable for these). Without this
+  -- filter the Decider can score and recommend a model whose ONLY
+  -- reachable credential belongs to a manually-disabled provider, after
+  -- which the live router returns no_candidates/502 instead of picking a
+  -- healthy alternative. p.enabled must be checked explicitly too because
+  -- the credential_model_index rollup is built independently of the view.
+  AND pr.enabled IS TRUE
+  AND COALESCE(pr.manual_disabled, false) IS FALSE
+  AND COALESCE(cr.manual_disabled, false) IS FALSE
 ORDER BY cmi.canonical_id, cmi.score_smart DESC
 `
 

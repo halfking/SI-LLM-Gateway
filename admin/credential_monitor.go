@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/kaixuan/llm-gateway-go/credentialhealth"
+	"github.com/kaixuan/llm-gateway-go/provider"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -129,11 +130,11 @@ type CredentialModelStatus struct {
 	BindingAvailable         bool    `json:"binding_available"`
 	BindingUnavailableReason *string `json:"binding_unavailable_reason,omitempty"`
 	// ProbeState: 'broken_confirmed' | 'healthy_confirmed' | 'recovering' | 'unknown' (no row).
-	ProbeState         string  `json:"probe_state"`
-	ProbeLastStatus    *string `json:"probe_last_status,omitempty"`
-	ProbeLastAttemptAt *string `json:"probe_last_attempt_at,omitempty"`
+	ProbeState         string   `json:"probe_state"`
+	ProbeLastStatus    *string  `json:"probe_last_status,omitempty"`
+	ProbeLastAttemptAt *string  `json:"probe_last_attempt_at,omitempty"`
 	RecentSuccessRate  *float64 `json:"recent_success_rate,omitempty"`
-	RecentSamples      int     `json:"recent_samples"`
+	RecentSamples      int      `json:"recent_samples"`
 	// 🆕 2026-06-23 credentials 详情页 4-tab 重构。
 	// P95LatencyMs: 优先 bg_rollup (5min), live_recent (3h) 兜底; no_data 时为 nil.
 	// P95Source: 标注 P95 计算来源,前端据此显示 "bg / live / N/A".
@@ -142,14 +143,14 @@ type CredentialModelStatus struct {
 	// TotalCalls: 24h 内调用次数.
 	// EffectiveState: 派生 5 状态,优先级 manual_disabled > probe_broken > offer_missing > binding_missing > available.
 	// ModelDisabledReason: 人类可读的禁用原因 (manual / probe / offer / binding).
-	P95LatencyMs   *int   `json:"p95_latency_ms,omitempty"`
-	AvgLatencyMs   *int   `json:"avg_latency_ms,omitempty"`
-	P95Source      string `json:"p95_source"`
-	DataSource     string `json:"data_source"`
-	LastUsedAt     *string `json:"last_used_at,omitempty"`
-	TotalCalls     int64  `json:"total_calls"`
-	EffectiveState string `json:"effective_state"`
-	ModelDisabledReason string `json:"model_disabled_reason,omitempty"`
+	P95LatencyMs        *int    `json:"p95_latency_ms,omitempty"`
+	AvgLatencyMs        *int    `json:"avg_latency_ms,omitempty"`
+	P95Source           string  `json:"p95_source"`
+	DataSource          string  `json:"data_source"`
+	LastUsedAt          *string `json:"last_used_at,omitempty"`
+	TotalCalls          int64   `json:"total_calls"`
+	EffectiveState      string  `json:"effective_state"`
+	ModelDisabledReason string  `json:"model_disabled_reason,omitempty"`
 }
 
 // monitorSummarySchemaVersion is bumped whenever the monitor-summary response
@@ -1242,6 +1243,12 @@ func (m *CredentialMonitorHandlers) handleClearManualDisabled(w http.ResponseWri
 	monitorSummaryCache.entries = nil
 	monitorSummaryCache.mu.Unlock()
 
+	// 2026-07-02 bug fix: invalidate the live routing candidate cache so the
+	// freshly-cleared credential is eligible again on the very next request,
+	// not after the 30s cache TTL. Same for the admin available-models cache.
+	provider.InvalidateAllCandidateCache()
+	InvalidateAvailableModelsCache()
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success": true,
 		"message": fmt.Sprintf("manual_disabled cleared for credential %d", req.CredentialID),
@@ -1344,6 +1351,12 @@ func (m *CredentialMonitorHandlers) handleSetManualDisabled(w http.ResponseWrite
 	monitorSummaryCache.entries = nil
 	monitorSummaryCache.mu.Unlock()
 
+	// 2026-07-02 bug fix: same as handleClearManualDisabled — invalidate the
+	// live routing candidate cache + admin available-models cache so the
+	// live router stops using this credential immediately, not after 30s.
+	provider.InvalidateAllCandidateCache()
+	InvalidateAvailableModelsCache()
+
 	statusText := "disabled"
 	if !req.ManualDisabled {
 		statusText = "enabled"
@@ -1357,16 +1370,16 @@ func (m *CredentialMonitorHandlers) handleSetManualDisabled(w http.ResponseWrite
 
 // deriveModelEffectiveState computes the 5-state effective_state for a model
 // row in monitor-summary. Priority (first match wins):
-//   1. credentialManualDisabled || (binding_unavailable_reason == 'manual_offline')
-//      → "manual_disabled"
-//   2. probe_state == "broken_confirmed"
-//      → "probe_broken"
-//   3. offer_available == false
-//      → "offer_missing"
-//   4. binding_available == false
-//      → "binding_missing"
-//   5. default
-//      → "available"
+//  1. credentialManualDisabled || (binding_unavailable_reason == 'manual_offline')
+//     → "manual_disabled"
+//  2. probe_state == "broken_confirmed"
+//     → "probe_broken"
+//  3. offer_available == false
+//     → "offer_missing"
+//  4. binding_available == false
+//     → "binding_missing"
+//  5. default
+//     → "available"
 //
 // 🆕 2026-06-23 credentials 详情页 4-tab 重构: 详情页模型可用性表用此值显示
 // 统一 status badge,避免前端重复拼装状态机。
