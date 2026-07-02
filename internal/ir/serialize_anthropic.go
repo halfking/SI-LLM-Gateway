@@ -143,14 +143,15 @@ func serializeAnthropicMessages(req *InternalRequest) []map[string]any {
 	messages := make([]map[string]any, 0, len(req.Messages))
 
 	for _, msg := range req.Messages {
-		messages = append(messages, serializeAnthropicMessage(msg))
+		messages = append(messages, serializeAnthropicMessage(msg, req.TargetProvider))
 	}
 
 	return messages
 }
 
 // serializeAnthropicMessage converts a single IR Message to Anthropic format.
-func serializeAnthropicMessage(msg Message) map[string]any {
+// targetProvider is used to handle provider-specific quirks (e.g., "minimax" uses "tool_call_id").
+func serializeAnthropicMessage(msg Message, targetProvider string) map[string]any {
 	// Tool role messages: convert to user+tool_result format (Anthropic convention)
 	if msg.Role == "tool" {
 		out := map[string]any{
@@ -160,7 +161,13 @@ func serializeAnthropicMessage(msg Message) map[string]any {
 			"type": "tool_result",
 		}
 		if msg.ToolCallID != "" {
-			toolResult["tool_use_id"] = msg.ToolCallID
+			// MiniMax uses "tool_call_id" instead of standard "tool_use_id"
+			// This handles the provider-specific protocol variation
+			if targetProvider == "minimax" {
+				toolResult["tool_call_id"] = msg.ToolCallID
+			} else {
+				toolResult["tool_use_id"] = msg.ToolCallID
+			}
 		}
 		// Extract content from text blocks
 		var textParts []string

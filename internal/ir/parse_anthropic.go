@@ -277,32 +277,37 @@ func parseAnthropicContentBlocks(blocks []any) ([]ContentBlock, error) {
 				Input: inputJSON,
 			}
 
-		case "tool_result":
-			toolUseID, _ := blockMap["tool_use_id"].(string)
-			content := blockMap["content"]
-			isError, _ := blockMap["is_error"].(bool)
+	case "tool_result":
+		// MiniMax uses "tool_call_id" instead of standard "tool_use_id"
+		toolUseID, _ := blockMap["tool_use_id"].(string)
+		if toolUseID == "" {
+			// Fallback to tool_call_id for MiniMax compatibility
+			toolUseID, _ = blockMap["tool_call_id"].(string)
+		}
+		content := blockMap["content"]
+		isError, _ := blockMap["is_error"].(bool)
 
-			// Parse content (can be string or array of blocks)
-			var contentBlocks []ContentBlock
-			switch c := content.(type) {
-			case string:
-				contentBlocks = []ContentBlock{{Type: "text", Text: c}}
-			case []any:
-				for _, item := range c {
-					if itemMap, ok := item.(map[string]any); ok {
-						cb := parseAnthropicContentBlock(itemMap)
-						if cb != nil {
-							contentBlocks = append(contentBlocks, *cb)
-						}
+		// Parse content (can be string or array of blocks)
+		var contentBlocks []ContentBlock
+		switch c := content.(type) {
+		case string:
+			contentBlocks = []ContentBlock{{Type: "text", Text: c}}
+		case []any:
+			for _, item := range c {
+				if itemMap, ok := item.(map[string]any); ok {
+					cb := parseAnthropicContentBlock(itemMap)
+					if cb != nil {
+						contentBlocks = append(contentBlocks, *cb)
 					}
 				}
 			}
+		}
 
-			irBlock.ToolResult = &ToolResult{
-				ToolUseID: toolUseID,
-				Content:   contentBlocks,
-				IsError:   isError,
-			}
+		irBlock.ToolResult = &ToolResult{
+			ToolUseID: toolUseID,
+			Content:   contentBlocks,
+			IsError:   isError,
+		}
 
 		case "image":
 			img := parseAnthropicImageBlock(blockMap)
@@ -363,7 +368,12 @@ func parseAnthropicContentBlock(blockMap map[string]any) *ContentBlock {
 		inputJSON, _ := json.Marshal(inputRaw)
 		irBlock.ToolUse = &ToolUse{ID: id, Name: name, Input: inputJSON}
 	case "tool_result":
+		// MiniMax uses "tool_call_id" instead of standard "tool_use_id"
 		toolUseID, _ := blockMap["tool_use_id"].(string)
+		if toolUseID == "" {
+			// Fallback to tool_call_id for MiniMax compatibility
+			toolUseID, _ = blockMap["tool_call_id"].(string)
+		}
 		isError, _ := blockMap["is_error"].(bool)
 		content := blockMap["content"]
 		var contentBlocks []ContentBlock

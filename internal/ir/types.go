@@ -92,6 +92,12 @@ type InternalRequest struct {
 
 	// ─── Source protocol (used by Serializer to determine output format) ───
 	SourceProtocol string // "openai-chat" | "anthropic-messages"
+
+	// ─── Target provider hint (used by Serializer for provider-specific quirks) ───
+	// TargetProvider is an optional hint for the serializer to handle provider-specific
+	// protocol variations. For example, "minimax" uses "tool_call_id" instead of the
+	// standard "tool_use_id" in Anthropic-format requests.
+	TargetProvider string
 }
 
 // SystemPrompt represents a normalized system prompt.
