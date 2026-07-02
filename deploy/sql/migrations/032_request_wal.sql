@@ -26,11 +26,17 @@ CREATE TABLE IF NOT EXISTS request_wal (
 ) PARTITION BY RANGE (created_at);
 
 -- Create initial partitions
+-- 2026-07-02: request_wal_2026_06 stays heap because gateway's telemetry
+-- UPDATE request_wal WHERE request_id=... (no ts filter) scans all partitions,
+-- and columnar cannot handle UPDATE/CTID scans. Future months (07+) can be
+-- columnar once 06 data ages out or gateway code adds ts WHERE filters.
+-- For now: 06=heap, 07+=columnar via ensure_next_month_request_wal_partition().
 CREATE TABLE IF NOT EXISTS request_wal_2026_06 PARTITION OF request_wal
     FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
 
 CREATE TABLE IF NOT EXISTS request_wal_2026_07 PARTITION OF request_wal
-    FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
+    FOR VALUES FROM ('2026-07-01') TO ('2026-08-01')
+    USING columnar;
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_wal_status_stage ON request_wal (status, stage);

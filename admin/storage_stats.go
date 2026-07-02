@@ -45,10 +45,11 @@ type DatabaseStats struct {
 }
 
 type TableSizeInfo struct {
-	TableName string `json:"table_name"`
-	SizeBytes int64  `json:"size_bytes"`
-	SizeHuman string `json:"size_human"`
-	RowCount  int64  `json:"row_count,omitempty"`
+	TableName  string `json:"table_name"`
+	SizeBytes  int64  `json:"size_bytes"`
+	SizeHuman  string `json:"size_human"`
+	RowCount   int64  `json:"row_count,omitempty"`
+	IsColumnar bool   `json:"is_columnar"`
 }
 
 type AttachmentStorageStats struct {
@@ -198,31 +199,40 @@ func (h *Handler) getDatabaseStats(ctx context.Context) (*DatabaseStats, error) 
 
 	// Get total database size
 	err := h.db.QueryRow(ctx, `
-		SELECT 
+		SELECT
 			pg_database_size(current_database()) AS total_size,
 			pg_size_pretty(pg_database_size(current_database())) AS total_human
 	`).Scan(&stats.TotalSizeBytes, &stats.TotalSizeHuman)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database size: %w", err)
 	}
 
-	// Get individual table sizes
+	// Get individual table sizes, including whether each uses the citus_columnar
+	// access method (so the operator can spot heap bloat in archive partitions).
 	rows, err := h.db.Query(ctx, `
-		SELECT 
-			'request_logs' AS table_name,
-			pg_total_relation_size('request_logs') AS size_bytes,
-			pg_size_pretty(pg_total_relation_size('request_logs')) AS size_human,
-			(SELECT COUNT(*) FROM request_logs) AS row_count
-		UNION ALL
-		SELECT 
-			'attachments' AS table_name,
-			pg_total_relation_size('attachments') AS size_bytes,
-			pg_size_pretty(pg_total_relation_size('attachments')) AS size_human,
-			(SELECT COUNT(*) FROM attachments) AS row_count
+		SELECT
+			t.table_name,
+			pg_total_relation_size(quote_ident(t.table_name)::regclass) AS size_bytes,
+			pg_size_pretty(pg_total_relation_size(quote_ident(t.table_name)::regclass)) AS size_human,
+			(SELECT c.reltuples::bigint FROM pg_class c
+			   JOIN pg_namespace n ON n.oid = c.relnamespace
+			   WHERE c.relname = t.table_name AND n.nspname = 'public'
+			   LIMIT 1) AS row_count,
+			COALESCE((
+				SELECT am.amname = 'columnar'
+				FROM pg_class c
+				LEFT JOIN pg_am am ON am.oid = c.relam
+				JOIN pg_namespace n ON n.oid = c.relnamespace
+				WHERE c.relname = t.table_name AND n.nspname = 'public' AND c.relkind = 'r'
+				LIMIT 1
+			), false) AS is_columnar
+		FROM (
+			VALUES ('request_logs'), ('attachments')
+		) AS t(table_name)
 		ORDER BY size_bytes DESC
 	`)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to query table sizes: %w", err)
 	}
@@ -230,12 +240,11 @@ func (h *Handler) getDatabaseStats(ctx context.Context) (*DatabaseStats, error) 
 
 	for rows.Next() {
 		var info TableSizeInfo
-		if err := rows.Scan(&info.TableName, &info.SizeBytes, &info.SizeHuman, &info.RowCount); err != nil {
+		if err := rows.Scan(&info.TableName, &info.SizeBytes, &info.SizeHuman, &info.RowCount, &info.IsColumnar); err != nil {
 			continue
 		}
 		stats.TableSizes = append(stats.TableSizes, info)
 
-		// Populate specific fields
 		switch info.TableName {
 		case "request_logs":
 			stats.RequestLogsBytes = info.SizeBytes

@@ -67,22 +67,27 @@ CREATE INDEX IF NOT EXISTS idx_routing_decision_log_part_model
 CREATE INDEX IF NOT EXISTS idx_routing_decision_log_part_success 
     ON public.routing_decision_log_partitioned (success, ts DESC);
 
--- 3. 创建当月分区（heap）
+-- 3. 创建当月分区（columnar）
+-- 2026-07-02: switched from heap to columnar. routing_decision_log has no
+-- AFTER ROW triggers, so columnar am is safe. Historical months are also
+-- columnar (archive function creates USING columnar). Result: every partition
+-- of routing_decision_log is columnar from creation; archive_request_logs()
+-- function handles retention.
 CREATE TABLE IF NOT EXISTS public.routing_decision_log_2026_06
     PARTITION OF public.routing_decision_log_partitioned
     FOR VALUES FROM ('2026-06-01 00:00:00+00') TO ('2026-07-01 00:00:00+00')
-    USING heap;
+    USING columnar;
 
--- 4. 创建下月分区（heap）
+-- 4. 创建下月分区（columnar）
 CREATE TABLE IF NOT EXISTS public.routing_decision_log_2026_07
     PARTITION OF public.routing_decision_log_partitioned
     FOR VALUES FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')
-    USING heap;
+    USING columnar;
 
--- 5. 创建默认分区（捕获不符合其他分区范围的数据）
+-- 5. 创建默认分区（columnar）
 CREATE TABLE IF NOT EXISTS public.routing_decision_log_default
     PARTITION OF public.routing_decision_log_partitioned DEFAULT
-    USING heap;
+    USING columnar;
 
 -- 6. 迁移现有数据
 -- 检查原表是否存在数据
