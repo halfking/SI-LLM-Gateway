@@ -283,3 +283,13 @@ onMounted(load)
     </div>
   </div>
 </template>
+
+<style scoped>
+.pending-count-badge {
+  font-size: 13px;
+  margin-inline-start: 8px;
+}
+.approve-btn-spacing {
+  margin-inline-end: 6px;
+}
+</style>
