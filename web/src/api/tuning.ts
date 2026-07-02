@@ -421,11 +421,11 @@ export interface CleanupAttachmentsResponse {
   executed_at?: string
 }
 
-export function cleanupAttachments(req: CleanupAttachmentsRequest) {
+export function cleanupAttachments(body: CleanupAttachmentsRequest) {
   return req<CleanupAttachmentsResponse>(
     'POST',
     '/api/admin/data-lifecycle/cleanup-attachments',
-    req
+    body
   )
 }
 
@@ -443,11 +443,11 @@ export interface CleanupLogsResponse {
   executed_at?: string
 }
 
-export function cleanupLogs(req: CleanupLogsRequest) {
+export function cleanupLogs(body: CleanupLogsRequest) {
   return req<CleanupLogsResponse>(
     'POST',
     '/api/admin/data-lifecycle/cleanup-logs',
-    req
+    body
   )
 }
 

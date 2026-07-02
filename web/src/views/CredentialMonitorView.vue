@@ -1155,10 +1155,10 @@ onUnmounted(() => {
                       <td class="mono-sm">{{ formatTs(d.ts) }}</td>
                       <td class="mono-sm"><code>{{ d.request_id }}</code></td>
                       <td>
-                        <span v-if="d.outbound_model && d.outbound_model !== d.canonical_name">
-                          {{ d.canonical_name }} → {{ d.outbound_model }}
+                        <span v-if="d.outbound_model && d.outbound_model !== (d.canonical_name || d.model)">
+                          {{ d.canonical_name || d.model }} → {{ d.outbound_model }}
                         </span>
-                        <span v-else>{{ d.canonical_name }}</span>
+                        <span v-else>{{ d.canonical_name || d.model }}</span>
                       </td>
                       <td class="mono-sm">{{ d.tier ?? '—' }}</td>
                       <td>
