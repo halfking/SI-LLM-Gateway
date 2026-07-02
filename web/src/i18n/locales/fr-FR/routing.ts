@@ -179,6 +179,14 @@ export default {
       routable: 'Routable',
       unroutable: 'Indisponible',
       l2Funnel: 'Entonnoir L2 actuel',
+      funnelStages: {
+        candidates: 'Candidats totaux',
+        candidatesHint: 'Candidats analysés dans cette résolution',
+        routable: 'Routable',
+        routableHint: 'Vérification de disponibilité réussie',
+        success: 'Identifiant principal',
+        successHint: 'Meilleur identifiant routable',
+      },
       runLogTitle: 'Journal d\'exécution',
       clear: 'Vider',
       colTime: 'Heure',
@@ -190,6 +198,7 @@ export default {
     live: {
       simulatorTitle: 'Simulateur de routage',
       simulatorPlaceholder: 'Saisir un prompt pour tester L1→L2…',
+      simulatorPromptDefault: 'Écrire un tri rapide en Python',
       simulate: 'Simuler',
       distTask: 'Tâche',
       recentDecisionsTitle: 'Décisions récentes',

@@ -32,9 +32,9 @@ function isFullyManual(m: AdminMaasModelRate) {
 }
 
 const pricingStatusOptions = [
-  { value: 'default', label: '仅全局基准' },
-  { value: 'custom', label: '含手工定价' },
-  { value: 'partial', label: '部分手工' },
+  { value: 'default', label: smp('filter.defaultOnly') },
+  { value: 'custom', label: smp('filter.customOnly') },
+  { value: 'partial', label: smp('filter.partialOnly') },
 ]
 
 const {

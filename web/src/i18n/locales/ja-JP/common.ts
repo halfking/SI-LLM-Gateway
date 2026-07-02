@@ -60,6 +60,7 @@ export default {
     noData: 'データがありません',
     noResults: '一致する結果がありません',
     copied: 'コピー済み',
+    clickToCopy: 'クリックしてコピー',
     confirmDelete: '削除を確認しますか？',
     confirmAction: 'この操作を実行しますか？',
   },
@@ -92,5 +93,19 @@ export default {
   error: {
     unknown: '不明なエラーが発生しました',
     network: 'ネットワークエラーです。接続を確認してください',
+  },
+  // Shared cell/component labels (added 2026-07-02 to remove hardcoded Chinese from src/components/**)
+  activeFilters: {
+    label: '選択中の条件',
+    removeHint: '{label} を削除',
+  },
+  filterInput: {
+    noMatch: '一致なし',
+  },
+  clientConfigGenerator: {
+    configure: '設定',
+  },
+  feeCostCell: {
+    costLabel: 'コスト',
   },
 }

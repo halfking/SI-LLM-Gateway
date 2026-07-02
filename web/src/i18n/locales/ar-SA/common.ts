@@ -59,6 +59,7 @@ export default {
     noData: 'لا توجد بيانات',
     noResults: 'لا توجد نتائج مطابقة',
     copied: 'تم النسخ',
+    clickToCopy: 'انقر للنسخ',
     confirmDelete: 'تأكيد الحذف؟',
     confirmAction: 'هل تريد تنفيذ هذا الإجراء؟',
   },
@@ -91,5 +92,19 @@ export default {
   error: {
     unknown: 'حدث خطأ غير معروف',
     network: 'خطأ في الشبكة، يرجى التحقق من الاتصال',
+  },
+  // Shared cell/component labels (added 2026-07-02 to remove hardcoded Chinese from src/components/**)
+  activeFilters: {
+    label: 'الفلاتر المحددة',
+    removeHint: 'إزالة {label}',
+  },
+  filterInput: {
+    noMatch: 'لا توجد مطابقات',
+  },
+  clientConfigGenerator: {
+    configure: 'إعداد',
+  },
+  feeCostCell: {
+    costLabel: 'التكلفة',
   },
 }

@@ -241,7 +241,7 @@ async function generate() {
   } else if (props.tool === 'roocode') {
     fileContent = renderRooCodeSettings(apiKey, baseURL)
   } else {
-    fileContent = { note: 'Cursor 不支持文件写入，请在 Settings UI 中手动配置' }
+    fileContent = { note: t('clientConfigDialog.cursorNotSupported') }
   }
 
   generatedFile.value = JSON.stringify(fileContent, null, 2)

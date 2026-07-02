@@ -229,6 +229,14 @@ export const TECH_ACRONYMS: ReadonlySet<string> = new Set<string>([
   'audio',
   'transcription',
 
+  // ---- Work type categories (WorkTypesView) ----
+  '通用',
+  '研发',
+  '营销',
+  '采集',
+  '多媒体',
+  '企业',
+
   // ---- Compression / data-lifecycle enums ----
   'gzip',
   'br',

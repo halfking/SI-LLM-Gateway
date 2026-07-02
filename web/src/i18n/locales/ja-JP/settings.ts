@@ -1,4 +1,5 @@
 // Auto-translated draft (zh-TW/ja-JP) · 2026-07-02 · please review
+// Updated to include settings.compression.* for Headroom modes (2026-07-02).
 // settings.ts — SettingsView 文案。名前空間:category / list / detail / editor / docs / errors。
 // 技術フィールド名 (JSON / RPM / TPM / WebSocket など) は翻訳しません。
 export default {
@@ -67,21 +68,41 @@ export default {
       off: '0 - オフ (off)',
       auto: '1 - 自動しきい値 (auto_threshold)',
       on4xx: '2 - 4xx 時に圧縮 (on_4xx) 【推奨】',
+      deltaOnly: '差分のみ (delta_only)',
+      smart: 'スマート圧縮 (smart) 【デフォルト】',
+      aggressive: 'アグレッシブ圧縮 (aggressive)',
+      headroom: 'ヘッドルーム圧縮 (headroom)',
+      headroomAggressive: 'ヘッドルームアグレッシブ (headroom_aggressive)',
     },
     enumLabels: {
       off: '0 - オフ (off)',
       auto: '1 - 自動しきい値 (auto_threshold)',
       on4xx: '2 - 4xx 時に圧縮 (on_4xx)',
+      deltaOnly: '差分のみ (delta_only)',
+      smart: 'スマート圧縮 (smart)',
+      aggressive: 'アグレッシブ圧縮 (aggressive)',
+      headroom: 'ヘッドルーム圧縮 (headroom)',
+      headroomAggressive: 'ヘッドルームアグレッシブ (headroom_aggressive)',
     },
     enumDescriptions: {
       off: 'メッセージ圧縮機能を完全に無効化',
       auto: 'メッセージ長がコンテキストウィンドウの閾値を超えた場合に自動圧縮',
       on4xx: '4xx エラー (context_length_exceeded など) を受信した場合に圧縮して再試行',
+      deltaOnly: 'メッセージ差分のみ保持、セッション圧縮は行わない',
+      smart: 'v4 スマート圧縮：ツールトリミング + スライディングウィンドウ',
+      aggressive: 'v4 アグレッシブ圧縮：タスク分析 + プロアクティブ圧縮',
+      headroom: 'v7 ヘッドルーム圧縮：スマート JSON 配列圧縮',
+      headroomAggressive: 'v7 ヘッドルームアグレッシブ：よりアグレッシブな配列圧縮 + CCR ストレージ',
     },
     hint: {
       off: 'メッセージ圧縮機能を完全に無効化',
       auto: 'メッセージ長がコンテキストウィンドウの閾値を超えた場合に自動圧縮',
       on4xx: '4xx エラー (context_length_exceeded など) を受信した場合に圧縮して再試行',
+      deltaOnly: 'メッセージ差分のみ保持、セッション圧縮は行わない（ステートレスシナリオ向け）',
+      smart: 'v4 スマート圧縮：ツール定義トリミングとスライディングウィンドウ最適化を含む（推奨デフォルト）',
+      aggressive: 'v4 アグレッシブ圧縮：タスク分析とプロアクティブ圧縮戦略を含む（高圧縮比）',
+      headroom: 'v7 ヘッドルーム圧縮：JSON 配列をスマートに圧縮（大量の構造化データなど）、意味の整合性を維持',
+      headroomAggressive: 'v7 ヘッドルームアグレッシブモード：よりアグレッシブな配列圧縮アルゴリズム + CCR 三階層キャッシュストレージ（最高圧縮比）',
     },
     strategyEnum: {
       naive: 'naive - 単純圧縮',

@@ -1,4 +1,5 @@
 // Auto-translated draft (fr-FR) · 2026-07-02 · please review
+// Updated to include settings.compression.* for Headroom modes (2026-07-02).
 // settings.ts — Textes SettingsView. Namespace : category / list / detail / editor / docs / errors.
 // Les noms de champs techniques (JSON / RPM / TPM / WebSocket) restent non traduits.
 export default {
@@ -67,21 +68,41 @@ export default {
       off: '0 - Désactivé',
       auto: '1 - Seuil auto',
       on4xx: '2 - Sur 4xx (recommandé)',
+      deltaOnly: 'Delta uniquement (delta_only)',
+      smart: 'Intelligent (par défaut)',
+      aggressive: 'Agressif (aggressive)',
+      headroom: 'Headroom (headroom)',
+      headroomAggressive: 'Headroom agressif (headroom_aggressive)',
     },
     enumLabels: {
       off: '0 - Désactivé',
       auto: '1 - Seuil auto',
       on4xx: '2 - Sur 4xx',
+      deltaOnly: 'Delta uniquement',
+      smart: 'Intelligent',
+      aggressive: 'Agressif',
+      headroom: 'Headroom',
+      headroomAggressive: 'Headroom agressif',
     },
     enumDescriptions: {
       off: 'La compression est entièrement désactivée.',
       auto: 'Compresser automatiquement lorsque la longueur des messages dépasse le seuil de la fenêtre de contexte.',
       on4xx: 'Compresser et réessayer en cas d\'erreur 4xx (ex. context_length_exceeded).',
+      deltaOnly: 'Conserver uniquement le delta des messages, pas de compression de session.',
+      smart: 'Compression intelligente v4 : découpage d\'outils + fenêtre glissante.',
+      aggressive: 'Compression agressive v4 : analyse de tâche + compression proactive.',
+      headroom: 'Compression Headroom v7 : compression intelligente de tableaux JSON.',
+      headroomAggressive: 'Headroom agressif v7 : compression de tableaux plus agressive + stockage CCR.',
     },
     hint: {
       off: 'La compression est entièrement désactivée.',
       auto: 'Compresser automatiquement lorsque la longueur des messages dépasse le seuil de la fenêtre de contexte.',
       on4xx: 'Compresser et réessayer en cas d\'erreur 4xx (ex. context_length_exceeded).',
+      deltaOnly: 'Conserver uniquement le delta des messages, pas de compression de session (adapté aux scénarios sans état).',
+      smart: 'Compression intelligente v4 : inclut le découpage des définitions d\'outils et l\'optimisation par fenêtre glissante (par défaut recommandé).',
+      aggressive: 'Compression agressive v4 : inclut l\'analyse de tâche et les stratégies de compression proactives (taux de compression élevé).',
+      headroom: 'Compression Headroom v7 : compresse intelligemment les tableaux JSON (ex. grandes données structurées) tout en maintenant l\'intégrité sémantique.',
+      headroomAggressive: 'Mode Headroom agressif v7 : algorithme de compression de tableaux plus agressif + stockage cache à trois niveaux CCR (taux de compression le plus élevé).',
     },
     strategyEnum: {
       naive: 'naive - Compression naïve',

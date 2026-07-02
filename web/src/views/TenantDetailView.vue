@@ -153,7 +153,7 @@ async function confirmOrder(orderId: number) {
   confirmSaving.value = orderId
   error.value = ''
   try {
-    await confirmAdminMaasOrder(orderId, '管理员手动确认到账')
+    await confirmAdminMaasOrder(orderId, tt('confirmOrderNote'))
     await Promise.all([loadOrders(), loadWallet(), loadLedger()])
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : tt('confirmOrderFailed')

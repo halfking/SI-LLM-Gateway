@@ -178,6 +178,14 @@ export default {
       routable: 'قابل للتوجيه',
       unroutable: 'غير متاح',
       l2Funnel: 'قمع L2 الحالي',
+      funnelStages: {
+        candidates: 'إجمالي المرشحين',
+        candidatesHint: 'المرشحون المحللون في هذا الحل',
+        routable: 'قابل للتوجيه',
+        routableHint: 'اجتاز فحص التوفر',
+        success: 'بيانات الاعتماد الرئيسية',
+        successHint: 'أفضل بيانات اعتماد قابلة للتوجيه',
+      },
       runLogTitle: 'سجل التشغيل',
       clear: 'مسح',
       colTime: 'الوقت',
@@ -189,6 +197,7 @@ export default {
     live: {
       simulatorTitle: 'محاكاة التوجيه',
       simulatorPlaceholder: 'إدخال prompt لاختبار L1→L2…',
+      simulatorPromptDefault: 'اكتب خوارزمية الفرز السريع في Python',
       simulate: 'محاكاة',
       distTask: 'المهمة',
       recentDecisionsTitle: 'القرارات الأخيرة',

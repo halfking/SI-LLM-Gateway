@@ -60,6 +60,7 @@ export default {
     noData: '暫無資料',
     noResults: '無符合結果',
     copied: '已複製',
+    clickToCopy: '點擊複製',
     confirmDelete: '確認刪除？',
     confirmAction: '確認執行此操作？',
   },
@@ -92,5 +93,19 @@ export default {
   error: {
     unknown: '發生未知錯誤',
     network: '網路錯誤，請檢查連線',
+  },
+  // Shared cell/component labels (added 2026-07-02 to remove hardcoded Chinese from src/components/**)
+  activeFilters: {
+    label: '已選條件',
+    removeHint: '移除 {label}',
+  },
+  filterInput: {
+    noMatch: '無符合項目',
+  },
+  clientConfigGenerator: {
+    configure: '配置',
+  },
+  feeCostCell: {
+    costLabel: '成本',
   },
 }

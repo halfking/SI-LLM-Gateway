@@ -195,12 +195,12 @@ onMounted(load)
       <div class="stat-card highlight">
         <div class="label">{{ tdash('statCredits') }}</div>
         <div class="value">{{ fmtNumber(summary.total_credits) }}</div>
-        <div class="sub">近 {{ days }} 天</div>
+        <div class="sub">{{ tdash('recentDaysSub', { n: days }) }}</div>
       </div>
       <div class="stat-card">
         <div class="label">{{ tdash('statRequests') }}</div>
         <div class="value">{{ fmtNumber(summary.total_requests) }}</div>
-        <div class="sub">近 {{ days }} 天</div>
+        <div class="sub">{{ tdash('recentDaysSub', { n: days }) }}</div>
       </div>
       <div class="stat-card">
         <div class="label">{{ tdash('statAvailable') }}</div>

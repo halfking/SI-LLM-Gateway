@@ -178,6 +178,14 @@ export default {
       routable: 'ルーティング可能',
       unroutable: '利用不可',
       l2Funnel: '今回の L2 ファネル',
+      funnelStages: {
+        candidates: '総候補',
+        candidatesHint: '今回解析した候補数',
+        routable: 'ルーティング可能',
+        routableHint: '可用性チェック通過',
+        success: '最優先資格情報',
+        successHint: 'トップ ルーティング可能資格情報',
+      },
       runLogTitle: '実行ログ',
       clear: 'クリア',
       colTime: '時刻',
@@ -189,6 +197,7 @@ export default {
     live: {
       simulatorTitle: 'ルーティングシミュレータ',
       simulatorPlaceholder: 'プロンプトを入力して L1→L2 をテスト…',
+      simulatorPromptDefault: 'Python でクイックソートを書く',
       simulate: 'シミュレーション',
       distTask: 'タスク',
       recentDecisionsTitle: '最近の判断',

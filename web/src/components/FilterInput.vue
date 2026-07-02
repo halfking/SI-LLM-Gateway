@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   modelValue: string
@@ -10,6 +11,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', v: string): void
 }>()
+
+const { t } = useI18n()
 
 const open = ref(false)
 const highlighted = ref(0)
@@ -88,7 +91,7 @@ if (typeof window !== 'undefined') {
       >{{ opt }}</li>
     </ul>
     <ul v-else-if="open && !filtered.length" class="filter-suggest">
-      <li class="empty">无匹配项</li>
+      <li class="empty">{{ t('common.filterInput.noMatch') }}</li>
     </ul>
   </div>
 </template>
