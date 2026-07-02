@@ -34,6 +34,7 @@ import (
 	"github.com/kaixuan/llm-gateway-go/bg"
 	"github.com/kaixuan/llm-gateway-go/circuit"
 	"github.com/kaixuan/llm-gateway-go/compressor"
+	"github.com/kaixuan/llm-gateway-go/compressor/ccr"
 	"github.com/kaixuan/llm-gateway-go/config"
 	"github.com/kaixuan/llm-gateway-go/credentialfpslot"
 	"github.com/kaixuan/llm-gateway-go/credentialhealth"
@@ -797,9 +798,45 @@ func main() {
 	// instantly without code change. Captures `exec` from the outer scope.
 	if redisClientForCache != nil && dbConn != nil && dbConn.Enabled() && telemetryClient.Enabled() && !compressorSessionDisabled() {
 		scCache := compressor.NewSessionCache(redisBackendFromClient(redisClientForCache), dbBackendFromPool(dbConn))
+		
+		// Initialize CCR (Columnar Content Repository) for Headroom compression
+		// CCR provides three-tier storage (L1 in-mem LRU, L2 Redis, L3 PostgreSQL)
+		// for compressed array data that can be retrieved via headroom_retrieve tool.
+		var ccrManager *ccr.Manager
+		var headroomComp *compressor.HeadroomCompressor
+		
+		// Create dedicated redis client for CCR (reuses same Redis instance as sessions)
+		if cfg.RedisAddr != "" {
+			ccrRedis := redis.NewClient(&redis.Options{
+				Addr:     cfg.RedisAddr,
+				Password: cfg.RedisPassword,
+				DB:       cfg.RedisDB,
+			})
+			
+			// TODO: Wire SQL backend when ccr.Manager supports pgxpool.Pool
+			// For now, use L1 (in-memory LRU) + L2 (Redis) only
+			ccrConfig := ccr.DefaultConfig()
+			var err error
+			ccrManager, err = ccr.NewManager(ccrConfig, ccrRedis, nil)
+			if err != nil {
+				slog.Warn("ccr: failed to initialize CCR manager", "error", err)
+			} else {
+				headroomComp = compressor.NewHeadroomCompressor(ccrManager)
+				
+				// Wire CCRRetrievalTool so LLM can retrieve compressed data via headroom_retrieve
+				ccrTool := relay.NewCCRRetrievalTool(ccrManager)
+				chatHandler.SetCCRRetrievalTool(ccrTool)
+				
+				slog.Info("headroom: CCR manager + HeadroomCompressor initialized (L1+L2 only)",
+					"l1_size", ccrConfig.L1MaxItems,
+					"l2_ttl", ccrConfig.L2TTL)
+			}
+		}
+		
 		scDeps := compressor.SessionCompressorDeps{
-			Cache:          scCache,
-			CompactionDeps: NewDependenciesFromExecutor(routingExec),
+			Cache:               scCache,
+			CompactionDeps:      NewDependenciesFromExecutor(routingExec),
+			HeadroomCompressor:  headroomComp,
 		}
 		chatHandler.SetSessionCompressor(compressor.NewSessionCompressor(scDeps))
 		slog.Info("v3 session-level compressor wired (L1 in-mem + L2 Redis + L3 PG)")
