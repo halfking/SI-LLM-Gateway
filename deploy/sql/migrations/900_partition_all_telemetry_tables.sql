@@ -44,17 +44,20 @@ CREATE INDEX idx_usage_ledger_part_request_id ON usage_ledger_partitioned (reque
 CREATE INDEX idx_usage_ledger_part_ts ON usage_ledger_partitioned (ts);
 CREATE INDEX idx_usage_ledger_part_tenant ON usage_ledger_partitioned (tenant_id, ts);
 
--- 1.3 创建当月分区（heap）
+-- 1.3 创建当月分区（heap for 06, columnar for 07+）
+-- 2026-07-02 AUDIT: usage_ledger_2026_06 stays heap because gateway's
+-- telemetry UPDATE usage_ledger WHERE request_id=... (no ts filter) scans
+-- all partitions. Columnar cannot handle UPDATE/CTID scans. Future months
+-- (07+) can be columnar once 06 ages out or gateway adds ts WHERE filters.
 CREATE TABLE usage_ledger_2026_06
 PARTITION OF usage_ledger_partitioned
-FOR VALUES FROM ('2026-06-01 00:00:00+00') TO ('2026-07-01 00:00:00+00')
-USING heap;
+FOR VALUES FROM ('2026-06-01 00:00:00+00') TO ('2026-07-01 00:00:00+00');
 
--- 1.4 创建下月分区（heap）
+-- 1.4 创建下月分区（columnar）
 CREATE TABLE usage_ledger_2026_07
 PARTITION OF usage_ledger_partitioned
 FOR VALUES FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')
-USING heap;
+USING columnar;
 
 -- 1.5 迁移现有数据
 INSERT INTO usage_ledger_partitioned 
@@ -112,17 +115,18 @@ CREATE INDEX idx_credit_ledger_part_tenant ON credit_ledger_partitioned (tenant_
 CREATE INDEX idx_credit_ledger_part_ref ON credit_ledger_partitioned (ref_type, ref_id);
 CREATE INDEX idx_credit_ledger_part_created ON credit_ledger_partitioned (created_at);
 
--- 2.3 创建当月分区（heap）
+-- 2.3 创建当月分区（columnar）
+-- 2026-07-02: columnar for ledger data, same rationale as usage_ledger.
 CREATE TABLE credit_ledger_2026_06
 PARTITION OF credit_ledger_partitioned
 FOR VALUES FROM ('2026-06-01 00:00:00+00') TO ('2026-07-01 00:00:00+00')
-USING heap;
+USING columnar;
 
--- 2.4 创建下月分区（heap）
+-- 2.4 创建下月分区（columnar）
 CREATE TABLE credit_ledger_2026_07
 PARTITION OF credit_ledger_partitioned
 FOR VALUES FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')
-USING heap;
+USING columnar;
 
 -- 2.5 迁移现有数据
 INSERT INTO credit_ledger_partitioned 
@@ -175,17 +179,18 @@ CREATE INDEX idx_tool_stats_part_tenant ON tool_usage_stats_partitioned (tenant_
 CREATE INDEX idx_tool_stats_part_date ON tool_usage_stats_partitioned (usage_date);
 CREATE INDEX idx_tool_stats_part_created ON tool_usage_stats_partitioned (created_at);
 
--- 3.3 创建当月分区（heap）
+-- 3.3 创建当月分区（columnar）
+-- 2026-07-02: columnar for tool usage stats (append-only aggregate data).
 CREATE TABLE tool_usage_stats_2026_06
 PARTITION OF tool_usage_stats_partitioned
 FOR VALUES FROM ('2026-06-01 00:00:00+00') TO ('2026-07-01 00:00:00+00')
-USING heap;
+USING columnar;
 
--- 3.4 创建下月分区（heap）
+-- 3.4 创建下月分区（columnar）
 CREATE TABLE tool_usage_stats_2026_07
 PARTITION OF tool_usage_stats_partitioned
 FOR VALUES FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')
-USING heap;
+USING columnar;
 
 -- 3.5 迁移现有数据
 INSERT INTO tool_usage_stats_partitioned 
@@ -282,28 +287,28 @@ BEGIN
     
     -- request_logs 分区已存在，跳过
     
-    -- usage_ledger
+    -- usage_ledger (columnar per migration 999 / 2026-07-02)
     EXECUTE format('
         CREATE TABLE IF NOT EXISTS usage_ledger_%s
         PARTITION OF usage_ledger
         FOR VALUES FROM (%L) TO (%L)
-        USING heap',
+        USING columnar',
         month_suffix, next_month_start, next_month_end);
     
-    -- credit_ledger
+    -- credit_ledger (columnar)
     EXECUTE format('
         CREATE TABLE IF NOT EXISTS credit_ledger_%s
         PARTITION OF credit_ledger
         FOR VALUES FROM (%L) TO (%L)
-        USING heap',
+        USING columnar',
         month_suffix, next_month_start, next_month_end);
-    
-    -- tool_usage_stats
+
+    -- tool_usage_stats (columnar)
     EXECUTE format('
         CREATE TABLE IF NOT EXISTS tool_usage_stats_%s
         PARTITION OF tool_usage_stats
         FOR VALUES FROM (%L) TO (%L)
-        USING heap',
+        USING columnar',
         month_suffix, next_month_start, next_month_end);
     
     RAISE NOTICE 'Created partitions for %', month_suffix;

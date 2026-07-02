@@ -124,6 +124,11 @@ CREATE TABLE IF NOT EXISTS public.request_logs_2026_08
     FOR VALUES FROM ('2026-08-01 00:00:00+00') TO ('2026-09-01 00:00:00+00');
 
 -- 默认分区（捕获不符合其他分区范围的数据）
+-- 2026-07-02: stays heap at creation (Citus columnar 11.x cannot host
+-- AFTER ROW triggers like trg_update_api_key_model_cost). The 999 migration
+-- sweeps its rows into columnar archive partitions and converts the empty
+-- default to columnar IF triggers allow. If triggers block conversion, the
+-- default stays heap but its historical rows are already in columnar archive.
 CREATE TABLE IF NOT EXISTS public.request_logs_default
     PARTITION OF public.request_logs DEFAULT;
 
