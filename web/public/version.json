@@ -1,8 +1,8 @@
 {
-  "version": "2.3.3-feda1901-20260702-737",
-  "git_tag": "2.3.3-feda1901-20260702-737",
-  "git_sha": "feda1901",
-  "build_seq": 737,
-  "build_date": "2026-07-02",
+  "version": "2.3.3-f966c84f-20260703-738",
+  "git_tag": "2.3.3-f966c84f-20260703-738",
+  "git_sha": "f966c84f",
+  "build_seq": 738,
+  "build_date": "2026-07-03",
   "module": "llm-gateway-go-2"
 }
