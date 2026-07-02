@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import FpSlotVisualizer from './FpSlotVisualizer.vue'
 import { getCredentialSlots, type SlotInfoResponse } from '../api/providers'
 
@@ -8,6 +9,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const { t } = useI18n()
 
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -34,7 +36,7 @@ async function fetchSlotInfo() {
   try {
     data.value = await getCredentialSlots(props.credentialId)
   } catch (e: any) {
-    error.value = e?.message || 'Failed to load slot info'
+    error.value = e?.message || t('slotInfoCard.error.fallback')
   } finally {
     loading.value = false
   }
@@ -43,7 +45,7 @@ async function fetchSlotInfo() {
 async function handleReleaseSlot(slotIndex: number) {
   // Phase 8 TODO: 实现 slot 释放功能（需要新增后端 endpoint）
   console.log('Release slot', slotIndex, 'for credential', props.credentialId)
-  alert('释放槽位功能暂未实现（Phase 8 TODO）')
+  alert(t('slotInfoCard.alert.releaseNotImplemented'))
 }
 
 onMounted(() => {
@@ -60,20 +62,20 @@ defineExpose({
     <!-- Loading State -->
     <div v-if="loading" class="slot-loading">
       <div class="spinner"></div>
-      <span>加载槽位信息...</span>
+      <span>{{ t('slotInfoCard.loading') }}</span>
     </div>
     
     <!-- Error State -->
     <div v-else-if="error" class="slot-error">
       <span class="error-icon">⚠️</span>
       <span>{{ error }}</span>
-      <button @click="fetchSlotInfo" class="retry-btn">重试</button>
+      <button @click="fetchSlotInfo" class="retry-btn">{{ t('slotInfoCard.retry') }}</button>
     </div>
     
     <!-- Disabled State -->
     <div v-else-if="!data?.enabled" class="slot-disabled">
       <span class="disabled-icon">ℹ️</span>
-      <span>该凭据未启用指纹槽（FpSlot 未启用）</span>
+      <span>{{ t('slotInfoCard.disabled') }}</span>
     </div>
     
     <!-- Main Content -->
@@ -82,25 +84,25 @@ defineExpose({
       <div class="v3-stats-header">
         <div class="v3-stat">
           <div class="v3-stat-value">{{ data?.total_slots || 0 }}</div>
-          <div class="v3-stat-label">总槽位</div>
+          <div class="v3-stat-label">{{ t('slotInfoCard.stats.totalSlots') }}</div>
         </div>
         <div class="v3-stat">
           <div class="v3-stat-value">{{ data?.active_slots || 0 }}</div>
-          <div class="v3-stat-label">已占用</div>
+          <div class="v3-stat-label">{{ t('slotInfoCard.stats.activeSlots') }}</div>
         </div>
         <div class="v3-stat v3-stat--highlight">
           <div class="v3-stat-value">{{ data?.total_inflight || 0 }}</div>
-          <div class="v3-stat-label">并发请求</div>
+          <div class="v3-stat-label">{{ t('slotInfoCard.stats.totalInflight') }}</div>
         </div>
         <div class="v3-stat">
           <div class="v3-stat-value">{{ data?.fp_slot_limit || '-' }}</div>
-          <div class="v3-stat-label">槽位上限</div>
+          <div class="v3-stat-label">{{ t('slotInfoCard.stats.slotLimit') }}</div>
         </div>
       </div>
       
       <!-- Layer 1: Fingerprint Slots (reuse FpSlotVisualizer) -->
       <div class="layer-section">
-        <h4 class="layer-title">Layer 1: 指纹槽</h4>
+        <h4 class="layer-title">{{ t('slotInfoCard.layers.layer1') }}</h4>
         <FpSlotVisualizer
           v-if="data?.slots"
           :details="slotDetails"
@@ -111,7 +113,7 @@ defineExpose({
       
       <!-- Layer 2: Inflight Details -->
       <div class="layer-section" v-if="data?.slots && data.slots.some(s => s.inflight > 0)">
-        <h4 class="layer-title">Layer 2: 并发详情</h4>
+        <h4 class="layer-title">{{ t('slotInfoCard.layers.layer2') }}</h4>
         <div class="inflight-grid">
           <div
             v-for="slot in data.slots.filter(s => s.inflight > 0)"
@@ -120,16 +122,16 @@ defineExpose({
           >
             <div class="inflight-header">
               <span class="inflight-slot-num">#{{ slot.index }}</span>
-              <span class="inflight-count">{{ slot.inflight }} 个并发</span>
+              <span class="inflight-count">{{ t('slotInfoCard.inflight.count', { count: slot.inflight }) }}</span>
             </div>
             <div class="inflight-meta">
               <div class="inflight-holder">
-                <span class="label">持有者:</span>
+                <span class="label">{{ t('slotInfoCard.inflight.holder') }}</span>
                 <span class="value">{{ slot.holder || '-' }}</span>
               </div>
               <div class="inflight-ttl">
-                <span class="label">TTL:</span>
-                <span class="value">{{ slot.ttl_seconds > 0 ? Math.floor(slot.ttl_seconds / 60) + 'm' : '已过期' }}</span>
+                <span class="label">{{ t('slotInfoCard.inflight.ttl') }}</span>
+                <span class="value">{{ slot.ttl_seconds > 0 ? Math.floor(slot.ttl_seconds / 60) + 'm' : t('slotInfoCard.inflight.expired') }}</span>
               </div>
             </div>
           </div>
@@ -139,7 +141,7 @@ defineExpose({
       <!-- Empty State -->
       <div v-else-if="data?.active_slots === 0" class="empty-state">
         <span class="empty-icon">📭</span>
-        <span>当前没有活跃的槽位</span>
+        <span>{{ t('slotInfoCard.empty') }}</span>
       </div>
     </div>
   </div>

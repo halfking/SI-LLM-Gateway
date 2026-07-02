@@ -7,6 +7,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ModelEffectiveState } from '../api/credential-monitor'
 
 const props = withDefaults(
@@ -17,21 +18,17 @@ const props = withDefaults(
   { reason: '' },
 )
 
-interface StateMeta {
-  label: string
-  defaultTooltip: string
-}
+const { t } = useI18n()
 
-const META: Record<ModelEffectiveState, StateMeta> = {
-  available:       { label: '可用',       defaultTooltip: '模型可用,所有依赖项健康' },
-  manual_disabled: { label: '已禁用',     defaultTooltip: '被管理员手动禁用' },
-  probe_broken:    { label: '探测失败',   defaultTooltip: '探测系统标记为 broken_confirmed' },
-  offer_missing:   { label: '未声明',     defaultTooltip: 'model_offers 缺失' },
-  binding_missing: { label: '绑定缺失',   defaultTooltip: 'credential_model_bindings 不可用' },
-}
+const label = computed(() => {
+  const stateKey = props.state as ModelEffectiveState
+  return t(`statusBadge.states.${stateKey}`, props.state)
+})
 
-const label = computed(() => META[props.state as ModelEffectiveState]?.label ?? props.state)
-const defaultTooltip = computed(() => META[props.state as ModelEffectiveState]?.defaultTooltip ?? '')
+const defaultTooltip = computed(() => {
+  const stateKey = props.state as ModelEffectiveState
+  return t(`statusBadge.tooltips.${stateKey}`, '')
+})
 </script>
 
 <style scoped>

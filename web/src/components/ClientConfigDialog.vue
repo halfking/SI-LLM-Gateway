@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { getKeys, listModels, getFeatured, applyForKey, revealKey, type ApiKey, type ModelCanonical } from '../api'
 import {
   TOOLS, OS_INFO,
@@ -14,6 +15,7 @@ import {
 const props = defineProps<{ tool: ToolId; open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 const router = useRouter()
+const { t } = useI18n()
 
 const toolInfo = computed(() => TOOLS.find(t => t.id === props.tool)!)
 
@@ -56,7 +58,7 @@ async function submitApply() {
     }
     applyForm.value = { application_code: 'default-app', description: '' }
   } catch (e: any) {
-    applyError.value = e?.message || '申请失败'
+    applyError.value = e?.message || t('clientConfigDialog.error.applyFailed')
   } finally {
     applying.value = false
   }
@@ -143,7 +145,7 @@ const filteredModels = computed(() => {
 const groupedModels = computed(() => {
   const groups = new Map<string, ModelCanonical[]>()
   for (const m of filteredModels.value) {
-    const key = m.family || m.vendor || '其它'
+    const key = m.family || m.vendor || 'Other'
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(m)
   }
@@ -290,9 +292,9 @@ function goManageFeatured() {
       <div class="drawer-header">
         <div class="dialog-title">
           <span>{{ toolInfo.icon }}</span>
-          <span>{{ toolInfo.name }} 配置生成器</span>
+          <span>{{ t('clientConfigDialog.title', { tool: toolInfo.name }) }}</span>
         </div>
-        <button class="btn btn-ghost btn-sm" @click="close">关闭 ✕</button>
+        <button class="btn btn-ghost btn-sm" @click="close">{{ t('clientConfigDialog.close') }} ✕</button>
       </div>
 
       <div class="drawer-body-scroll">
@@ -300,9 +302,9 @@ function goManageFeatured() {
         <!-- Step 1: API Key -->
         <div class="step-section">
           <div class="step-label">
-            <span>① 选择 API Key（当前租户下所有密钥）</span>
+            <span>{{ t('clientConfigDialog.step1.title') }}</span>
             <button class="btn btn-ghost btn-sm refresh-btn" :disabled="keysLoading" @click="loadKeys">
-              {{ keysLoading ? '刷新中…' : '↻ 刷新' }}
+              {{ keysLoading ? t('clientConfigDialog.step1.refreshing') : '↻ ' + t('clientConfigDialog.step1.refresh') }}
             </button>
           </div>
           <select v-if="!keysLoading && keys.length > 0" v-model="selectedKeyId" class="select-field">
@@ -310,26 +312,26 @@ function goManageFeatured() {
               {{ k.key_prefix }}**** ({{ k.application_code }}, {{ k.status }})
             </option>
           </select>
-          <div v-else-if="keysLoading" class="state-row">加载中…</div>
+          <div v-else-if="keysLoading" class="state-row">{{ t('clientConfigDialog.step1.loading') }}</div>
           <div v-else class="empty-state">
             <div class="empty-state-icon">🔑</div>
-            <div class="empty-state-title">暂无 API Key</div>
+            <div class="empty-state-title">{{ t('clientConfigDialog.step1.empty.title') }}</div>
             <div class="empty-state-desc">
-              当前租户下还没有可用的 API Key。管理员可点击下方按钮申请一个新 Key。
+              {{ t('clientConfigDialog.step1.empty.description') }}
             </div>
             <button class="btn btn-primary" @click="applyDialogOpen = true">
-              申请新密钥
+              {{ t('clientConfigDialog.step1.empty.applyButton') }}
             </button>
           </div>
           <div v-if="selectedKey" class="key-info">
-            已选：<code>{{ selectedKey.key_prefix }}****</code>
+            {{ t('clientConfigDialog.step1.selected') }}<code>{{ selectedKey.key_prefix }}****</code>
             <span class="badge" :class="selectedKey.status === 'active' ? 'badge-green' : 'badge-yellow'">{{ selectedKey.status }}</span>
           </div>
         </div>
 
         <!-- Step 2: OS -->
         <div class="step-section">
-          <div class="step-label">② 操作系统</div>
+          <div class="step-label">{{ t('clientConfigDialog.step2.title') }}</div>
           <div class="os-tabs">
             <button
               v-for="(info, os) in OS_INFO"
@@ -339,37 +341,37 @@ function goManageFeatured() {
             >{{ info.label }}</button>
           </div>
           <div class="path-hint">
-            配置文件路径：<code>{{ OS_INFO[selectedOS].paths[tool] }}</code>
+            {{ t('clientConfigDialog.step2.pathHint') }}<code>{{ OS_INFO[selectedOS].paths[tool] }}</code>
           </div>
         </div>
 
         <!-- Step 3: Model scope -->
         <div class="step-section">
-          <div class="step-label">③ 选择模型范围</div>
+          <div class="step-label">{{ t('clientConfigDialog.step3.title') }}</div>
           <div class="scope-radios">
             <label class="radio-label">
               <input type="radio" value="featured" v-model="selectedScope" />
-              <span>热门模型（路由 featured 配置）</span>
+              <span>{{ t('clientConfigDialog.step3.featured') }}</span>
             </label>
             <label class="radio-label">
               <input type="radio" value="all" v-model="selectedScope" />
-              <span>全部可用模型（从网关拉取）</span>
+              <span>{{ t('clientConfigDialog.step3.all') }}</span>
             </label>
           </div>
 
           <!-- Featured preview -->
           <div v-if="selectedScope === 'featured'" class="model-preview">
-            <div v-if="featuredLoading" class="models-loading">加载中…</div>
+            <div v-if="featuredLoading" class="models-loading">{{ t('clientConfigDialog.step3.featuredPreview.loading') }}</div>
             <div v-else-if="featuredModels.length === 0" class="empty-mini-state">
-              <div class="empty-mini-title">路由中尚未配置热门模型</div>
+              <div class="empty-mini-title">{{ t('clientConfigDialog.step3.featuredPreview.empty') }}</div>
               <button class="btn btn-primary btn-sm" @click="goManageFeatured">
-                前往「路由策略」配置 →
+                {{ t('clientConfigDialog.step3.featuredPreview.manageButton') }}
               </button>
             </div>
             <template v-else>
               <span class="model-tag" v-for="m in featuredModels" :key="m">{{ m }}</span>
               <button class="btn btn-ghost btn-sm manage-link" @click="goManageFeatured">
-                管理 →
+                {{ t('clientConfigDialog.step3.featuredPreview.manage') }}
               </button>
             </template>
           </div>
@@ -377,21 +379,21 @@ function goManageFeatured() {
           <!-- All models from API -->
           <div v-if="selectedScope === 'all'" class="all-models-panel">
             <div class="all-models-toolbar">
-              <button class="btn btn-ghost btn-sm" @click="selectAllModels">全选当前</button>
-              <button class="btn btn-ghost btn-sm" @click="deselectAllModels">清空</button>
+              <button class="btn btn-ghost btn-sm" @click="selectAllModels">{{ t('clientConfigDialog.step3.allModels.selectAll') }}</button>
+              <button class="btn btn-ghost btn-sm" @click="deselectAllModels">{{ t('clientConfigDialog.step3.allModels.deselectAll') }}</button>
               <span class="model-count-label">
-                <strong>{{ selectedModels.length }}</strong> / {{ allModels.length }} 已选
-                <span v-if="modelSearch" class="filter-hint">（{{ filteredModels.length }} 匹配搜索）</span>
+                <strong>{{ selectedModels.length }}</strong> / {{ allModels.length }} {{ t('clientConfigDialog.step3.allModels.selected') }}
+                <span v-if="modelSearch" class="filter-hint">{{ t('clientConfigDialog.step3.allModels.filterHint', { count: filteredModels.length }) }}</span>
               </span>
             </div>
             <input
               v-model="modelSearch"
               type="text"
               class="model-search-input"
-              placeholder="🔍 搜索模型名称 / 厂商 / family…"
+              :placeholder="t('clientConfigDialog.step3.allModels.searchPlaceholder')"
             />
-            <div v-if="allModelsLoading" class="models-loading">加载中…</div>
-            <div v-else-if="filteredModels.length === 0" class="models-loading">没有匹配的模型</div>
+            <div v-if="allModelsLoading" class="models-loading">{{ t('clientConfigDialog.step3.allModels.loading') }}</div>
+            <div v-else-if="filteredModels.length === 0" class="models-loading">{{ t('clientConfigDialog.step3.allModels.noMatch') }}</div>
             <div v-else class="models-grouped">
               <div v-for="[family, list] in groupedModels" :key="family" class="model-family-group">
                 <label class="model-family-header">
@@ -427,7 +429,7 @@ function goManageFeatured() {
         <!-- Sticky footer with primary action -->
         <div class="drawer-footer">
           <div class="footer-info" v-if="hasGenerated">
-            <span class="footer-hint">已生成 {{ selectedModels.length }} 个模型配置</span>
+            <span class="footer-hint">{{ t('clientConfigDialog.footer.generated', { count: selectedModels.length }) }}</span>
           </div>
           <button
             v-if="!hasGenerated"
@@ -435,7 +437,7 @@ function goManageFeatured() {
             :disabled="!selectedKeyId || generating"
             @click="generate"
           >
-            {{ generating ? '生成中…' : '生成配置' }}
+            {{ generating ? t('clientConfigDialog.footer.generating') : t('clientConfigDialog.footer.generate') }}
           </button>
           <button
             v-else
@@ -443,27 +445,27 @@ function goManageFeatured() {
             @click="generate"
             :disabled="generating"
           >
-            重新生成
+            {{ t('clientConfigDialog.footer.regenerate') }}
           </button>
         </div>
 
         <!-- Results -->
         <div v-if="hasGenerated" class="results-section">
           <div class="result-tabs">
-            <button :class="['tab-btn', activeTab === 'file' ? 'active' : '']" @click="activeTab = 'file'">配置文件</button>
+            <button :class="['tab-btn', activeTab === 'file' ? 'active' : '']" @click="activeTab = 'file'">{{ t('clientConfigDialog.results.tabs.file') }}</button>
             <button
               v-if="tool !== 'cherry_studio' && tool !== 'cursor'"
               :class="['tab-btn', activeTab === 'script' ? 'active' : '']" @click="activeTab = 'script'"
-            >配置脚本</button>
-            <button :class="['tab-btn', activeTab === 'manual' ? 'active' : '']" @click="activeTab = 'manual'">手动步骤</button>
+            >{{ t('clientConfigDialog.results.tabs.script') }}</button>
+            <button :class="['tab-btn', activeTab === 'manual' ? 'active' : '']" @click="activeTab = 'manual'">{{ t('clientConfigDialog.results.tabs.manual') }}</button>
           </div>
 
           <!-- File Tab -->
           <div v-if="activeTab === 'file'" class="tab-content">
             <pre class="code-preview">{{ generatedFile }}</pre>
             <div class="result-actions">
-              <button class="btn btn-ghost btn-sm" @click="copyFile">复制内容</button>
-              <button class="btn btn-ghost btn-sm" @click="downloadFileContent">下载文件</button>
+              <button class="btn btn-ghost btn-sm" @click="copyFile">{{ t('clientConfigDialog.results.actions.copyContent') }}</button>
+              <button class="btn btn-ghost btn-sm" @click="downloadFileContent">{{ t('clientConfigDialog.results.actions.downloadFile') }}</button>
             </div>
           </div>
 
@@ -471,8 +473,8 @@ function goManageFeatured() {
           <div v-if="activeTab === 'script'" class="tab-content">
             <pre class="code-preview script-code">{{ generatedScript }}</pre>
             <div class="result-actions">
-              <button class="btn btn-primary btn-sm" @click="downloadScript">下载脚本</button>
-              <span class="action-hint">脚本自动备份旧配置文件</span>
+              <button class="btn btn-primary btn-sm" @click="downloadScript">{{ t('clientConfigDialog.results.actions.downloadScript') }}</button>
+              <span class="action-hint">{{ t('clientConfigDialog.results.actions.scriptHint') }}</span>
             </div>
           </div>
 
@@ -490,24 +492,24 @@ function goManageFeatured() {
   <div v-if="applyDialogOpen" class="modal-backdrop" @click.self="applyDialogOpen = false">
     <div class="modal-panel card" @click.stop>
       <div class="modal-header">
-        <h4 style="margin:0">申请新 API Key</h4>
-        <button class="btn btn-ghost btn-sm" @click="applyDialogOpen = false">关闭 ✕</button>
+        <h4 style="margin:0">{{ t('clientConfigDialog.applyDialog.title') }}</h4>
+        <button class="btn btn-ghost btn-sm" @click="applyDialogOpen = false">{{ t('clientConfigDialog.applyDialog.close') }} ✕</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>应用标识 (application_code)</label>
-          <input v-model="applyForm.application_code" class="form-input" placeholder="例如: default-app" />
+          <label>{{ t('clientConfigDialog.applyDialog.applicationCode') }}</label>
+          <input v-model="applyForm.application_code" class="form-input" :placeholder="t('clientConfigDialog.applyDialog.applicationCodePlaceholder')" />
         </div>
         <div class="form-group">
-          <label>备注 (description)</label>
-          <textarea v-model="applyForm.description" class="form-input" rows="3" placeholder="可选：申请原因 / 用途"></textarea>
+          <label>{{ t('clientConfigDialog.applyDialog.description') }}</label>
+          <textarea v-model="applyForm.description" class="form-input" rows="3" :placeholder="t('clientConfigDialog.applyDialog.descriptionPlaceholder')"></textarea>
         </div>
         <div v-if="applyError" class="alert alert-danger">{{ applyError }}</div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-ghost" @click="applyDialogOpen = false">取消</button>
+        <button class="btn btn-ghost" @click="applyDialogOpen = false">{{ t('clientConfigDialog.applyDialog.cancel') }}</button>
         <button class="btn btn-primary" :disabled="applying" @click="submitApply">
-          {{ applying ? '提交中…' : '提交申请' }}
+          {{ applying ? t('clientConfigDialog.applyDialog.submitting') : t('clientConfigDialog.applyDialog.submit') }}
         </button>
       </div>
     </div>
