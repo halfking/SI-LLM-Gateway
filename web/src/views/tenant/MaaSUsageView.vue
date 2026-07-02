@@ -234,8 +234,8 @@ onMounted(load)
           <tr>
             <th>时间</th>
             <th>类型</th>
-            <th style="text-align:right">变动</th>
-            <th style="text-align:right">余额</th>
+            <th class="num-th">变动</th>
+            <th class="num-th">余额</th>
             <th>关联</th>
             <th>备注</th>
           </tr>
