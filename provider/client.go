@@ -282,13 +282,21 @@ func (c *Client) GetCandidates(ctx context.Context, model, profile string) ([]Ca
 			slog.Warn("provider.GetCandidates: fetchCandidatesDB failed", "error", fetchErr)
 			return nil, fetchErr
 		}
-		slog.Info("provider.GetCandidates: fetchCandidatesDB returned", 
+		slog.Info("provider.GetCandidates: fetchCandidatesDB returned",
 			"candidate_count", len(resp.Candidates))
 
 		c.mu.Lock()
 		c.candCache[key] = cacheEntry[*resolveResponse]{
+			// 2026-07-03: shortened from 30s → 5s as a defence-in-depth
+			// after the minimax-m3 incident (request a69a71a05e6610adcf55df32f2618797).
+			// All state-change paths now call provider.InvalidateAllCandidateCache
+			// synchronously, but if any future code path forgets to wire the
+			// invalidator, the candidate list will at worst lag 5s behind DB.
+			// The fetchCandidatesDB query hits idx_request_logs_credential_ts and
+			// v_routable_credential_models — both indexed — so a 6× higher
+			// re-read rate is well within budget.
 			value:   resp,
-			expires: time.Now().Add(30 * time.Second),
+			expires: time.Now().Add(5 * time.Second),
 		}
 		c.mu.Unlock()
 		return resp, nil

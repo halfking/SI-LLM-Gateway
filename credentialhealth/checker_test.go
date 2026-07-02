@@ -235,7 +235,9 @@ func TestRecoverExpired(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 2))
 
 	ctx := context.Background()
-	count, err := RecoverExpired(ctx, mockDB)
+	// 2026-07-03: nil invalidator — the test only asserts DB writes,
+	// not the candCache invalidation behaviour (covered in main wiring).
+	count, err := RecoverExpired(ctx, mockDB, nil)
 	if err != nil {
 		t.Fatalf("RecoverExpired failed: %v", err)
 	}
@@ -255,7 +257,7 @@ func TestRecoverExpired_HonoursRecoverAt(t *testing.T) {
 	mockDB.ExpectExec(`UPDATE credential_model_bindings[\s\S]*unavailable_recover_at`).WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 	mockDB.ExpectExec(`UPDATE model_offers[\s\S]*unavailable_at`).WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 	mockDB.ExpectExec(`UPDATE credentials`).WillReturnResult(pgxmock.NewResult("UPDATE", 0))
-	if _, err := RecoverExpired(context.Background(), mockDB); err != nil {
+	if _, err := RecoverExpired(context.Background(), mockDB, nil); err != nil {
 		t.Fatalf("RecoverExpired: %v", err)
 	}
 	if err := mockDB.ExpectationsWereMet(); err != nil {
@@ -269,10 +271,77 @@ func TestRecoverExpired_SkipsModelProbeBroken(t *testing.T) {
 	mockDB.ExpectExec(`UPDATE credential_model_bindings[\s\S]*model_probe_broken`).WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 	mockDB.ExpectExec(`UPDATE model_offers[\s\S]*model_probe_broken`).WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 	mockDB.ExpectExec(`UPDATE credentials`).WillReturnResult(pgxmock.NewResult("UPDATE", 0))
-	if _, err := RecoverExpired(context.Background(), mockDB); err != nil {
+	if _, err := RecoverExpired(context.Background(), mockDB, nil); err != nil {
 		t.Fatalf("RecoverExpired: %v", err)
 	}
 	if err := mockDB.ExpectationsWereMet(); err != nil {
 		t.Errorf("model_probe_broken not excluded: %v", err)
+	}
+}
+
+// TestRecoverExpired_InvokesInvalidator is the regression test for the
+// 2026-07-03 incident (request a69a71a05e6610adcf55df32f2618797):
+// minimax-prod-1/minimax-m3 was healthy in the session but the router
+// kept returning "no available provider" for up to 30s because the
+// in-memory candCache held the stale empty list. RecoverExpired must
+// invoke the supplied invalidateCache exactly once when rows are
+// restored, so the very next request observes the recovered binding.
+func TestRecoverExpired_InvokesInvalidator(t *testing.T) {
+	mockDB, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("failed to create mock: %v", err)
+	}
+	defer mockDB.Close()
+
+	mockDB.ExpectExec("UPDATE credential_model_bindings").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mockDB.ExpectExec("UPDATE model_offers").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mockDB.ExpectExec("UPDATE credentials").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	var calls int
+	invalidate := func() { calls++ }
+
+	count, err := RecoverExpired(context.Background(), mockDB, invalidate)
+	if err != nil {
+		t.Fatalf("RecoverExpired failed: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 recovered, got %d", count)
+	}
+	if calls != 1 {
+		t.Errorf("invalidateCache should fire exactly once on success, got %d", calls)
+	}
+	if err := mockDB.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestRecoverExpired_NoInvalidateWhenZeroRows confirms the invalidator is
+// NOT called when RecoverExpired finds nothing to restore. This keeps
+// the contract minimal: invalidation is the recovery signal, not a
+// per-tick housekeeping call.
+func TestRecoverExpired_NoInvalidateWhenZeroRows(t *testing.T) {
+	mockDB, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("failed to create mock: %v", err)
+	}
+	defer mockDB.Close()
+
+	mockDB.ExpectExec("UPDATE credential_model_bindings").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+	mockDB.ExpectExec("UPDATE model_offers").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+	mockDB.ExpectExec("UPDATE credentials").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	calls := 0
+	invalidate := func() { calls++ }
+	if _, err := RecoverExpired(context.Background(), mockDB, invalidate); err != nil {
+		t.Fatalf("RecoverExpired failed: %v", err)
+	}
+	if calls != 0 {
+		t.Errorf("invalidateCache must not fire on no-op recovery, got %d calls", calls)
 	}
 }
