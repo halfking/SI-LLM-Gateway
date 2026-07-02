@@ -161,13 +161,24 @@ func TestRebuildBodyWithCompressedArrays_NoChanges(t *testing.T) {
 func TestRebuildBodyWithCompressedArrays_WithCCRMarker(t *testing.T) {
 	body := []byte(`{
 		"messages": [
-			{"role": "user", "content": "original"}
+			{
+				"role": "user",
+				"content": [
+					{
+						"type": "tool_result",
+						"tool_use_id": "test",
+						"content": "[\"item1\", \"item2\", \"item3\", \"item4\", \"item5\"]"
+					}
+				]
+			}
 		]
 	}`)
 
 	arrays := []*ArrayInfo{
 		{
 			MessageIndex:     0,
+			ContentIndex:     0,
+			ArrayPath:        "messages[0].content[0].content",
 			ReplacementItems: []json.RawMessage{json.RawMessage(`"compressed"`)},
 			CCRMarker:        "<<ccr:abc123 5_rows_offloaded>>",
 		},

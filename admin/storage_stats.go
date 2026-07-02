@@ -228,7 +228,14 @@ func (h *Handler) getDatabaseStats(ctx context.Context) (*DatabaseStats, error) 
 				LIMIT 1
 			), false) AS is_columnar
 		FROM (
-			VALUES ('request_logs'), ('attachments')
+			VALUES
+				('request_logs'),
+				('attachments'),
+				('ccr_cache'),
+				('request_logs_archive'),
+				('candidate_failure_logs'),
+				('routing_decision_log'),
+				('credential_model_call_history')
 		) AS t(table_name)
 		ORDER BY size_bytes DESC
 	`)
