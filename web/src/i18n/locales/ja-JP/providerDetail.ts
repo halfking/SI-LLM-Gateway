@@ -147,6 +147,21 @@ export default {
       suspended: 'suspended (一時停止)',
       retired: 'retired (リタイア)',
     },
+    // v735: route-side plan type (credentials.plan_type)
+    drawerFieldPlanType: '課金プラン',
+    planTypeUnset: '未設定（token として処理）',
+    planTypeHint: 'ルーティング時、cmb.billing_mode はここから自動派生します',
+    planTypes: {
+      token: 'token (従量課金)',
+      token_plan: 'token_plan (サブスクリプション)',
+      code_plan: 'code_plan (コードプラン)',
+      agent_plan: 'agent_plan (Agent プラン)',
+      request: 'request (リクエスト単位)',
+      seat: 'seat (シート単位)',
+      compute_time: 'compute_time (コンピュート単位)',
+      flat_quota: 'flat_quota (固定クォータ)',
+      free: 'free (無料)',
+    },
     health: {
       healthy: '正常',
       warning: '警告',
@@ -188,6 +203,7 @@ export default {
     expired: '期限切れ',
     checkFailed: 'チェック失敗',
     lifecycleFailed: '設定失敗',
+    planTypeFailed: 'plan_type の設定に失敗しました',
   },
   models: {
     title: 'モデル一覧 ({n})',
