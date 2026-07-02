@@ -69,9 +69,10 @@ func TestCCRRetrievalTool_Execute_Success(t *testing.T) {
 	err := manager.Put(ctx, hash, testData, "test_session")
 	require.NoError(t, err)
 
-	// Execute retrieval
+	// Execute retrieval — must include matching session_id
 	args := map[string]interface{}{
-		"hash": hash,
+		"hash":       hash,
+		"session_id": "test_session",
 	}
 	result, err := tool.Execute(ctx, args)
 	require.NoError(t, err)
@@ -124,11 +125,12 @@ func TestCCRRetrievalTool_Execute_NotFound(t *testing.T) {
 	ctx := context.Background()
 
 	args := map[string]interface{}{
-		"hash": "nonexistent00000000000000",
+		"hash":       "nonexistent0000000000000",
+		"session_id": "any_session",
 	}
 	_, err := tool.Execute(ctx, args)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to retrieve")
+	assert.Contains(t, err.Error(), "not found for this session")
 }
 
 func TestCCRRetrievalTool_Execute_NoCCRManager(t *testing.T) {
@@ -188,7 +190,8 @@ func TestCCRRetrievalTool_Execute_NonArrayData(t *testing.T) {
 
 	// Execute retrieval
 	args := map[string]interface{}{
-		"hash": hash,
+		"hash":       hash,
+		"session_id": "test_session",
 	}
 	result, err := tool.Execute(ctx, args)
 	require.NoError(t, err)

@@ -307,7 +307,7 @@ func TestCircuitBreakerBlocksAfterFailures(t *testing.T) {
 		resp.Body.Close()
 	}
 
-	b := cm.GetOrCreate(1, 1)
+	b := cm.GetOrCreate(1, 1, "")
 	t.Logf("circuit breaker state: %s, consecutive: %d", b.State(), b.ConsecutiveFailures())
 }
 
