@@ -395,21 +395,21 @@ func (h *Handler) updateCredential(w http.ResponseWriter, r *http.Request, provi
 	}
 	if req.PlanType != nil {
 		// v735: validate against credentials.plan_type CHECK constraint
-		// (see pricing_plans migration). Empty string clears the column
-		// (NULL). Any other value must be one of the supported plan
-		// types; an invalid value would otherwise crash the UPDATE with
-		// SQLSTATE 23514.
+		// (defined in deploy/sql/migrations/063_credentials_plan_type.sql).
+		// Empty string clears the column to NULL. Any other value must be
+		// one of the supported plan types; an invalid value would otherwise
+		// crash the UPDATE with SQLSTATE 23514.
 		allowed := map[string]bool{
-			"":            true, // empty → NULL (clears the field)
-			"token":       true,
-			"token_plan":  true,
-			"code_plan":   true,
-			"agent_plan":  true,
-			"request":     true,
-			"seat":        true,
+			"":             true, // empty → NULL (clears the field)
+			"token":        true,
+			"token_plan":   true,
+			"code_plan":    true,
+			"agent_plan":   true,
+			"request":      true,
+			"seat":         true,
 			"compute_time": true,
-			"flat_quota":  true,
-			"free":        true,
+			"flat_quota":   true,
+			"free":         true,
 		}
 		if !allowed[*req.PlanType] {
 			writeError(w, http.StatusBadRequest,
@@ -418,13 +418,44 @@ func (h *Handler) updateCredential(w http.ResponseWriter, r *http.Request, provi
 		}
 		// Empty string → SQL NULL.
 		var planVal interface{}
-		if *req.PlanType != "" {
-			planVal = *req.PlanType
+		cmbTarget := *req.PlanType
+		if *req.PlanType == "" {
+			planVal = nil
+			// H4 (audit fix): when clearing plan_type, also reset
+			// cmb.billing_mode to the column default ('per_token').
+			// Otherwise the cmb row keeps the stale value while the
+			// credential is no longer on a plan — fine for routing
+			// (rule 8 requires plan_type in the allow-list to be
+			// triggered) but breaks the invariant "cmb.billing_mode
+			// is derived from credential.plan_type" and confuses
+			// downstream billing/quoting that reads cmb.billing_mode.
+			cmbTarget = "" // sentinel meaning "reset to column default"
 		}
-		if _, err := h.db.Exec(ctx,
+		// H2 (audit fix): wrap cred + cmb UPDATEs in a single tx so a
+		// concurrent admin/pricing UPDATE between the two UPDATEs
+		// cannot land on a half-applied state. The credential UPDATE
+		// fires the credentials trigger NOTIFY ('plan_type' added
+		// 2026-07-03); the cmb UPDATE fires the cmb trigger NOTIFY.
+		// Both NOTIFYs land AFTER COMMIT, so the listener sees both
+		// and the candCache is invalidated by the post-handler call
+		// to provider.InvalidateAllCandidateCache() below (belt-and-
+		// suspenders).
+		//
+		// Read the old plan_type before the UPDATE so we can audit it.
+		var prevPlan sql.NullString
+		_ = h.db.QueryRow(ctx, `SELECT plan_type FROM credentials WHERE id = $1`, credID).Scan(&prevPlan)
+		prevJSON := nullableString(prevPlan)
+
+		tx, txErr := h.db.Begin(ctx)
+		if txErr != nil {
+			writeError(w, http.StatusInternalServerError, "begin tx: "+txErr.Error())
+			return
+		}
+		if _, err := tx.Exec(ctx,
 			`UPDATE credentials SET plan_type = $1, updated_at = now()
 			 WHERE id = $2 AND provider_id = $3`,
 			planVal, credID, providerID); err != nil {
+			_ = tx.Rollback(ctx)
 			writeError(w, http.StatusInternalServerError, "plan_type update failed: "+err.Error())
 			return
 		}
@@ -437,19 +468,52 @@ func (h *Handler) updateCredential(w http.ResponseWriter, r *http.Request, provi
 		// The WHERE clause `billing_mode <> $1` is intentionally broad:
 		// it rewrites every row that disagrees with the new plan_type,
 		// including legacy 'per_token' values left over from the v734
-		// incident. This is the desired uniform-billing_mode behavior
-		// — admin/pricing paths can override individual rows afterwards
-		// (pricingBulkUpdate writes via model_offers UPDATE).
-		if planVal != nil {
-			if _, derr := h.db.Exec(ctx,
+		// incident. This is the desired uniform-billing_mode behavior.
+		if cmbTarget == "" {
+			// Reset cmb.billing_mode to the column default (the
+			// UPDATE without SET means the DEFAULT clause kicks in).
+			if _, derr := tx.Exec(ctx,
+				`UPDATE credential_model_bindings
+				 SET billing_mode = DEFAULT, updated_at = now()
+				 WHERE credential_id = $1`,
+				credID); derr != nil {
+				_ = tx.Rollback(ctx)
+				writeError(w, http.StatusInternalServerError, "cmb reset failed: "+derr.Error())
+				return
+			}
+		} else {
+			if _, derr := tx.Exec(ctx,
 				`UPDATE credential_model_bindings
 				 SET billing_mode = $1, updated_at = now()
 				 WHERE credential_id = $2 AND billing_mode <> $1`,
-				*req.PlanType, credID); derr != nil {
-				slog.Warn("plan_type update: cmb re-derive failed",
-					"credential_id", credID, "plan_type", *req.PlanType, "error", derr)
+				cmbTarget, credID); derr != nil {
+				_ = tx.Rollback(ctx)
+				writeError(w, http.StatusInternalServerError, "cmb re-derive failed: "+derr.Error())
+				return
 			}
 		}
+		if err := tx.Commit(ctx); err != nil {
+			writeError(w, http.StatusInternalServerError, "commit failed: "+err.Error())
+			return
+		}
+
+		// H1 (audit fix): emit settings.WriteAudit so an operator can
+		// later answer "who flipped cred 6 from token_plan to token".
+		// plan_type is high-impact (controls whether routes are
+		// routable — see v734 plan_incompatible), so loss-of-history
+		// here is a v734-style incident waiting to recur.
+		var newPlan sql.NullString
+		_ = h.db.QueryRow(ctx, `SELECT plan_type FROM credentials WHERE id = $1`, credID).Scan(&newPlan)
+		newJSON := nullableString(newPlan)
+		settings.WriteAudit(ctx, h.db, settings.AuditEntry{
+			SettingKey:   fmt.Sprintf("credential:%d:plan_type", credID),
+			Action:       "update",
+			OperatorUser: actorFromRequest(r),
+			OperatorRole: "admin",
+			ClientIP:     clientIPFromRequest(r),
+			OldValue:     prevJSON,
+			NewValue:     newJSON,
+		})
 	}
 	if req.ConcurrencyLimit != nil {
 		//nolint:errcheck // best-effort exec, non-critical
@@ -519,6 +583,15 @@ func (h *Handler) updateCredential(w http.ResponseWriter, r *http.Request, provi
 		h.db.Exec(ctx, `UPDATE credentials SET balance_usd = $1 WHERE id = $2 AND provider_id = $3`, *req.BalanceUSD, credID, providerID)
 	}
 	provider.InvalidateAllCandidateCache()
+	// H3 (audit fix): plan_type and other credential-level fields feed
+	// /api/routing/available-models (the admin dropdown that shows
+	// which models are routable for each credential). Without
+	// invalidating that cache, an operator who flipped plan_type
+	// from 'token_plan' to 'token' would still see the old
+	// plan_incompatible reason in the dropdown for up to its TTL.
+	// Mirrors setCredentialManualDisabled's precedent of pairing
+	// InvalidateAllCandidateCache with InvalidateAvailableModelsCache.
+	InvalidateAvailableModelsCache()
 	writeJSON(w, http.StatusOK, map[string]string{"message": "updated"})
 }
 
@@ -780,6 +853,18 @@ func jsonOrNull(v sql.NullInt32) json.RawMessage {
 		return json.RawMessage("null")
 	}
 	return json.RawMessage(strconv.FormatInt(int64(v.Int32), 10))
+}
+
+// nullableString is the text analogue of jsonOrNull. Used by
+// settings.WriteAudit calls that record plan_type (a TEXT column
+// that may be NULL). Returns explicit JSON null when Valid=false so
+// the audit reader sees a uniform shape across audit entries.
+func nullableString(v sql.NullString) json.RawMessage {
+	if !v.Valid {
+		return json.RawMessage("null")
+	}
+	b, _ := json.Marshal(v.String)
+	return b
 }
 
 // rejectedTransitionJSON builds the new_value payload for a constraint

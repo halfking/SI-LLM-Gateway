@@ -66,6 +66,12 @@ CREATE TABLE public.credentials (
     default_probe_model_picked_at timestamp with time zone,
     concurrency_limit_auto integer,
     fp_slot_limit integer NOT NULL,
+    -- v735: route-side plan type. NULL = "no plan" (treated like 'token'
+    -- by the routing layer). The 9-value set mirrors pricing_plans.plan_type
+    -- (pricing_plans.sql:27) so the two tables cannot drift apart. Plan↔
+    -- billing_mode parity is enforced by v_routable_credential_models rule 8
+    -- (see deploy/sql/objects/views/public.v_routable_credential_models.view.sql).
+    plan_type text,
     CONSTRAINT chk_credentials_health_source CHECK (((health_source IS NULL) OR (health_source = ANY (ARRAY['models'::text, 'probe'::text, 'mixed'::text, 'none'::text, 'fast_reprobe'::text])))),
     CONSTRAINT chk_credentials_health_status CHECK ((health_status = ANY (ARRAY['unknown'::text, 'healthy'::text, 'warning'::text, 'unreachable'::text]))),
     CONSTRAINT credentials_availability_state_check CHECK ((availability_state = ANY (ARRAY['ready'::text, 'cooling'::text, 'rate_limited'::text, 'auth_failed'::text, 'unreachable'::text, 'suspended'::text]))),
@@ -73,9 +79,13 @@ CREATE TABLE public.credentials (
     CONSTRAINT credentials_fp_slot_limit_check CHECK (((fp_slot_limit >= 0) AND (fp_slot_limit <= 10000))),
     CONSTRAINT credentials_fp_slot_vs_concurrency CHECK (((concurrency_limit IS NULL) OR (fp_slot_limit IS NULL) OR (fp_slot_limit <= concurrency_limit))),
     CONSTRAINT credentials_lifecycle_status_check CHECK ((lifecycle_status = ANY (ARRAY['active'::text, 'disabled'::text, 'suspended'::text, 'retired'::text]))),
+    CONSTRAINT credentials_plan_type_check CHECK ((plan_type IS NULL) OR (plan_type = ANY (ARRAY['token'::text, 'token_plan'::text, 'code_plan'::text, 'agent_plan'::text, 'request'::text, 'seat'::text, 'compute_time'::text, 'flat_quota'::text, 'free'::text])))),
     CONSTRAINT credentials_status_check CHECK ((status = ANY (ARRAY['active'::text, 'cooling'::text, 'degraded'::text, 'quarantine'::text, 'quota_expired'::text, 'disabled'::text]))),
     CONSTRAINT credentials_trust_level_check CHECK ((trust_level = ANY (ARRAY['trusted'::text, 'cooling'::text, 'degraded'::text, 'quarantine'::text])))
 );
+-- TOC entry for credentials_plan_type_check (created via pg_dump ordering)
+-- The CHECK above is part of the CREATE TABLE statement; pg_dump's
+-- pg_get_constraintdef() reads it back from pg_constraint.
 
 
 --

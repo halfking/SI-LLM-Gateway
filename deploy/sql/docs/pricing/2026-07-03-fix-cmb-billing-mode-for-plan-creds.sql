@@ -74,22 +74,20 @@ WHERE cmb.credential_id = c.id
   AND cmb.billing_mode <> 'agent_plan';
 
 -- 4. Verification: report rows affected and the new billing_mode distribution
---    for credentials on subscription plans.
-SELECT 'cmb_billing_mode_for_plan_creds_fix' AS check_name,
-       (SELECT count(*)
-        FROM credential_model_bindings cmb
-        JOIN credentials c ON c.id = cmb.credential_id
-        WHERE c.plan_type = 'token_plan') AS token_plan_cmb_total,
-       (SELECT count(*)
-        FROM credential_model_bindings cmb
-        JOIN credentials c ON c.id = cmb.credential_id
-        WHERE c.plan_type = 'token_plan'
-          AND cmb.billing_mode = 'token_plan') AS token_plan_cmb_correct,
-       (SELECT count(*)
-        FROM credential_model_bindings cmb
-        JOIN credentials c ON c.id = cmb.credential_id
-        WHERE c.plan_type = 'token_plan'
-          AND cmb.billing_mode <> 'token_plan') AS token_plan_cmb_still_wrong;
+--    for credentials on each subscription plan. 2026-07-03 audit fix: the
+--    original script only verified token_plan. This UNION-style report
+--    covers all three subscription plans (token_plan, code_plan,
+--    agent_plan) so a missing UPDATE in any branch surfaces in the
+--    verification row, not just the targeted one.
+SELECT plan_type,
+       count(*) AS total_cmb,
+       count(*) FILTER (WHERE cmb.billing_mode = plan_type::text) AS correct,
+       count(*) FILTER (WHERE cmb.billing_mode <> plan_type::text) AS still_wrong
+FROM credential_model_bindings cmb
+JOIN credentials c ON c.id = cmb.credential_id
+WHERE c.plan_type IN ('token_plan', 'code_plan', 'agent_plan')
+GROUP BY c.plan_type
+ORDER BY c.plan_type;
 
 -- 5. Targeted check on the originally-failing pair
 SELECT 'cred6_minimax_m3' AS check_name,
@@ -101,5 +99,19 @@ JOIN credentials c ON c.id = cmb.credential_id
 JOIN v_routable_credential_models v
      ON v.credential_id = c.id AND v.raw_model_name = pm.raw_model_name
 WHERE c.id = 6 AND pm.raw_model_name = 'MiniMax-M3';
+
+-- 6. Catch-all: any (cred, model) pair whose credential plan_type is
+--    a subscription plan but cmb.billing_mode is something else. This is
+--    a regression test for any future bug where the parity invariant
+--    (CMB-1) breaks; the WHERE clause matches the v_routable view's rule 8
+--    on the source columns.
+SELECT 'cmb_rule8_violations' AS check_name, count(*) AS violation_rows
+FROM credential_model_bindings cmb
+JOIN credentials c ON c.id = cmb.credential_id
+JOIN provider_models pm ON pm.id = cmb.provider_model_id
+JOIN model_offers mo
+     ON mo.credential_id = cmb.credential_id AND mo.raw_model_name = pm.raw_model_name
+WHERE c.plan_type IN ('token_plan','code_plan','agent_plan')
+  AND mo.billing_mode NOT IN ('token_plan','code_plan','agent_plan');
 
 COMMIT;
