@@ -160,6 +160,19 @@ export default {
       compute_time: 'compute_time (按算力)',
       flat_quota: 'flat_quota (固定配额)',
       free: 'free (免费)',
+      // camelCase aliases — CredsTab.vue references the dropdown labels
+      // via `creds.planTypes.tokenPlan` etc. (v735 used camelCase in the
+      // computed() but the locale keys were snake_case; that mismatch made
+      // the dropdown show the raw key path. Keep these aliases in sync with
+      // the snake_case entries above so the drop-down labels render in
+      // every locale. Do NOT remove the snake_case entries — they remain
+      // the parity-test source of truth and may be referenced by other
+      // callers (e.g. backend error messages re-rendered client-side).
+      tokenPlan: 'token_plan (订阅套餐)',
+      codePlan: 'code_plan (代码套餐)',
+      agentPlan: 'agent_plan (Agent 套餐)',
+      computeTime: 'compute_time (按算力)',
+      flatQuota: 'flat_quota (固定配额)',
     },
     health: {
       healthy: '正常',

@@ -162,6 +162,12 @@ export default {
       compute_time: 'compute_time (par calcul)',
       flat_quota: 'flat_quota (quota fixe)',
       free: 'free (gratuit)',
+      // camelCase aliases — see zh-CN/providerDetail.ts for the rationale.
+      tokenPlan: 'token_plan (abonnement)',
+      codePlan: 'code_plan (forfait code)',
+      agentPlan: 'agent_plan (forfait agent)',
+      computeTime: 'compute_time (par calcul)',
+      flatQuota: 'flat_quota (quota fixe)',
     },
     health: {
       healthy: 'Sain',

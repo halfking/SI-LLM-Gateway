@@ -161,6 +161,14 @@ export default {
       compute_time: 'compute_time (per compute)',
       flat_quota: 'flat_quota (flat quota)',
       free: 'free',
+      // camelCase aliases — see zh-CN/providerDetail.ts for the rationale.
+      // Mirrors the snake_case entries above so CredsTab.vue's
+      // `creds.planTypes.tokenPlan` lookups hit.
+      tokenPlan: 'token_plan (subscription)',
+      codePlan: 'code_plan (coding plan)',
+      agentPlan: 'agent_plan (agent plan)',
+      computeTime: 'compute_time (per compute)',
+      flatQuota: 'flat_quota (flat quota)',
     },
     health: {
       healthy: 'Healthy',

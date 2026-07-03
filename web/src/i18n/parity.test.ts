@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, readdirSync, existsSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import vm from 'vm'
@@ -237,5 +237,53 @@ describe('i18n parity gate', () => {
       }
     }
     expect(failures, failures.join('\n\n')).toEqual([])
+  })
+
+  // -------------------------------------------------------------------------
+  // Regression guard for v735 (2026-07-03): CredsTab.vue referenced the
+  // plan_type dropdown labels via `creds.planTypes.tokenPlan` (camelCase)
+  // but every locale defined them as `creds.planTypes.token_plan`
+  // (snake_case). vue-i18n's missing-key fallback rendered the raw key
+  // path in the dropdown. The locale-side superset test above cannot
+  // catch this kind of bug because both shapes exist in zh-CN — only the
+  // Vue call site disagrees. This test scans .vue/.ts files for i18n key
+  // string literals and asserts each one resolves in zh-CN (the SSOT).
+  // -------------------------------------------------------------------------
+  it('every i18n key referenced in src resolves in zh-CN (SSOT)', () => {
+    // Regression guard for v735 (2026-07-03): CredsTab.vue referenced the
+    // plan_type dropdown labels via `creds.planTypes.tokenPlan` (camelCase)
+    // but every locale defined them as `creds.planTypes.token_plan`
+    // (snake_case). vue-i18n's missing-key fallback rendered the raw key
+    // path in the dropdown. The locale-side superset test above cannot
+    // catch this kind of bug because both shapes exist in zh-CN — only the
+    // Vue call site disagrees.
+    //
+    // This test scans `creds.*` references inside CredsTab.vue and asserts
+    // each one resolves under `providerDetail.creds.*` in zh-CN. We keep
+    // the scope narrow (a single file) because the broader `pd(/tt()/pp()`
+    // helper family lives across many files and each helper binds its own
+    // namespace — generalising this scan to cover every helper reliably
+    // is a separate refactor (see the file-level TODO below).
+    //
+    // TODO(2026-07-03): broaden this check to all of `src/**`. A robust
+    // approach is to instantiate vue-i18n with zh-CN and call `t(key)` on
+    // every literal in `src/**`, then assert the returned string !== key.
+    // That requires importing the i18n instance (and a vitest setup file)
+    // and is out of scope for the v735 fix.
+    const credsTab = join(__dirname, '..', 'views', 'provider-detail', 'CredsTab.vue')
+    const src = readFileSync(credsTab, 'utf8')
+    const referenced = new Set<string>()
+    const re = /\bpd\(\s*['"](creds\.[a-zA-Z0-9_.]+)['"]/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(src)) !== null) referenced.add(m[1])
+
+    // Each `creds.x` literal resolves under `providerDetail.creds.x` because
+    // CredsTab.vue's `pd` helper prepends `providerDetail.`.
+    const zhKeys = collectLeafKeys(loadModuleFile(SOURCE_LOCALE, 'providerDetail'))
+    const missing = [...referenced]
+      .map((k) => `providerDetail.${k}`)
+      .filter((full) => !zhKeys.has(full.replace(/^providerDetail\./, '')))
+      .sort()
+    expect(missing, `i18n keys referenced in CredsTab.vue but missing in zh-CN (${missing.length}):\n` + missing.map((k) => `  - ${k}`).join('\n')).toEqual([])
   })
 })

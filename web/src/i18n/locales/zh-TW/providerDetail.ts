@@ -161,6 +161,12 @@ export default {
       compute_time: 'compute_time (按算力)',
       flat_quota: 'flat_quota (固定配額)',
       free: 'free (免費)',
+      // camelCase aliases — see zh-CN/providerDetail.ts for the rationale.
+      tokenPlan: 'token_plan (訂閱方案)',
+      codePlan: 'code_plan (程式碼方案)',
+      agentPlan: 'agent_plan (Agent 方案)',
+      computeTime: 'compute_time (按算力)',
+      flatQuota: 'flat_quota (固定配額)',
     },
     health: {
       healthy: '正常',
