@@ -341,9 +341,16 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	-- and idx_request_logs_client_model_trgm.
 	--
 	-- Idempotent via CREATE INDEX IF NOT EXISTS.
-	CREATE INDEX IF NOT EXISTS idx_request_logs_search_text_trgm
-	    ON public.request_logs
-	    USING gin (search_text public.gin_trgm_ops);
+	-- 2026-07-03 FIX: Wrap in DO block to handle pg_trgm extension missing.
+	DO $$
+	BEGIN
+	    CREATE INDEX IF NOT EXISTS idx_request_logs_search_text_trgm
+	        ON public.request_logs
+	        USING gin (search_text public.gin_trgm_ops);
+	EXCEPTION
+	    WHEN OTHERS THEN
+	        RAISE NOTICE 'idx_request_logs_search_text_trgm skipped (pg_trgm extension not available): %', SQLERRM;
+	END $$;
 `)
 	if err != nil {
 		slog.Error("ensureRequestLogSchema failed", "error", err)
