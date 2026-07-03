@@ -293,7 +293,11 @@ echo '--- gateway starting log ---'
 docker logs --since 30s "$SERVICE_NAME" 2>&1 | grep -E 'gateway starting' | tail -3 || true
 echo
 echo '--- cleaning stale index.html.bak ---'
-rm -f "$REMOTE_DIR/web/dist/index.html.bak."* || true
+# Backup lives at ${REMOTE_WEB}/index.html.bak.* (default
+# /opt/llm-gateway-go/web/), not under web/dist/, so the glob must
+# match that prefix. Keep only the most recent backup (the one just
+# created in this deploy) and delete older ones.
+ls -1t "$REMOTE_DIR/web/index.html.bak."* 2>/dev/null | tail -n +2 | xargs -r rm -f || true
 REMOTE
 fi
 
