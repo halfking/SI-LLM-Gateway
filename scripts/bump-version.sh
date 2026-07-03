@@ -291,14 +291,14 @@ ss -tlnp 2>/dev/null | grep ':8781' | head -2 || true
 echo
 echo '--- gateway starting log ---'
 docker logs --since 30s "$SERVICE_NAME" 2>&1 | grep -E 'gateway starting' | tail -3 || true
-echo
-echo '--- cleaning stale index.html.bak ---'
-# Backup lives at ${REMOTE_WEB}/index.html.bak.* (default
-# /opt/llm-gateway-go/web/), not under web/dist/, so the glob must
-# match that prefix. Keep only the most recent backup (the one just
-# created in this deploy) and delete older ones.
-ls -1t "$REMOTE_DIR/web/index.html.bak."* 2>/dev/null | tail -n +2 | xargs -r rm -f || true
 REMOTE
+
+  # Backups live at $REMOTE_DIR/web/index.html.bak.* (default
+  # /opt/llm-gateway-go/web/), not under web/dist/. Keep only the most
+  # recent backup (one from this deploy) and delete older ones to
+  # prevent accumulation across deploys.
+  log_info "Cleaning stale index.html.bak (keep only the latest)..."
+  $SSH "$USER_HOST" "ls -1t '${REMOTE_DIR}/web/index.html.bak.'* 2>/dev/null | tail -n +2 | xargs -r rm -f"
 fi
 
 log_info "bump-version done: VERSION=${NEW_VERSION} build_seq=${NEW_SEQ}"
