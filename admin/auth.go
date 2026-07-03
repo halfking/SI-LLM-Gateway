@@ -5,12 +5,12 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
-	"strings"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -116,9 +116,11 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rate limit by client IP
+	// Rate limit by client IP — counts only FAILED attempts. Successful
+	// logins burn no quota, so ops rotating passwords can do many
+	// successful logins without being locked out.
 	clientIP := clientIPFromRequest(r)
-	if !loginLimiter.Allow(clientIP) {
+	if !loginLimiter.Check(clientIP) {
 		h.auditLog("unknown", "auth.rate_limited", "user", 0, map[string]any{"ip": clientIP})
 		writeError(w, http.StatusTooManyRequests, "too many login attempts, try again later")
 		return
@@ -173,6 +175,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 				}
 
 				h.auditLog(u.Username, "auth.login", "user", u.ID, fmt.Sprintf("method=jwt role=%s tenant=%s ip=%s", u.Role, u.TenantID, r.RemoteAddr))
+				loginLimiter.Reset(clientIP)
 				writeJSON(w, http.StatusOK, map[string]any{
 					"access_token": token,
 					"token_type":   "Bearer",
@@ -190,11 +193,14 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		h.auditLog(req.Username, "auth.login_failed", "user", 0, fmt.Sprintf("method=jwt ip=%s", r.RemoteAddr))
+		loginLimiter.Record(clientIP)
 	}
 
 	// ── Fall back to legacy admin key auth ────────────────────────────
 	if subtle.ConstantTimeCompare([]byte(req.Username), []byte("admin")) != 1 ||
 		subtle.ConstantTimeCompare([]byte(req.Password), []byte(getAdminPassword())) != 1 {
+		h.auditLog(req.Username, "auth.login_failed", "user", 0, fmt.Sprintf("method=legacy_key ip=%s", r.RemoteAddr))
+		loginLimiter.Record(clientIP)
 		writeError(w, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
