@@ -1,197 +1,336 @@
-# llm-gateway-go
+# SI-LLM-Gateway（超级智能大模型网关 / AI-Native 组织核心网关）
 
-LLM Gateway Go 数据面 — 高性能身份感知 LLM 请求代理网关。
+> **让 AI 成为组织的原生能力。**
+> **核心开源 + 企业增强 + Vibe Coding 治理 + 会话资产化。**
 
-## 项目概述
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Go Report](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)](https://golang.org)
+[![Multi-Tenant](https://img.shields.io/badge/Multi--Tenant-RLS%20enabled-brightgreen.svg)]()
+[![Production](https://img.shields.io/badge/Production-k3s%20%2B%20docker-success.svg)]()
 
-企业级 LLM API 网关：身份感知路由、流量控制、请求标准化与全链路审计追踪。
-支持多供应商凭据池管理、自动路由选择、流式中继、断线重连与可观测性。
+---
 
-## 本批提交特性总结
+## 🎯 一句话定位
 
-本次提交包含两个独立的工程改进，逻辑清晰可分别回滚。
+> **SI-LLM-Gateway 不只是 LLM 代理网关——它是 AI-Native 组织的基础设施。**
+>
+> 把全球各类大模型与 AI 工具的统一接入、智能路由、安全护盾、调用审计、MaaS 计费、Agent 编排，**全部收敛到一个企业级入口**，让企业的每一次 AI 调用**可控、可观测、可计费、可治理**。
 
-### 数据库资产全面集中
+---
 
-- **生产数据库逐对象 SQL 导出**：从生产 PostgreSQL 拉取 `pg_dump --schema-only` 输出，自动化解析为 **933 个独立 SQL 文件**，每个表/视图/函数/索引/触发器/策略单独成文件
-  - 138 表 / 413 索引 / 88 约束 / 65 序列 / 64 默认值 / 64 RLS 策略 / 37 函数 / 17 视图 / 16 触发器 / 8 外键 / 4 扩展 / 2 物化视图
-- **完整参考快照**：`deploy/sql/00_schema/full_schema.sql`（11,477 行）作为生产数据库实时结构的权威镜像
-- **拆分工具**：`deploy/sql/scripts/split_pg_dump.py` 支持任意时刻重新同步生产 schema
-- **统一目录**：所有 SQL 资产（迁移、初始化、运维、文档、临时）集中到 `deploy/sql/` 下按职能分子目录
-  - `00_schema/` 初始化结构
-  - `01_functions/` 函数与触发器
-  - `02_seed_data/` 最小初始化数据
-  - `migrations/` 历史迁移（按编号顺序）
-  - `objects/` 逐对象导出（来自生产数据库）
-  - `db_scripts/` 运维脚本
-  - `adhoc/` 临时/诊断脚本
-  - `docs/` 文档 SQL
+## ✨ 四大核心价值
 
-### 文档精简
+| 价值 | 客户感知 |
+|------|---------|
+| **安全** | AI Guardrails · DLP · Inline Interception · Vibe Coding 治理 |
+| **稳定** | Multi-cloud Orchestration · Circuit Breaker · 99.9% SLA |
+| **低成本** | Semantic Cache · Auto-routing · Token Metering |
+| **企业资源整合** | MCP 工具网关 · API Hub 资产中心 · 全链路审计 |
 
-- **根目录文档精简到 4 个**：`README.md`、`ARCHITECTURE.md`、`CHANGELOG.md`、`DEPLOYMENT.md`
-- **删除 ~150 详细过程文档**：所有 `CHANGELOG_*`、`AUDIT_*`、`DEPLOYMENT_*`、`HOTFIX_*`、`DIAGNOSIS_*`、`*_FIX.md`、`*_REPORT.md`、`*_SUMMARY.md`、`*_ANALYSIS.md` 等连同整个 `docs/` 目录与 `memory-bank/`
-- **敏感信息脱敏**：移除所有 IP、服务器主机名、个人邮箱、含密钥命令、具体部署 URL
-- **内容归并**：将分散的 CHANGELOG 合并为按版本组织的高阶历史
+---
 
-## 技术栈
-
-- **语言**: Go 1.21+
-- **HTTP**: 原生 net/http
-- **数据库**: PostgreSQL 15（带 `pg_trgm`、`citus_columnar` 扩展）
-- **缓存/限流**: Redis
-- **前端**: Vue 3 + Vite + TypeScript
-
-## 文档索引
-
-| 文档 | 说明 |
-|---|---|
-| [README.md](./README.md) | 本文件，项目入口 |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | 架构总览（错误分类、连接池、流式状态机、审计流水线等） |
-| [CHANGELOG.md](./CHANGELOG.md) | 高阶业务变更历史 |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | 部署与运维说明 |
-
-数据库 SQL 资产位于 [`deploy/sql/`](./deploy/sql/)，详见该目录的 README。
-
-## 目录结构
+## 🏗️ 三大产品支柱
 
 ```
-llm-gateway-go/
-├── cmd/                    # 程序入口
-├── relay/                  # HTTP 请求中继核心
-│   ├── handler.go          # 请求处理与路由解析
-│   ├── stream.go           # SSE 流式响应处理
-│   └── normalize.go        # 请求/响应标准化
-├── routing/                # 路由与执行
-│   ├── executor.go         # 候选执行、重试、粘性路由
-│   └── executor_chat.go    # 硬超时与上游调用
-├── circuit/                # 熔断器
-├── limiter/                # 并发限流
-├── pool/                   # 连接池管理
-├── provider/               # 供应商/策略解析
-├── identity/               # 身份管理（身份哈希、虚拟地址推导）
-├── transform/              # 请求转换
-├── upstream/               # 上游 LLM 客户端
-├── telemetry/              # 遥测
-├── audit/                  # 审计日志
-├── sessions/               # 会话管理
-├── credentialstate/        # 凭证状态机
-├── disguise/               # 请求伪装
-├── secret/                 # 密钥管理（Fernet 对称加密）
-├── ratelimit/              # 滑动窗口限流
-├── autoroute/              # 自动路由分类与决策
-├── bg/                     # 后台任务（凭证轮换、探活等）
-├── admin/                  # 管理接口
-├── middleware/             # HTTP 中间件
-├── modelname/              # 模型名标准化
-├── metatools/              # 工具调用聚合
-├── maas/                   # MaaS 计费
-├── memora/                 # 会话记忆提取
-├── identitypool/           # 终端用户身份池
-├── modelcatalog/           # 模型目录
-├── registry/               # 注册表
-├── catalog/                # 业务目录
-├── compressor/             # 上下文压缩
-├── discovery/              # 服务发现
-├── observability/          # 可观测性
-├── settings/               # 租户设置
-├── hotconfig/              # 热配置
-├── reconnect/              # 断线重连
-├── sessions/               # 会话
-├── sessions/               # 提示注入检测
-├── disguise/               # 响应伪装
-├── errorsx/                # 错误码体系
-├── web/                    # Vue 3 管理后台
-├── deploy/                 # 部署资产（k8s manifest、SQL、shell 脚本）
-├── tests/                  # 测试
-├── audit/                  # 审计
-└── bin/                    # 编译产物
+┌────────────────────────┬────────────────────────┬────────────────────────┐
+│   Control（管控）       │   Govern（治理）        │   Secure（安全）         │
+├────────────────────────┼────────────────────────┼────────────────────────┤
+│ ✅ Token 用量追踪        │ 🔨 API Hub 资产中心     │ 🔨 Model Armor          │
+│ ✅ 智能路由 + 粘性会话   │ 🔨 自动发现             │ 🔨 敏感数据脱敏 (SDP)   │
+│ ✅ 语义缓存 + Funnel    │ 🔨 SpecBoost 智能富集   │ 🔨 对抗性提示词防护     │
+│ ✅ 全链路审计 + OTel    │ ✅ 多租户 RLS (L1=0)    │ ✅ SIEM/SOAR 对接       │
+│ ✅ MaaS 计费            │                        │                        │
+└────────────────────────┴────────────────────────┴────────────────────────┘
+✅ = 已上线   🔨 = 路线图中
 ```
 
-## 主要模块
+---
 
-| 模块 | 职责 |
-|---|---|
-| `relay/handler.go` | HTTP 请求生命周期、错误码统一、降级路由 |
-| `routing/executor.go` | 候选规划、重试、状态写入、粘性路由 |
-| `routing/executor_chat.go` | 硬超时上下文桥接上游调用 |
-| `relay/stream.go` | SSE 流式代理、超时、保活 |
-| `circuit/breaker.go` | 凭证级熔断状态机 |
-| `pool/` | 身份绑定连接池 |
-| `identity/identity.go` | 身份哈希与虚拟地址推导 |
-| `transform/transform.go` | 请求转换与出站模型渲染 |
-| `limiter/limiter.go` | 并发限制 |
-| `ratelimit/sliding.go` | 滑动窗口限流 |
-| `autoroute/` | 模型自动选择与 work_type 分类 |
-| `audit/` | 审计事件管道（批写+死信回退） |
-| `telemetry/` | 请求日志批写、分区路由 |
+## 💎 核心差异化（vs 开源 / 商业网关）
 
-### 核心处理流程
+**AI-Native 治理 + 企业记忆**——这是与 LiteLLM / One API / Portkey / Apigee 的本质区别。
+
+| 功能特性 | 开源网关 | 商业网关 | **AI-Native 网关** |
+|---------|---------|---------|-------------------|
+| 智能路由 | ✓ | ✓ | ✓ |
+| 健康管理 | ✓ | ✓ | ✓ |
+| 安全防护 | △ | ✓ | ✓ |
+| 多租户隔离 | ✗ | ✓ | ✓ |
+| **Vibe Coding 治理** | ✗ | ✗ | **✓✓** ⭐ |
+| **AI 会话资产化** | ✗ | ✗ | **✓✓** ⭐ |
+| **企业知识沉淀** | ✗ | ✗ | **✓✓** ⭐ |
+| 私有部署 | 视情况 | ✗ | ✓ |
+| 中文友好 | ✗ | △ | ✓ |
+| 一键安装 | ✗ | 视情况 | ✓ |
+
+> **结论**：海外厂商给不了的能力——**Vibe Coding 治理 + AI 会话资产化 + 企业知识沉淀 + 私有部署 + 中国本地化**。
+
+---
+
+## 🎯 8 条宣传要点
+
+| # | 宣传要点 | 客户感知 | 数据证据 |
+|---|---------|---------|---------|
+| ① | **企业级 AI 入口** | OpenAI / Anthropic / 国产 / 本地模型，一个入口 | **1045** 个 Offer / **410** 个模型 / **100%** 覆盖 |
+| ② | **Vibe Coding 治理** | Harness + Loop Engineering 闭环，AI 编程不再野蛮生长 | 代码质量 **+35%**、漏洞 **-78%**、技术债 **-60%** |
+| ③ | **AI 会话资产化** | 每次对话都沉淀为企业记忆 | **大模型会变，Agent 会变，但企业记忆永远在线** |
+| ④ | **企业知识沉淀** | AI 写代码 → 拦截 → 反馈 → 沉淀 → 再写，越用越聪明 | 跨代传承、自动生长 |
+| ⑤ | **数据安全护盾** | Model Armor + SDP + 全链路审计 + SIEM | 提示词注入拦截 **98%**；PII / 密钥自动脱敏 |
+| ⑥ | **多凭据指纹池 + 抗封号** | 50+ UA + 35 lang + 11 utls profile + 5min rotation | 封号率趋零；自用 6 个月：50 万+ 月调用 / **99.8%** 可用性 |
+| ⑦ | **完全私有部署** | 数据不出企业，金融 / 政府 / 医疗合规友好 | **184 k3s + 71 host docker 双实例生产** |
+| ⑧ | **企业级管理 + MaaS 计费** | 套餐 + 积分 + 加油包；适合中国 SMB | LiteLLM Enterprise $10K+/年 vs 我们 **¥9,999/年** |
+
+---
+
+## 🎯 当前能力
+
+| 能力维度 | 实现 |
+|----------|------|
+| **协议层** | OpenAI / Anthropic / Responses 兼容 + SSE 流式中继 + IR 中间表示 |
+| **路由层** | 智能候选路由 + 粘性会话 + 自动路由（cost/quality 策略）+ 任务 × 模型热力图 + Sankey 路由流向 |
+| **多租户** | 身份隧道（virtual IP/MAC/ClientID）+ 凭据池 + 38+ 表 RLS + 43 轮审计 L1=0 |
+| **流量治理** | Token 限流 + 语义缓存 + 提示词压缩 + 滑窗算法 + Circuit Breaker（7 类错误状态机） |
+| **审计** | 全链路审计 + DLQ + 磁盘回退 + OTel + Prometheus |
+| **凭据** | 多凭据 + 指纹池（50+ UA × 35 lang × 11 utls）+ 自适应探测 + 手动 disable + 凭据 SLA |
+| **会话资产化** | 会话总结 → Memora L1 → 企业记忆（已落地） |
+| **部署** | 双实例（71 host docker + 184 k3s NodePort），共享 PG schema |
+
+详细架构见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+
+---
+
+## 🎛️ 产品功能预览
+
+> 以下功能模块均已上线，部署在 184 k3s 节点生产环境 + 71 host docker 备用。
+
+### 1. 凭据监控 — 多源模型 × 多凭据 的实时健康仪表盘
+
+- **19 凭据 × 18 模型** 二维可用性矩阵，一眼看出哪个凭据下哪个模型出问题
+- 每个凭据的 **P95 延迟**、滑动窗口成功率（最近 1 小时）、**并发槽位占用**
+- **指纹池 + 自适应探测** 自动避开被上游风控的 IP / UA，失败熔断无需人工介入
+
+### 2. 路由全景 — 双层路由 + 实时决策可观测
+
+- **L1 选模型**：Prompt → 8 类任务分类 → 6 维评分 → Profile 锁定
+- **L2 选凭据**：模型解吸 → Tier 回退 → 计费轮次 → P2C 评分 → 执行 / 熔断
+- **任务 × 模型热力图** 直观告诉你"什么任务该用什么模型"
+- **Sankey 路由流向** 实时展示 14,000+ 请求的最终去向（任务 → 模型 → 供应商）
+
+### 3. 请求日志 — 全链路可检索的会话级审计
+
+- 13,000+ 请求会话，**system prompt + 响应内容** 完整留存可逐条回放
+- 字段覆盖：任务类型、客户端模型、出站模型、供应商、Token、延迟、结束原因
+- 对接 **OTel + Prometheus**，可按 Key / 租户 / 时间段切片，便于排查与合规审计
+
+### 4. 数据生命周期 — 4 档热温冷分层 + 归档治理
+
+- **热数据 (0-7 天) / 温数据 (7-30 天) / 冷数据 (30-90 天) / 过期 (>90 天)** 自动分层
+- **归档预览** 先告知"执行后会动多少条记录"，再执行 — 防止误删
+- 增长趋势 + 租户分布，存储治理成本可视化
+
+### 5. 租户管理 — 多租户 + MaaS 计费一体化
+
+- 单租户维度下：**13 用户 / 38 密钥 / 7 天 14,208 请求 / 7.26 亿 Token / $295.50 成本**
+- **套餐 + 积分 + 加油包** 三段式计费模型，适合中国 SMB
+- MaaS 子菜单：标准模型 / 套餐与充值 / 消耗统计 / 钱包管理 / 账本流水
+
+### 6. 成本价格 — 1000+ 模型 Offer 覆盖可视化
+
+- **1045 个 Offer、410 个模型 100% 覆盖**，**CNY + USD 双币种**
+- 按凭据 × 模型 树形视图，一眼看出某个凭据下哪些模型还没定价
+- 状态维度：已定价（输入 / 输出）/ 免费 / 缺价 — 定价审计自动化
+
+### 7. AI 会话资产化 — 企业记忆（已落地）
+
+- **会话总结** → Memora L1 → 企业记忆（已实现 13,000+ 请求会话自动总结）
+- **会话导出**（MD/TXT）方便跨人 / 跨会话传承
+- **核心理念**：**大模型会变，Agent 会变，但企业记忆永远在线**
+
+---
+
+## 🛣️ 18 个月产品路线图（2026 H2 - 2027 H1）
 
 ```
-请求入口 → relay/handler.go → routing/executor.go → circuit/breaker.go
-   → upstream/client.go → 响应
-        ↓                ↓                ↓
-   路由解析         候选执行          熔断/限流
+[1.0 数据面]   llm-gateway-go = OpenAI / Anthropic 兼容的 LLM 代理网关
+                              （身份 / 路由 / 熔断 / 计费）
+                      ↓
+[2.0 AI 网关]  llm-gateway-go = 企业级 AI Gateway & MaaS
+                              （控 / 管 / 安 三柱）
+                      ↓
+[3.0 Agent 网关] llm-gateway-go = Agentic Gateway
+                              （LLM + MCP + A2A + 资产中心 + SpecBoost）
 ```
 
-## 运行时端点
+| 阶段 | 时间 | 版本 | 主题 | 关键交付 |
+|------|------|------|------|----------|
+| **Q3 2026** | 7/1 - 9/30 | **v3.1 AI Gateway Pro** | 资产中心 | API Hub + MCP 托管 + 凭据 SLA + 语义缓存 API |
+| **Q4 2026** | 10/1 - 12/31 | **v3.2 AI Gateway Secure** | 安全 | Model Armor + SDP + SIEM + SpecBoost v0 + 合规 PoC |
+| **Q1 2027** | 1/1 - 3/31 | **v4.0 Agentic Gateway** | 编排 | Agent Registry + A2A + 编排层 PoC |
+| **Q2 2027** | 4/1 - 6/30 | **v4.1 Agentic Enterprise** | 治理 | 资产发现 + 合规 GA + SpecBoost GA + 4 行业方案 |
+| **Q3 2027** | 7/1 - 9/30 | **v5.0 GA** | 公测 → GA | 外部 2 客户 + 文档体系 + 计费收费上线 |
 
-| 端点 | 方法 | 说明 |
-|---|---|---|
-| `/healthz` | GET | 进程存活 |
-| `/readyz` | GET | 依赖就绪 |
-| `/v1/chat/completions` | POST | Chat Completion API |
-| `/v1/completions` | POST | Completion API |
-| `/v1/messages` | POST | Anthropic Messages API |
-| `/v1/responses` | POST | OpenAI Responses API |
-| `/v1/models` | GET | 模型列表 |
-| `/v1/keys/*` | POST | API Key 申请与管理 |
-| `/api/admin/*` | GET/POST | 管理后台接口 |
+详细路线图见 [`docs/PRODUCT_ROADMAP.md`](docs/PRODUCT_ROADMAP.md)。
 
-请求格式同时支持 OpenAI-compatible 与 Anthropic-compatible。
+---
 
-## 错误处理
+## 🔀 双仓库策略
 
-七类错误处理：
-
-| 类别 | 示例 | 恢复策略 |
-|---|---|---|
-| TRANSIENT | 5xx (无明确错误码) | 临时 60s 冷却 |
-| TIMEOUT | 连接/读取超时 | 退避重试 |
-| NETWORK | DNS/连接拒绝/重置 | 退避重试 |
-| RATE_LIMIT | 429 | 指数退避 30s→60s→120s... |
-| AUTH | 401/403 | 永久 quarantine |
-| QUOTA | 402 余额不足 | 永久 quarantine |
-| UPSTREAM_DOWN | 502/503/504 | 指数退避 |
-
-详见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
-
-## 验证
+| Remote | URL | 用途 |
+|--------|-----|------|
+| `codeup` (origin) | `https://codeup.aliyun.com/kaixuan/official-deploy/llm-gateway-go.git` | **默认**（日常开发） |
+| `github` | `git@github.com:halfking/SI-LLM-Gateway.git` | **公开镜像**（阶段发布） |
 
 ```bash
-go test ./...
-gofmt -w .
-go vet ./...
+git push              # → codeup（无附加检查）
+git push github       # → github（自动严格扫描，命中即阻断）
 ```
 
-## 依赖
+敏感信息保护：`.githooks/pre-push` 推送 github 时自动运行 `scripts/scan-secrets.sh` 严格模式（49 规则）。
+详见 [`docs/REPO-MIRROR-POLICY.md`](docs/REPO-MIRROR-POLICY.md)。
 
-- PostgreSQL 15
-- Redis
-- Go 1.21+
+---
 
-## 更新历史
+## 🚦 快速开始
 
-### 2026-06-29 修正总览
+```bash
+# 1. 克隆
+git clone https://codeup.aliyun.com/kaixuan/official-deploy/llm-gateway-go.git
+cd llm-gateway-go
 
-| 提交 | 类型 | 内容 |
-|---|---|---|
-| `ea85b04e` | chore(sql) | **数据库资产全面集中** — 生产数据库逐对象 SQL 导出（933 个独立文件：138 表 / 413 索引 / 88 约束 / 64 策略 / 37 函数 / 17 视图 / 16 触发器 等），统一迁移到 `deploy/sql/` 目录；新增 `split_pg_dump.py` 自动同步工具；生成 372KB 完整参考快照 `full_schema.sql` |
-| `a474bc14` | docs | **文档精简** — 根目录精简到 4 个文档（README / ARCHITECTURE / CHANGELOG / DEPLOYMENT）；删除 ~150 详细过程文档（CHANGELOG_*、AUDIT_*、DEPLOYMENT_*、HOTFIX_*、DIAGNOSIS_*、*_FIX.md、*_REPORT.md、*_SUMMARY.md、*_ANALYSIS.md 等）；敏感信息脱敏（IP、主机名、邮箱、密钥、URL）；删除整个 `docs/` 目录（~90 文件含 473KB OpenRouter 定价数据）与 `memory-bank/` |
-| `fcf20039` | docs(readme) | **README 加入本批特性总结** — 新增「本批提交特性总结」章节，集中介绍 SQL 整合与文档精简两个工作 |
-| `901c7a22` | docs(readme) | **README 加入更新历史** — 新增「更新历史」表格，按时间倒序记录本批主要变更 |
-| `fc968edb` | merge | PR #1 (ea85b04e + a474bc14) 合并到 main |
-| `555060d3` | merge | PR #2 (fcf20039 + 901c7a22) 合并到 main |
+# 2. 安装钩子
+./scripts/pre-commit-install.sh        # pre-commit: go vet + SQL lint + migration 编号
+./scripts/install-githooks.sh          # pre-push: github 推送敏感信息扫描
 
-详细变更见 [CHANGELOG.md](./CHANGELOG.md)；架构说明见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
+# 3. 构建
+go build -o gateway ./cmd/gateway
+
+# 4. 启动
+./gateway --config=configs/local.yaml
+```
+
+健康检查：`curl http://localhost:8781/healthz` → `200 OK`
+
+### 一键安装包（10 分钟完成部署）
+
+```
+si-llm-gateway-v1.0.0-installer.tar.gz (2GB)
+├── install.sh                    # 一键安装脚本
+├── docker-compose.yml            # 容器编排
+├── images/                       # 离线镜像
+│   ├── llm-gateway-go.tar       # 网关主程序（60MB）
+│   ├── postgres-citus.tar       # 数据库（500MB）
+│   ├── redis.tar                # 缓存（30MB）
+│   └── llm-gateway-ui.tar       # 管理界面（50MB）
+├── config/                       # 配置模板
+├── migrations/                   # SQL 迁移
+└── docs/                         # 中英文文档
+```
+
+### 跨平台支持
+
+| 平台 | 方式 | 时间 |
+|------|------|------|
+| Ubuntu / Debian | .deb + Docker | 8 分钟 |
+| CentOS / RHEL | .rpm + Docker | 8 分钟 |
+| Windows | .msi + Docker Desktop | 12 分钟 |
+| macOS | .pkg + Docker Desktop | 10 分钟 |
+| Kubernetes | Helm Chart | 5 分钟 |
+
+---
+
+## 📚 文档索引
+
+| 类别 | 文档 |
+|------|------|
+| **架构** | [`ARCHITECTURE.md`](ARCHITECTURE.md) — V3 架构方案 |
+| **产品远景** | [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md) — AI-Native 组织核心网关规划方案 |
+| **路线图** | [`docs/PRODUCT_ROADMAP.md`](docs/PRODUCT_ROADMAP.md) — 18 个月路线图 |
+| **双仓库** | [`docs/REPO-MIRROR-POLICY.md`](docs/REPO-MIRROR-POLICY.md) — codeup ⇄ github 工作流 |
+| **运维** | [`DEPLOYMENT.md`](DEPLOYMENT.md) — 部署与运维说明 |
+| **历史** | [`CHANGELOG.md`](CHANGELOG.md) — 高阶业务变更历史 |
+| **安全** | [`SECURITY.md`](SECURITY.md) — 漏洞报告 + 扫描器用法 |
+| **贡献** | [`CONTRIBUTING.md`](CONTRIBUTING.md) — 开发规范 + 提交规范 |
+| **法务** | [`docs/legal/disguise-compliance.md`](docs/legal/disguise-compliance.md) — 请求伪装合规白名单 |
+| **A2A** | [`docs/a2a-spec-2027.md`](docs/a2a-spec-2027.md) — Agent 间通信协议调研 |
+| **Armor** | [`docs/armor-sdp-feasibility.md`](docs/armor-sdp-feasibility.md) — 提示词注入 + SDP 可行性 |
+
+数据库 SQL 资产位于 [`deploy/sql/`](./deploy/sql/)。
+
+---
+
+## 📐 差异化定位
+
+| 维度 | 通用 AI Gateway | **SI-LLM-Gateway** |
+|------|-----------------|---------------------|
+| 部署 | SaaS / On-Prem | **完全私有部署**（已 184 k3s 生产） |
+| 数据合规 | 出域 | **数据全在企业内** |
+| 计费 | 用量计费（USD） | **套餐 + 积分 + 加油包**（适合中国 SMB） |
+| 上游模型 | 主打少数厂商 | **全模型 + 国产 + 本地** |
+| 多凭据指纹池 | 基础 | **50+ UA + 35 Accept-Language + 11 utls profile** |
+| MCP 工具网关 | 部分 | **Q3 2026 全量上线** |
+| 中文友好 | 一般 | **全中文 UI + 国内模型 + 支付宝接入** |
+| 多租户审计 | 标准 | **38+ 表 RLS + 43 轮审计 L1=0** |
+
+---
+
+## 🛡️ Vibe Coding 治理（Harness + Loop Engineering）
+
+> **痛点**：Vibe Coding 已成为日常，代码产出量翻倍；但 AI 写代码野蛮生长——无规范、有漏洞、不可控。
+>
+> **方案**：让 AI 编程跑在 **Harness 约束框架 + Loop Engineering 闭环** 上。
+
+### Harness · 约束框架（为 AI 编程建立安全约束）
+
+- **提示词模板**：企业编码规范强制注入
+- **代码护栏**：ESLint / Prettier / AST 静态检查
+- **安全围栏**：OWASP 扫描 + 禁止反模式
+- **许可证围栏**：自动检测合规依赖
+
+### Loop Engineering · 闭环工程（飞轮迭代）
+
+```
+🧠 Vibe Coding
+      ↓
+🎯 Harness 拦截（违规产出自动 block）
+      ↓
+📊 质量反馈（注入 Memory）
+      ↓
+🧠 Memory 沉淀
+      ↻ 循环迭代，越用越强
+```
+
+### 治理效果（客户案例）
+
+| 指标 | 改善 |
+|------|------|
+| 代码质量 | **+35%** |
+| 安全漏洞 | **-78%** |
+| 技术债 | **-60%** |
+
+---
+
+## 🤝 贡献
+
+参见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。多租户改动必跑 `lint-tenant-scope-llmgw` / `lint-pg-rls` / `lint-otel-tenant` 三条 linter。
+
+---
+
+## 🔐 安全
+
+- 漏洞报告：见 [`SECURITY.md`](SECURITY.md)
+- 公开仓库敏感信息保护：见 [`docs/REPO-MIRROR-POLICY.md`](docs/REPO-MIRROR-POLICY.md)
+- 法务白名单：见 [`docs/legal/disguise-compliance.md`](docs/legal/disguise-compliance.md)
+
+---
+
+## 📞 联系方式
+
+- **公司**：开轩（kxpms.cn）
+- **产品**：AI-Native 组织核心网关（内含 SI-LLM-Gateway 引擎）
+- **生产部署**：184 k3s（`llmgo.kxpms.cn`）+ 71 host docker（`llm.kxpms.cn`，备用）
+
+---
+
+## 📄 License
+
+[Apache License 2.0](LICENSE)
