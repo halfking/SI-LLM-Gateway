@@ -7085,8 +7085,7 @@ CREATE VIEW public.v_routable_credential_models AS
             WHEN c.quota_state = 'periodic_exhausted'::text THEN false
             WHEN c.quota_state = 'exhausted'::text AND (c.quota_recover_at IS NULL OR c.quota_recover_at > now()) THEN false
             WHEN c.availability_state = 'unavailable'::text AND (c.availability_recover_at IS NULL OR c.availability_recover_at > now()) THEN false
-            WHEN (c.plan_type = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (mo.billing_mode <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN false
-            WHEN (mo.billing_mode = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (c.plan_type <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN false
+            WHEN (mo.billing_mode = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (c.plan_type IS NULL OR c.plan_type <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN false
             WHEN COALESCE(p.manual_disabled, false) = true THEN false
             WHEN COALESCE(c.manual_disabled, false) = true THEN false
             ELSE true
@@ -7100,8 +7099,7 @@ CREATE VIEW public.v_routable_credential_models AS
             WHEN c.quota_state = 'periodic_exhausted'::text THEN 'quota_periodic_exhausted'::text
             WHEN c.quota_state = 'exhausted'::text AND (c.quota_recover_at IS NULL OR c.quota_recover_at > now()) THEN 'quota_exhausted'::text
             WHEN c.availability_state = 'unavailable'::text AND (c.availability_recover_at IS NULL OR c.availability_recover_at > now()) THEN 'availability_unavailable'::text
-            WHEN (c.plan_type = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (mo.billing_mode <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN 'plan_incompatible_model_requires_'::text || COALESCE(mo.billing_mode, 'token'::text)
-            WHEN (mo.billing_mode = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (c.plan_type <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN 'plan_incompatible_credential_not_'::text || mo.billing_mode
+            WHEN (mo.billing_mode = ANY (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) AND (c.plan_type IS NULL OR c.plan_type <> ALL (ARRAY['token_plan'::text, 'code_plan'::text, 'agent_plan'::text])) THEN 'plan_incompatible_credential_not_'::text || mo.billing_mode
             ELSE NULL::text
         END AS unavailable_reason
    FROM credential_model_bindings cmb
