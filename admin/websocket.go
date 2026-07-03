@@ -267,11 +267,15 @@ func (h *LiveStreamHub) ProviderCodeFor(ctx context.Context, providerID int) str
 	if providerID == 0 {
 		return ""
 	}
-	if h.db == nil {
-		return ""
-	}
+	// Cache lookup FIRST — both positive ("anthropic", "openai") and
+	// negative ("", sentinel for "we tried and failed") entries are
+	// stored so the no-DB relay mode and a future DB-down window do
+	// not stampede the DB.
 	if cached, ok := h.providerCache.Load(providerID); ok {
 		return cached.(string)
+	}
+	if h.db == nil {
+		return ""
 	}
 	var code string
 	row := h.db.QueryRow(ctx, "SELECT COALESCE(NULLIF(catalog_code, ''), '') FROM providers WHERE id = $1", providerID)

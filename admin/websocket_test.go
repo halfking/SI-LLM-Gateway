@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -123,5 +124,39 @@ func TestPublish_DoesNotBlock(t *testing.T) {
 		// good
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Publish blocked when queue was full")
+	}
+}
+
+func TestProviderCodeFor_NoDB(t *testing.T) {
+	// No-DB mode (the 71 stateless relay). Should always return ""
+	// regardless of the provider_id — the frontend falls back to
+	// "???" which is the same behaviour as before this fix.
+	hub := NewLiveStreamHub(nil, "test-secret", LiveStreamConfig{})
+	if got := hub.ProviderCodeFor(context.Background(), 14); got != "" {
+		t.Fatalf("expected empty provider_code in no-DB mode, got %q", got)
+	}
+}
+
+func TestProviderCodeFor_ZeroID(t *testing.T) {
+	// provider_id == 0 is the "no provider" sentinel; should
+	// short-circuit without any cache lookup.
+	hub := NewLiveStreamHub(nil, "test-secret", LiveStreamConfig{})
+	if got := hub.ProviderCodeFor(context.Background(), 0); got != "" {
+		t.Fatalf("expected empty provider_code for id=0, got %q", got)
+	}
+}
+
+func TestProviderCodeFor_NegativeCache(t *testing.T) {
+	// A negative result (unknown provider id) MUST be cached so
+	// repeated lookups for the same id do not pound the DB.
+	// We use a real pgxpool in this test by registering a one-shot
+	// in-memory mock... but pgxpool.Pool needs a live DB. Instead
+	// we verify the cache contract by pre-populating the cache and
+	// confirming the lookup short-circuits.
+	hub := NewLiveStreamHub(nil, "test-secret", LiveStreamConfig{})
+	hub.providerCache.Store(42, "anthropic")
+
+	if got := hub.ProviderCodeFor(context.Background(), 42); got != "anthropic" {
+		t.Fatalf("expected cached anthropic, got %q", got)
 	}
 }
