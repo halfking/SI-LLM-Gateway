@@ -43,6 +43,32 @@ export const STATUS_COLORS: Record<string, string> = {
   failure: '#e74545',     // brightened red (was #dc2626, 3.35 -> 4.50)
 }
 
+/**
+ * Status → 2px border colour. Used by LiveRequestBlock for the
+ * status ring around each tile (see liveStreamDisplay.ts for the
+ * full mapping rationale). The status border sits on the OUTSIDE
+ * of the tile so the body fill (family colour at 22% alpha) can
+ * stay calm and the status ring reads as a clear halo.
+ */
+export const STATUS_BORDER_COLORS: Record<string, string> = {
+  success: 'rgba(34, 197, 94, 0.85)',
+  in_progress: 'rgba(245, 158, 11, 0.95)',
+  failure: 'rgba(239, 68, 68, 0.95)',
+  in_progress_idle: 'rgba(139, 148, 158, 0.4)', // for non-status states
+  default: 'rgba(139, 148, 158, 0.4)',
+}
+
+/**
+ * Per-status border thickness. Failure gets a thicker ring so the
+ * eye catches it even before reading the tile's text content.
+ */
+export const STATUS_BORDER_WIDTHS: Record<string, string> = {
+  success: '2',
+  in_progress: '2',
+  failure: '3', // thicker for visual emphasis
+  default: '2',
+}
+
 // Friendly label for a model family — mirrored in i18n but kept here
 // as a fallback for places that need a non-translated string
 // (aria-label, console logging, etc.).

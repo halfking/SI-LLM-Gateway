@@ -48,9 +48,15 @@ type LiveStreamEnvelope struct {
 // Fields are nullable to match the database shape — clients render "—"
 // when a value is missing.
 type LiveRequest struct {
-	RequestID        string   `json:"request_id"`
-	Ts               string   `json:"ts"`
-	TenantID         string   `json:"tenant_id"`
+	RequestID string `json:"request_id"`
+	Ts        string `json:"ts"`
+	TenantID  string `json:"tenant_id"`
+	// GwSessionID is the LLM-Gateway session id (request_logs.gw_session_id)
+	// if the request was sent through a session. Empty when the request
+	// is one-off (e.g. a /v1/chat/completions call without a session).
+	// 2026-07-03: added so the dashboard swim lane can count distinct
+	// sessions in real time without hitting the sessions API.
+	GwSessionID      string   `json:"gw_session_id,omitempty"`
 	Model            string   `json:"model"`
 	ModelCategory    string   `json:"model_category"`
 	ProviderCode     string   `json:"provider_code"`
@@ -509,6 +515,7 @@ func (h *LiveStreamHub) replay(ctx context.Context, tenantID string, isSuper boo
 		SELECT rl.request_id,
 		       rl.ts,
 		       COALESCE(NULLIF(rl.tenant_id, ''), COALESCE(NULLIF(ak.tenant_id, ''), 'default')) AS tenant_id,
+		       COALESCE(NULLIF(rl.gw_session_id, ''), '') AS gw_session_id,
 		       COALESCE(NULLIF(rl.outbound_model, ''), rl.client_model, '') AS model,
 		       COALESCE(NULLIF(p.catalog_code, ''), '') AS provider_code,
 		       COALESCE(NULLIF(rl.request_status, ''), CASE WHEN rl.success THEN 'success' WHEN rl.success = FALSE THEN 'failure' ELSE 'in_progress' END) AS status,

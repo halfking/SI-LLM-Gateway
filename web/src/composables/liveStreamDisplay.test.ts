@@ -10,10 +10,12 @@ import { describe, it, expect } from 'vitest'
 import {
   modelGlyph,
   modelShortLabel,
+  providerShortLabel,
   timeHHMM,
   latencyLabel,
   statusBorderColor,
   errorKindColor,
+  statusCategory,
 } from './liveStreamDisplay'
 
 describe('modelGlyph (1-char tile accent)', () => {
@@ -82,6 +84,104 @@ describe('modelShortLabel (top-vendor family code)', () => {
     expect(modelShortLabel('GPT-4O')).toBe('GPT')
     expect(modelShortLabel('CLAUDE-3')).toBe('CLD')
     expect(modelShortLabel('QWEN-Max')).toBe('QWN')
+  })
+})
+
+describe('providerShortLabel (top-vendor provider code)', () => {
+  it('returns the canonical 4-letter code for the major Western providers', () => {
+    expect(providerShortLabel('openai')).toBe('OPEN')
+    expect(providerShortLabel('OpenAI')).toBe('OPEN')
+    expect(providerShortLabel('OPENAI')).toBe('OPEN')
+    expect(providerShortLabel('openai-prod')).toBe('OPEN')
+    expect(providerShortLabel('anthropic')).toBe('ANTH')
+    expect(providerShortLabel('Anthropic')).toBe('ANTH')
+    expect(providerShortLabel('azure')).toBe('AZR')
+    expect(providerShortLabel('azure-openai')).toBe('AZR')
+    expect(providerShortLabel('Azure-OpenAI-US-East')).toBe('AZR')
+    expect(providerShortLabel('google')).toBe('GGL')
+    expect(providerShortLabel('vertex-ai')).toBe('GGL')
+  })
+
+  it('returns 3-letter codes for the major Chinese / OSS providers', () => {
+    expect(providerShortLabel('minimax')).toBe('MIX')
+    expect(providerShortLabel('qwen')).toBe('QWN')
+    expect(providerShortLabel('deepseek')).toBe('DSK')
+    expect(providerShortLabel('zhipu')).toBe('GLM')
+    expect(providerShortLabel('glm')).toBe('GLM')
+    expect(providerShortLabel('mistral')).toBe('MST')
+    expect(providerShortLabel('cohere')).toBe('COH')
+    expect(providerShortLabel('bedrock')).toBe('BDR')
+  })
+
+  it('returns 3-char uppercase of stripped name for unknown providers', () => {
+    expect(providerShortLabel('my-vendor')).toBe('MYV')
+    expect(providerShortLabel('foo.bar')).toBe('FOO')
+    expect(providerShortLabel('abc-123')).toBe('ABC')
+  })
+
+  it('returns ??? for empty / null / undefined / whitespace', () => {
+    expect(providerShortLabel('')).toBe('???')
+    expect(providerShortLabel(undefined)).toBe('???')
+    expect(providerShortLabel(null)).toBe('???')
+    expect(providerShortLabel('   ')).toBe('???')
+  })
+})
+
+describe('statusCategory (coarse failure taxonomy)', () => {
+  it('returns success for status=success regardless of error_kind', () => {
+    expect(statusCategory('success', null)).toBe('success')
+    expect(statusCategory('success', 'timeout')).toBe('success')
+  })
+
+  it('returns in_progress for status=in_progress', () => {
+    expect(statusCategory('in_progress', null)).toBe('in_progress')
+  })
+
+  it('returns failure_timeout FIRST (must not be caught by 5xx bucket)', () => {
+    expect(statusCategory('failure', 'timeout')).toBe('failure_timeout')
+    expect(statusCategory('failure', 'client_disconnect')).toBe('failure_timeout')
+    expect(statusCategory('failure', 'network_reset')).toBe('failure_timeout')
+    expect(statusCategory('failure', 'eof')).toBe('failure_timeout')
+  })
+
+  it('returns failure_5xx for server-side errors', () => {
+    expect(statusCategory('failure', '5xx')).toBe('failure_5xx')
+    expect(statusCategory('failure', 'upstream_5xx')).toBe('failure_5xx')
+    expect(statusCategory('failure', 'provider_overloaded')).toBe('failure_5xx')
+    expect(statusCategory('failure', 'server_error')).toBe('failure_5xx')
+    expect(statusCategory('failure', 'backend_timeout')).toBe('failure_5xx')
+  })
+
+  it('returns failure_4xx for client-side / auth errors', () => {
+    expect(statusCategory('failure', '4xx')).toBe('failure_4xx')
+    expect(statusCategory('failure', 'unauthorized')).toBe('failure_4xx')
+    expect(statusCategory('failure', 'rate_limit_exceeded')).toBe('failure_4xx')
+    expect(statusCategory('failure', 'quota_exceeded')).toBe('failure_4xx')
+    expect(statusCategory('failure', 'payment_required')).toBe('failure_4xx')
+  })
+
+  it('returns failure_not_found for routing / config errors', () => {
+    expect(statusCategory('failure', 'model_not_found')).toBe('failure_not_found')
+    expect(statusCategory('failure', 'routing_failed')).toBe('failure_not_found')
+    expect(statusCategory('failure', 'no_route')).toBe('failure_not_found')
+    expect(statusCategory('failure', 'policy_denied')).toBe('failure_not_found')
+  })
+
+  it('returns failure_other for failure status with unmapped error_kind', () => {
+    expect(statusCategory('failure', null)).toBe('failure_other')
+    expect(statusCategory('failure', 'transient')).toBe('failure_other')
+    expect(statusCategory('failure', 'unknown_error')).toBe('failure_other')
+  })
+
+  it('returns failure_other for unmapped non-failure status', () => {
+    expect(statusCategory('weird_status', 'timeout')).toBe('failure_other')
+    expect(statusCategory(undefined, null)).toBe('failure_other')
+  })
+
+  it('is case-insensitive on error_kind', () => {
+    expect(statusCategory('failure', 'TIMEOUT')).toBe('failure_timeout')
+    expect(statusCategory('failure', 'UPSTREAM_5xx')).toBe('failure_5xx')
+    expect(statusCategory('failure', 'Model_Not_Found')).toBe('failure_not_found')
   })
 })
 

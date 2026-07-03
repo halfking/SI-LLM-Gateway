@@ -14,8 +14,9 @@
 // tail tile gets the entrance animation.
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useLiveStream, type LiveStatus } from '../composables/useLiveStream'
+import { useLiveStream } from '../composables/useLiveStream'
 import { useElementSize } from '../composables/useElementSize'
+import { statusCategory, type StatusCategory } from '../composables/liveStreamDisplay'
 import LiveRequestBlock from './LiveRequestBlock.vue'
 import LiveStreamLegend from './LiveStreamLegend.vue'
 
@@ -27,13 +28,21 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { requests, connection, paused, togglePause } = useLiveStream()
 
-const statusFilter = ref<'all' | LiveStatus>('all')
+type StatusFilter = 'all' | 'success' | 'in_progress' | StatusCategory
+const statusFilter = ref<StatusFilter>('all')
 
 const filteredRequests = computed(() => {
   if (statusFilter.value === 'all') return requests.value
   return requests.value.filter((r) => {
     if (r.type === 'idle_marker') return true
-    return r.status === statusFilter.value
+    // 'success' / 'in_progress' match the raw status directly. The
+    // failure_* buckets come from statusCategory(), which inspects
+    // both `status` and `error_kind` to decide which of the 5
+    // coarse failure families the request belongs to.
+    if (statusFilter.value === 'success' || statusFilter.value === 'in_progress') {
+      return r.status === statusFilter.value
+    }
+    return statusCategory(r.status, r.error_kind ?? null) === statusFilter.value
   })
 })
 
@@ -42,7 +51,11 @@ const filteredRequests = computed(() => {
 // Tile pitch = 52px wide + 4px gap. Reserve ~120px on the right so
 // the entrance animation has room to overshoot without escaping the
 // track. The idle marker is wider (110px) and counted separately.
-const TILE_WIDTH = 52
+// Tile pitch = 60px wide + 4px gap. Reserve ~24px on the right so
+// the entrance animation has room to overshoot without escaping
+// the track. The idle marker is wider (110px) and counted
+// separately.
+const TILE_WIDTH = 60
 const TILE_GAP = 4
 const TILE_PITCH = TILE_WIDTH + TILE_GAP
 const IDLE_WIDTH = 110
@@ -115,7 +128,13 @@ function onSelect(requestId: string) {
           <option value="all">{{ t('dashboard.liveStream.filterAll') }}</option>
           <option value="success">{{ t('dashboard.liveStream.filterSuccess') }}</option>
           <option value="in_progress">{{ t('dashboard.liveStream.filterInProgress') }}</option>
-          <option value="failure">{{ t('dashboard.liveStream.filterFailure') }}</option>
+          <optgroup :label="t('dashboard.liveStream.filterGroupFailures')">
+            <option value="failure_5xx">{{ t('dashboard.liveStream.filterFailure5xx') }}</option>
+            <option value="failure_4xx">{{ t('dashboard.liveStream.filterFailure4xx') }}</option>
+            <option value="failure_timeout">{{ t('dashboard.liveStream.filterFailureTimeout') }}</option>
+            <option value="failure_not_found">{{ t('dashboard.liveStream.filterFailureNotFound') }}</option>
+            <option value="failure_other">{{ t('dashboard.liveStream.filterFailureOther') }}</option>
+          </optgroup>
         </select>
         <span
           class="live-stream__count"

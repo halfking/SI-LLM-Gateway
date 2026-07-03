@@ -1,33 +1,38 @@
 <script setup lang="ts">
 // LiveRequestBlock — single tile in the swim lane.
 //
-// 2026-07-03 revision (v3): switched to a 3-line text layout because
-// the operator needs to read at-a-glance WHICH model, WHEN it
-// arrived, and HOW LONG it took — not just one letter.
+// 2026-07-03 v5: 4-row layout (time / model / provider / latency).
 //
 //   ┌──────────┐
-//   │ 14:35    │  ← line 1: HH:MM start time
-//   │  GPT     │  ← line 2: top-vendor 3-letter code (GPT/CLD/QWN/
-//   │ 1.2s     │     GLM/DSK/MIX), or error_kind if failed, or ??? otherwise
-//   └══════════┘  ← 2px border: green=ok, amber=in-progress, red=failed
+//   │ 14:35    │  ← line 1: HH:MM start time              (9px)
+//   │  GPT     │  ← line 2: model-family code           (11px, bold)
+//   │  ANTH   │  ← line 3: provider code (NEW)         ( 8px, muted)
+//   │ 1.2s     │  ← line 4: latency                     (9px, monospace)
+//   └══════════┘
+//     ↑ 2-3px border: coloured by STATUS (green/amber/red), NOT
+//       family. The body bg is the FAMILY colour at ~22% alpha so
+//       a wall of GPT tiles reads as "blue band" while the status
+//       border sits clearly on top.
 //
-// The status border (2px) replaces the colour-filled bottom strip.
-// For failed tiles the second line swaps the vendor code for the
-// error_kind colour-coded word (e.g. "TIMEOUT" amber, "5xx" red,
-// "MODEL_NOT_FOUND" purple) so the operator can tell at a glance
-// WHY a request failed.
+// Why a 4-row layout: the operator needs to see WHICH MODEL on
+// which VENDOR is taking the load. The model line is the dominant
+// signal (largest, boldest); the provider line is secondary
+// (smaller, muted). A failure does NOT replace the model line —
+// the failure is encoded in the border colour + a corner badge.
 //
-// Hover carries the full model name + provider + cost + tokens + id.
+// Tile is 60px wide × 76px tall. 4 rows of ~14px line-height + 2px
+// padding × 2 (top/bottom) + 4px gap between rows = 76px. The
+// narrow width keeps the swim lane in one viewport without
+// horizontal scroll.
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { LiveRequest } from '../composables/useLiveStream'
+import { modelShortLabel, providerShortLabel } from '../composables/liveStreamDisplay'
 import {
-  modelShortLabel,
-  timeHHMM,
-  latencyLabel,
-  statusBorderColor,
-  errorKindColor,
-} from '../composables/liveStreamDisplay'
+  getModelCategoryColor,
+  STATUS_BORDER_COLORS,
+  STATUS_BORDER_WIDTHS,
+} from '../composables/liveStreamColors'
 
 const props = defineProps<{
   request: LiveRequest
@@ -42,8 +47,6 @@ const { locale } = useI18n()
 
 const isIdle = computed(() => props.request.type === 'idle_marker')
 
-// Idle label: "Idle 1 min" — kept as a single horizontal pill so a
-// 1-minute silence still reads as "gap" rather than "request".
 const idleLabel = computed(() => {
   if (!isIdle.value) return ''
   const start = Date.parse(props.request.ts)
@@ -53,43 +56,55 @@ const idleLabel = computed(() => {
 })
 
 // Line 1: HH:MM start time (locale-aware).
-const timeLabel = computed(() => timeHHMM(props.request.ts, locale.value))
-
-// Line 2: vendor code (top-7 only) OR error_kind on failure.
-// `errorKindLabel` is a short token for failure tiles so we fit in
-// 5-6 characters; `vendorLabel` is the canonical 3-letter code.
-const errorKindLabel = computed(() => {
-  const k = props.request.error_kind
-  if (!k) return ''
-  // Keep to ≤6 chars so the tile never overflows.
-  return k.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 6).toUpperCase()
-})
-
-const vendorLabel = computed(() => {
-  // Failed tiles show the error_kind (in colour) instead of the
-  // vendor — the vendor already lives on the bottom edge of the
-  // tile via the family-colour background of the inner panel.
-  if (props.request.status === 'failure' && errorKindLabel.value) {
-    return errorKindLabel.value
+const timeLabel = computed(() => {
+  if (!props.request.ts) return '--:--'
+  const d = new Date(props.request.ts)
+  if (Number.isNaN(d.getTime())) return '--:--'
+  try {
+    return d.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit', hour12: false })
+  } catch {
+    return '--:--'
   }
-  return modelShortLabel(props.request.model)
 })
 
-const secondLineColor = computed(() => {
-  if (props.request.status === 'failure' && props.request.error_kind) {
-    return errorKindColor(props.request.error_kind)
-  }
-  return 'inherit' // inherit from .live-block__second
+// Line 2: model-family code (always the family, even on failure).
+const vendorLabel = computed(() => modelShortLabel(props.request.model))
+
+// Line 3: provider code. Smaller font + lower contrast — secondary
+// signal, but critical when an incident is on a specific vendor.
+const providerLabel = computed(() => providerShortLabel(props.request.provider_code))
+
+// Line 4: latency.
+const latencyText = computed(() => {
+  if (props.request.status === 'in_progress') return '…'
+  const ms = props.request.latency_ms
+  if (ms == null) return '—'
+  if (ms < 0) return '—'
+  if (ms < 1000) return `${Math.round(ms)}ms`
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`
+  return `${Math.round(ms / 1000)}s`
 })
 
-// Line 3: latency or in-progress dot.
-const latencyText = computed(() =>
-  latencyLabel(props.request.latency_ms ?? null, props.request.status === 'in_progress'),
+/**
+ * Background colour: family colour at ~22% alpha. The status
+ * border (set via :style below) provides the primary visual
+ * signal; the family bg just helps the eye group similar tiles.
+ */
+const familyBg = computed(() => {
+  const c = getModelCategoryColor(props.request.model_category)
+  return hexToRgba(c, 0.22)
+})
+
+const statusBorder = computed(() =>
+  STATUS_BORDER_COLORS[props.request.status ?? 'in_progress'] ||
+  STATUS_BORDER_COLORS.in_progress,
 )
 
-// 2px status border. The border sits on the OUTSIDE of the tile so
-// the inner text never gets clipped.
-const borderColor = computed(() => statusBorderColor(props.request.status))
+const statusBorderWidth = computed(() =>
+  STATUS_BORDER_WIDTHS[props.request.status ?? 'in_progress'] ||
+  STATUS_BORDER_WIDTHS.in_progress,
+)
+
 const isPulsing = computed(() => props.request.status === 'in_progress')
 
 /**
@@ -104,6 +119,7 @@ const tooltip = computed(() => {
   if (r.model) lines.push(`Model: ${r.model}`)
   if (r.provider_code) lines.push(`Provider: ${r.provider_code}`)
   lines.push(`Status: ${r.status ?? '?'}`)
+  if (r.error_kind) lines.push(`Error: ${r.error_kind}`)
   if (r.latency_ms != null) lines.push(`Latency: ${latencyText.value}`)
   if (r.total_tokens != null) {
     lines.push(`Tokens: ${r.total_tokens}`)
@@ -113,7 +129,6 @@ const tooltip = computed(() => {
     lines.push(`Tokens: ${p}+${c}`)
   }
   if (r.cost_usd != null) lines.push(`Cost: $${r.cost_usd.toFixed(4)}`)
-  if (r.error_kind) lines.push(`Error: ${r.error_kind}`)
   if (r.request_id) lines.push(`ID: ${r.request_id.slice(0, 8)}`)
   try {
     lines.push(`Time: ${new Date(r.ts).toLocaleString(locale.value)}`)
@@ -123,10 +138,39 @@ const tooltip = computed(() => {
   return lines.join('\n')
 })
 
+/**
+ * Tiny error badge — top-right corner. Single-char glyph for
+ * failure type so the operator can tell "this was a timeout" vs
+ * "5xx" without opening the tooltip.
+ */
+const errorBadge = computed(() => {
+  if (props.request.status !== 'failure' || !props.request.error_kind) return ''
+  const k = props.request.error_kind.toLowerCase()
+  if (/(timeout|timedout)/.test(k)) return 'T'
+  if (/(5xx|server|upstream|provider|overloaded|backend)/.test(k)) return '!'
+  if (/(4xx|auth|unauthor|forbidden|quota|rate|billing|payment)/.test(k)) return 'X'
+  if (/(not_found|model_not|route|no_route|resolve|policy)/.test(k)) return '?'
+  return '!'
+})
+
 function onClick() {
   if (!isIdle.value && props.request.request_id) {
     emit('select', props.request.request_id)
   }
+}
+
+/**
+ * Tiny hex → rgba converter so the family colour can sit at low
+ * alpha over the dark card.
+ */
+function hexToRgba(hex: string, alpha: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return `rgba(139, 148, 158, ${alpha})`
+  const n = parseInt(m[1], 16)
+  const r = (n >> 16) & 0xff
+  const g = (n >> 8) & 0xff
+  const b = n & 0xff
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 </script>
 
@@ -142,58 +186,65 @@ function onClick() {
     <span class="live-block__idle-text">{{ idleLabel }}</span>
   </div>
 
-  <!-- Real tile: 3 lines + 2px status border. -->
+  <!-- Real tile: 4 lines + status border + family background. -->
   <div
     v-else
     class="live-block"
     :class="{
       'live-block--clickable': !!request.request_id,
       'live-block--in-progress': isPulsing,
+      'live-block--failure': request.status === 'failure',
     }"
     role="button"
     tabindex="0"
     :aria-label="tooltip"
     :title="tooltip"
-    :style="{ borderColor: borderColor }"
+    :style="{
+      background: familyBg,
+      borderColor: statusBorder,
+      borderWidth: statusBorderWidth + 'px',
+    }"
     @click="onClick"
     @keyup.enter="onClick"
     @keyup.space.prevent="onClick"
   >
     <span class="live-block__time">{{ timeLabel }}</span>
-    <span class="live-block__vendor" :style="{ color: secondLineColor }">
-      {{ vendorLabel }}
-    </span>
+    <span class="live-block__vendor">{{ vendorLabel }}</span>
+    <span class="live-block__provider">{{ providerLabel }}</span>
     <span class="live-block__latency">{{ latencyText }}</span>
+    <span
+      v-if="errorBadge"
+      class="live-block__error-badge"
+      :title="request.error_kind || ''"
+      aria-hidden="true"
+    >{{ errorBadge }}</span>
   </div>
 </template>
 
 <style scoped>
-/* 2026-07-03 v3 — 3-line text tile.
+/* 2026-07-03 v5 — 4-row tile (60×76).
  *
- *   width  52px   ← fits ~22-23 tiles in a 1280px dashboard track
- *   height 60px   ← 3 lines × ~16px + 4px padding
- *   border 2px    ← status colour sits on the outside, not inside
- *   font   9-10px ← small enough to fit 3 lines without crowding
+ *   width  60px   ← 8px wider than v3 so 4-char OPEN/ANTH fit
+ *   height 76px   ← 4 rows × 14px + 4px padding (top+bottom)
+ *   border 2-3px  ← thicker on failure
+ *   font   8-11px ← model is the loudest; provider is the quietest
  */
 .live-block {
   box-sizing: border-box;
-  width: 52px;
-  height: 60px;
+  width: 60px;
+  height: 76px;
   border-radius: 4px;
-  border: 2px solid transparent;
-  background: var(--bg-subtle, #161b22);
+  border: 2px solid rgba(139, 148, 158, 0.4);
   color: var(--text, #e6edf3);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-around;
-  padding: 2px 2px;
+  padding: 3px 2px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  /* `position: relative` so hover-scale doesn't escape the track's
-   * overflow:hidden (see below). */
   position: relative;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .live-block--clickable {
@@ -217,38 +268,77 @@ function onClick() {
   50%      { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.25); }
 }
 
-/* Line 1: time HH:MM. The lightest weight because time is the
- * least identifying info (the swim lane is a ~minute wide). */
+/* Failure: an extra slight scale-up hint + a subtle red glow. */
+.live-block--failure {
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4) inset;
+}
+
+/* Line 1: time HH:MM. */
 .live-block__time {
   font-size: 9px;
-  line-height: 1;
+  line-height: 1.1;
   color: var(--muted, #8b949e);
   letter-spacing: 0.3px;
 }
 
-/* Line 2: vendor code / error_kind. Largest font — this is what
- * the operator reads to identify the row at a glance. */
+/* Line 2: model-family code. The dominant signal. */
 .live-block__vendor {
   font-size: 11px;
   font-weight: 700;
-  line-height: 1;
+  line-height: 1.1;
   letter-spacing: 0.5px;
   color: var(--text, #e6edf3);
-  /* If the vendor label is too wide, ellipsise instead of
-   * overflowing the 52px tile. */
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-/* Line 3: latency. Slightly muted so it doesn't compete with
- * the vendor label. */
+/* Line 3: provider code. Smaller + muted so the model line
+ * stays the dominant signal. */
+.live-block__provider {
+  font-size: 8px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: var(--muted, #8b949e);
+  text-transform: uppercase;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Slight tint so it doesn't blend into the family-coloured bg
+   * when the family is the same colour as the muted text. */
+  opacity: 0.85;
+}
+
+/* Line 4: latency. */
 .live-block__latency {
-  font-size: 10px;
-  line-height: 1;
+  font-size: 9px;
+  line-height: 1.1;
   color: var(--muted, #8b949e);
   font-variant-numeric: tabular-nums;
+}
+
+/* Error badge — top-right corner. */
+.live-block__error-badge {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: rgba(239, 68, 68, 0.95);
+  border-radius: 2px;
+  pointer-events: none;
+  text-shadow: none;
 }
 
 /* Idle marker: 3x wider so a silence reads as a distinct shape. */
@@ -259,6 +349,8 @@ function onClick() {
   background: transparent;
   color: var(--muted, #8b949e);
   cursor: default;
+  /* Override the 4-row vertical layout — idle is single-line. */
+  justify-content: center;
 }
 .live-block__idle-text {
   font-size: 11px;
