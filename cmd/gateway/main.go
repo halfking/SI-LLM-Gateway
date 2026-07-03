@@ -799,15 +799,11 @@ func main() {
 	// still relay live broadcasts from upstream.
 	var liveStreamHub *admin.LiveStreamHub
 	if cfg.SecretKey != "" {
-		var dbPool = (func() interface{} {
-			if dbConn != nil && dbConn.Enabled() {
-				return dbConn.Pool()
-			}
-			return nil
-		})()
-		var hasDB = dbPool != nil
-		// Type assertion: dbPool is either *pgxpool.Pool or nil
-		liveStreamHub = admin.NewLiveStreamHub(dbPool.(*pgxpool.Pool), cfg.SecretKey, admin.LiveStreamConfig{
+		var dbPoolPtr *pgxpool.Pool
+		if dbConn != nil && dbConn.Enabled() {
+			dbPoolPtr = dbConn.Pool()
+		}
+		liveStreamHub = admin.NewLiveStreamHub(dbPoolPtr, cfg.SecretKey, admin.LiveStreamConfig{
 			BroadcastQueueSize: 2048,
 			InitialReplayLimit: 50,
 			IdleThreshold:      60 * time.Second,
@@ -821,7 +817,7 @@ func main() {
 				liveStreamHub.Publish(adminLiveRequestFromEntry(entry))
 			})
 		}
-		slog.Info("live request stream hub enabled (websocket /api/admin/live-stream)", "has_db", hasDB, "has_telemetry", telemetryClient.Enabled())
+		slog.Info("live request stream hub enabled (websocket /api/admin/live-stream)", "has_db", dbPoolPtr != nil, "has_telemetry", telemetryClient.Enabled())
 	}
 
 	// ── Request WAL (Request Logger) ───────────────────────────────────────
