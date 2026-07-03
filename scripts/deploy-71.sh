@@ -57,7 +57,7 @@ if [[ "$SKIP_DB_PRECHECK" != "true" ]]; then
   DB_URL=$(ssh -p "$SSH_PORT" \
     -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     "$SSH_TARGET" \
-    "grep '^LLM_GATEWAY_DATABASE_URL=' /etc/llm-gateway-go/env 2>/dev/null || echo ''")
+    "grep '^LLM_GATEWAY_DATABASE_URL=' /etc/llm-gateway-go/env 2>/dev/null | head -1 | cut -d= -f2-")
 
   if [[ -z "$DB_URL" ]]; then
     log_err "[preflight] cannot read LLM_GATEWAY_DATABASE_URL from /etc/llm-gateway-go/env on $SSH_TARGET"
@@ -66,7 +66,8 @@ if [[ "$SKIP_DB_PRECHECK" != "true" ]]; then
   fi
   log_info "[preflight] LLM_GATEWAY_DATABASE_URL = ${DB_URL}"
 
-  HOST=$(echo "$DB_URL" | sed -n 's|.*@\([0-9.]\+\):.*|\1|p')
+  HOST=$(echo "$DB_URL" | sed -n 's|^postgres://[^@]*@||p' | sed 's|:.*||')
+  PORT=$(echo "$DB_URL" | sed -n 's|^postgres://[^@]*@[^:]*:||p' | sed 's|/.*||')
 
   # Check banned list first (most dangerous)
   for banned in $BANNED_HOSTS; do
@@ -90,8 +91,7 @@ if [[ "$SKIP_DB_PRECHECK" != "true" ]]; then
   fi
 
   # TCP reachability check (best effort)
-  PORT=$(echo "$DB_URL" | sed -n 's|.*:\([0-9]\+\)/.*|\1|p')
-  log_info "[preflight] TCP probe $HOST:$PORT via $SSH_TARGET…"
+  log_info "[preflight] TCP probe ${HOST}:${PORT} via ${SSH_TARGET}…"
   if ssh -p "$SSH_PORT" \
        -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
        "$SSH_TARGET" \
@@ -106,18 +106,29 @@ if [[ "$SKIP_DB_PRECHECK" != "true" ]]; then
 fi
 
 extra_flags=()
-if [[ -n "$SEQ" ]]; then
+if [[ -n "${SEQ:-}" ]]; then
   extra_flags+=(--seq "$SEQ")
 fi
-if [[ "$SKIP_FRONTEND" == "true" ]]; then
+if [[ "${SKIP_FRONTEND:-true}" == "true" ]]; then
   extra_flags+=(--no-frontend)
 fi
 
-exec ./scripts/bump-version.sh \
-  --ssh "$SSH_TARGET" \
-  --port "$SSH_PORT" \
-  --remote-dir "$REMOTE_DIR" \
-  --service "$SERVICE_NAME" \
-  --bin "$BIN_NAME" \
-  "${extra_flags[@]}" \
-  "$@"
+# exec with optional extra_flags (avoid set -u unbound on empty array)
+if [[ ${#extra_flags[@]} -gt 0 ]]; then
+  exec ./scripts/bump-version.sh \
+    --ssh "$SSH_TARGET" \
+    --port "$SSH_PORT" \
+    --remote-dir "$REMOTE_DIR" \
+    --service "$SERVICE_NAME" \
+    --bin "$BIN_NAME" \
+    "${extra_flags[@]}" \
+    "$@"
+else
+  exec ./scripts/bump-version.sh \
+    --ssh "$SSH_TARGET" \
+    --port "$SSH_PORT" \
+    --remote-dir "$REMOTE_DIR" \
+    --service "$SERVICE_NAME" \
+    --bin "$BIN_NAME" \
+    "$@"
+fi

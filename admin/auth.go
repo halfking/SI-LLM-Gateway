@@ -191,9 +191,15 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
+			// User exists and is enabled but password mismatch — record
+			// once and exit so the legacy path can't double-count.
+			h.auditLog(req.Username, "auth.login_failed", "user", u.ID, fmt.Sprintf("method=jwt reason=bad_password ip=%s", r.RemoteAddr))
+			loginLimiter.Record(clientIP)
+			writeError(w, http.StatusUnauthorized, "Invalid credentials")
+			return
 		}
-		h.auditLog(req.Username, "auth.login_failed", "user", 0, fmt.Sprintf("method=jwt ip=%s", r.RemoteAddr))
-		loginLimiter.Record(clientIP)
+		// User doesn't exist or is disabled — fall through to legacy
+		// admin auth (which has its own counting below).
 	}
 
 	// ── Fall back to legacy admin key auth ────────────────────────────
