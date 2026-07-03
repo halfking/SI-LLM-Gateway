@@ -1,5 +1,7 @@
 # SI-LLM-Gateway（超级智能大模型网关 / AI-Native 组织核心网关）
 
+[简体中文](README.zh-CN.md) | [English](README.en-US.md) | [日本語](README.ja-JP.md) | [繁體中文](README.zh-TW.md) | [Español](README.es-ES.md) | [Français](README.fr-FR.md) | [Deutsch](README.de-DE.md) | [العربية](README.ar-SA.md) | [한국어](README.ko-KR.md)
+
 > **让 AI 成为组织的原生能力。**
 > **核心开源 + 企业增强 + Vibe Coding 治理 + 会话资产化。**
 
