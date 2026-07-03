@@ -22,6 +22,14 @@ type Client struct {
 	queue chan any
 	done  chan struct{}
 	wg    sync.WaitGroup
+
+	// onPersisted is invoked once after every successful INSERT/UPDATE
+	// of a request_logs row. Consumers (e.g. admin.LiveStreamHub) use
+	// this hook to fan-out live dashboard updates without coupling
+	// telemetry to admin. May be nil; the callback MUST be cheap and
+	// non-blocking — telemetry drops it on a slow-consumer channel
+	// internally.
+	onPersisted func(entry *RequestLogEntry)
 }
 
 type DecisionLogEntry struct {
@@ -230,6 +238,15 @@ func (c *Client) SetDB(pool *pgxpool.Pool) {
 	c.dbPool = pool
 }
 
+// SetOnRequestLogPersisted registers a hook invoked after each
+// successful INSERT/UPDATE of a request_logs row. The hook runs on the
+// telemetry worker goroutine — it must be cheap and non-blocking.
+// Pass nil to clear. Hooks added after Stop() is called are ignored
+// because no further persist calls happen post-Stop.
+func (c *Client) SetOnRequestLogPersisted(fn func(entry *RequestLogEntry)) {
+	c.onPersisted = fn
+}
+
 func (c *Client) EmitDecisionLog(entry *DecisionLogEntry) {
 	if !c.Enabled() {
 		return
@@ -277,16 +294,16 @@ func (c *Client) EmitRequestLogUpdate(entry *RequestLogEntry) {
 // 2026-07-02 fix (in_flight_during_restart bug): the previous Stop()
 // called `c.wg.Wait()` with no timeout, which meant:
 //
-//   1. If the caller relied on a SIGTERM grace period (e.g. 10s from
-//      docker stop / k8s preStop), wg.Wait() blocked forever because
-//      the worker loop only exits on `<-c.done`, which is fine — but
-//      when the OS sends SIGKILL after the grace period, any queue
-//      entries still buffered are lost (this is exactly the
-//      in_flight_during_restart orphan rows we observed in audit).
+//  1. If the caller relied on a SIGTERM grace period (e.g. 10s from
+//     docker stop / k8s preStop), wg.Wait() blocked forever because
+//     the worker loop only exits on `<-c.done`, which is fine — but
+//     when the OS sends SIGKILL after the grace period, any queue
+//     entries still buffered are lost (this is exactly the
+//     in_flight_during_restart orphan rows we observed in audit).
 //
-//   2. Even when `close(c.done)` was reached, if the worker was
-//      blocked inside a slow pgx Exec, wg.Wait() could exceed the
-//      orchestrator's grace window.
+//  2. Even when `close(c.done)` was reached, if the worker was
+//     blocked inside a slow pgx Exec, wg.Wait() could exceed the
+//     orchestrator's grace window.
 //
 // Now we use a bounded timeout (default 8s, configurable via
 // LLM_GATEWAY_TELEMETRY_DRAIN_TIMEOUT). After the deadline, we mark
@@ -480,10 +497,26 @@ func (c *Client) insertDecisionLog(entry *DecisionLogEntry) error {
 
 func (c *Client) persistRequestLog(entry *RequestLogEntry) error {
 	normalizeRequestStatus(entry)
+	var err error
 	if entry.Op == RequestLogUpdate {
-		return c.updateRequestLog(entry)
+		err = c.updateRequestLog(entry)
+	} else {
+		err = c.insertRequestLog(entry)
 	}
-	return c.insertRequestLog(entry)
+	if err == nil && c.onPersisted != nil {
+		// Fan-out hooks (e.g. live dashboard) — must never block
+		// telemetry. We use a recover guard so a panicking consumer
+		// cannot take down the worker.
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Warn("telemetry onPersisted panic", "request_id", entry.RequestID)
+				}
+			}()
+			c.onPersisted(entry)
+		}()
+	}
+	return err
 }
 
 func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
@@ -1305,8 +1338,8 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 		strPtrValue(entry.UpstreamFinishReason), // $50
 		entry.ClientRequestID,                   // $51
 		// 2026-07-02: attachment tracking. See SET clause comment.
-		entry.HasAttachments,                    // $52
-		entry.AttachmentCount,                   // $53
+		entry.HasAttachments,  // $52
+		entry.AttachmentCount, // $53
 	)
 	return err
 }
