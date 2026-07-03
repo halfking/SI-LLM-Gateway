@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bufio"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -67,5 +68,7 @@ func (rw *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if h, ok := rw.ResponseWriter.(http.Hijacker); ok {
 		return h.Hijack()
 	}
+	slog.Warn("loggingResponseWriter: underlying ResponseWriter does not implement http.Hijacker",
+		"type", fmt.Sprintf("%T", rw.ResponseWriter))
 	return nil, nil, http.ErrNotSupported
 }
