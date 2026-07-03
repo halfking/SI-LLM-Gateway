@@ -46,12 +46,12 @@ import (
 	"github.com/kaixuan/llm-gateway-go/internal/ir"
 	"github.com/kaixuan/llm-gateway-go/internal/modelpolicy"
 	"github.com/kaixuan/llm-gateway-go/internal/observability"
-	"github.com/kaixuan/llm-gateway-go/observability/rotate"
 	"github.com/kaixuan/llm-gateway-go/limiter"
 	"github.com/kaixuan/llm-gateway-go/maas"
 	"github.com/kaixuan/llm-gateway-go/memora"
 	"github.com/kaixuan/llm-gateway-go/metatools"
 	"github.com/kaixuan/llm-gateway-go/middleware"
+	"github.com/kaixuan/llm-gateway-go/observability/rotate"
 	"github.com/kaixuan/llm-gateway-go/pending"
 	"github.com/kaixuan/llm-gateway-go/pool"
 	"github.com/kaixuan/llm-gateway-go/provider"
@@ -790,6 +790,27 @@ func main() {
 		slog.Info("telemetry emission enabled (chatHandler + routingExec)")
 	}
 
+	// ── Live request stream WebSocket hub (2026-07-03) ────────────────────
+	// Fans out newly-persisted request_logs rows to dashboard clients.
+	// Owned by admin; created here so we have access to dbConn and
+	// can wire the telemetry hook at startup.
+	var liveStreamHub *admin.LiveStreamHub
+	if dbConn != nil && dbConn.Enabled() && telemetryClient.Enabled() {
+		liveStreamHub = admin.NewLiveStreamHub(dbConn.Pool(), admin.LiveStreamConfig{
+			BroadcastQueueSize: 2048,
+			InitialReplayLimit: 50,
+			IdleThreshold:      60 * time.Second,
+			IdleTickInterval:   10 * time.Second,
+			ReadTimeout:        90 * time.Second,
+			WriteTimeout:       10 * time.Second,
+		})
+		go liveStreamHub.Run()
+		telemetryClient.SetOnRequestLogPersisted(func(entry *telemetry.RequestLogEntry) {
+			liveStreamHub.Publish(adminLiveRequestFromEntry(entry))
+		})
+		slog.Info("live request stream hub enabled (websocket /api/admin/live-stream)")
+	}
+
 	// ── Request WAL (Request Logger) ───────────────────────────────────────
 	// 2026-06-22: Synchronous initial log + async batch updates for request lifecycle.
 	// Uses same DB pool as telemetryClient. Disabled if env var LLM_GATEWAY_REQUEST_WAL_DISABLE=true.
@@ -811,13 +832,13 @@ func main() {
 	// instantly without code change. Captures `exec` from the outer scope.
 	if redisClientForCache != nil && dbConn != nil && dbConn.Enabled() && telemetryClient.Enabled() && !compressorSessionDisabled() {
 		scCache := compressor.NewSessionCache(redisBackendFromClient(redisClientForCache), dbBackendFromPool(dbConn))
-		
+
 		// Initialize CCR (Columnar Content Repository) for Headroom compression
 		// CCR provides three-tier storage (L1 in-mem LRU, L2 Redis, L3 PostgreSQL)
 		// for compressed array data that can be retrieved via headroom_retrieve tool.
 		var ccrManager *ccr.Manager
 		var headroomComp *compressor.HeadroomCompressor
-		
+
 		// Create dedicated redis client for CCR (reuses same Redis instance as sessions)
 		if cfg.RedisAddr != "" {
 			ccrRedis := redis.NewClient(&redis.Options{
@@ -825,7 +846,7 @@ func main() {
 				Password: cfg.RedisPassword,
 				DB:       cfg.RedisDB,
 			})
-			
+
 			// TODO: Wire SQL backend when ccr.Manager supports pgxpool.Pool
 			// For now, use L1 (in-memory LRU) + L2 (Redis) only
 			ccrConfig := ccr.DefaultConfig()
@@ -835,21 +856,21 @@ func main() {
 				slog.Warn("ccr: failed to initialize CCR manager", "error", err)
 			} else {
 				headroomComp = compressor.NewHeadroomCompressor(ccrManager)
-				
+
 				// Wire CCRRetrievalTool so LLM can retrieve compressed data via headroom_retrieve
 				ccrTool := relay.NewCCRRetrievalTool(ccrManager)
 				chatHandler.SetCCRRetrievalTool(ccrTool)
-				
+
 				slog.Info("headroom: CCR manager + HeadroomCompressor initialized (L1+L2 only)",
 					"l1_size", ccrConfig.L1MaxItems,
 					"l2_ttl", ccrConfig.L2TTL)
 			}
 		}
-		
+
 		scDeps := compressor.SessionCompressorDeps{
-			Cache:               scCache,
-			CompactionDeps:      NewDependenciesFromExecutor(routingExec),
-			HeadroomCompressor:  headroomComp,
+			Cache:              scCache,
+			CompactionDeps:     NewDependenciesFromExecutor(routingExec),
+			HeadroomCompressor: headroomComp,
 		}
 		chatHandler.SetSessionCompressor(compressor.NewSessionCompressor(scDeps))
 		slog.Info("v3 session-level compressor wired (L1 in-mem + L2 Redis + L3 PG)")
@@ -946,6 +967,12 @@ func main() {
 		}
 		if discoverySvc != nil {
 			adminHandler.SetDiscoveryService(discoverySvc)
+		}
+		// Wire the live request stream hub so /api/admin/live-stream
+		// is registered. Hub itself is created earlier so the
+		// telemetry hook can call back into it.
+		if liveStreamHub != nil {
+			adminHandler.SetLiveStreamHub(liveStreamHub)
 		}
 		// settings-management: inject the DB-backed settings store so the
 		// /api/admin/settings/* endpoints can read/write settings_kv.
@@ -1825,4 +1852,51 @@ func (a *irAdapter) SerializeOpenAIResponse(irResp *ir.InternalResponse, clientM
 
 func (a *irAdapter) SerializeAnthropicResponse(irResp *ir.InternalResponse, clientModel string) ([]byte, error) {
 	return ir.SerializeAnthropicResponse(irResp, clientModel)
+}
+
+// adminLiveRequestFromEntry adapts a telemetry RequestLogEntry into
+// the admin.LiveRequest projection used by the dashboard swim lane.
+// Kept in main.go (rather than admin/) so we avoid an admin → telemetry
+// import edge. The hub itself only depends on the admin package.
+//
+// Note: the telemetry entry does NOT carry the DB-side `ts` (the SQL
+// uses now()) nor total_tokens (computed in SQL). We use the caller's
+// time.Now() as a UI-freshness approximation; total_tokens is computed
+// here from prompt + completion when both are set, otherwise left nil
+// so the frontend treats it as unknown.
+func adminLiveRequestFromEntry(entry *telemetry.RequestLogEntry) admin.LiveRequest {
+	clientModel := ""
+	if entry.ClientModel != nil {
+		clientModel = strings.TrimSpace(*entry.ClientModel)
+	}
+	outboundModel := ""
+	if entry.OutboundModel != nil {
+		outboundModel = strings.TrimSpace(*entry.OutboundModel)
+	}
+	status := ""
+	if entry.RequestStatus != nil {
+		status = strings.TrimSpace(*entry.RequestStatus)
+	}
+	var totalTokens *int
+	if entry.PromptTokens != nil && entry.CompletionTokens != nil {
+		t := *entry.PromptTokens + *entry.CompletionTokens
+		totalTokens = &t
+	}
+
+	return admin.LiveRequestFromTelemetry(
+		entry.RequestID,
+		time.Now().UTC(),
+		entry.TenantID,
+		clientModel,
+		outboundModel,
+		"",
+		status,
+		entry.Success,
+		entry.ErrorKind,
+		entry.LatencyMs,
+		entry.PromptTokens,
+		entry.CompletionTokens,
+		totalTokens,
+		entry.CostUSD,
+	)
 }

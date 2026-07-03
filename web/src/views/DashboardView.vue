@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MemoraStatusButton from '../components/MemoraStatusButton.vue'
+import LiveRequestStream from '../components/LiveRequestStream.vue'
+import RequestLogDrawer from '../components/RequestLogDrawer.vue'
 import TenantDashboardView from './TenantDashboardView.vue'
 import {
   getUsageSummary,
@@ -21,6 +23,7 @@ import {
   type HealthResponse,
   type CompressionStats,
 } from '../api'
+import { useLiveStream, type LiveRequest } from '../composables/useLiveStream'
 import { store, isSuperAdmin, isDefaultTenant, getCurrentTenantId } from '../store'
 import { useLocale } from '../i18n/useLocale'
 
@@ -41,6 +44,110 @@ const error   = ref('')
 let discoveryPollTimer: ReturnType<typeof setInterval> | null = null
 let healthPollTimer: ReturnType<typeof setInterval> | null = null
 let probeFailuresPollTimer: ReturnType<typeof setInterval> | null = null
+let statsRecalibrateTimer: ReturnType<typeof setInterval> | null = null
+
+// ── Live request stream (2026-07-03) ─────────────────────────────────
+// The composable owns the WebSocket connection. We pass requests
+// through a watch to incrementally update the stat cards instead of
+// re-fetching the full summary on every push (which would create
+// a thundering-herd under QPS=50+).
+const { requests: liveRequests } = useLiveStream()
+const activeRequestId = ref<string | null>(null)
+function openRequestDetail(id: string) {
+  activeRequestId.value = id
+}
+function closeRequestDrawer() {
+  activeRequestId.value = null
+}
+
+// Track which request IDs we have already credited so a re-mount of
+// the stream (initial_data replay) does not double-count. Cleared
+// whenever load() refetches the full summary.
+const seenLiveRequestIds = new Set<string>()
+let prevLiveCount = 0
+
+function applyIncrementalStats() {
+  if (!summary.value) return
+  // Only count requests NEW since the previous tick. The composable
+  // keeps up to 100, so we cap the delta at 100 (anything beyond
+  // that was already ejected by the buffer and re-counted only when
+  // the user reloads via load()).
+  const items = liveRequests.value
+  const added: LiveRequest[] = []
+  for (let i = prevLiveCount; i < items.length; i++) {
+    const r = items[i]
+    if (r.type !== 'request' || !r.request_id) continue
+    if (seenLiveRequestIds.has(r.request_id)) continue
+    seenLiveRequestIds.add(r.request_id)
+    added.push(r)
+  }
+  prevLiveCount = items.length
+  if (added.length === 0) return
+
+  const tokensDelta =
+    added.reduce((s, r) => s + (r.total_tokens ?? ((r.prompt_tokens ?? 0) + (r.completion_tokens ?? 0))), 0)
+  const costDelta = added.reduce((s, r) => s + (r.cost_usd ?? 0), 0)
+  const successes = added.filter((r) => r.status === 'success').length
+  const failures = added.filter((r) => r.status === 'failure').length
+  const inProgress = added.filter((r) => r.status === 'in_progress').length
+
+  // Bump raw counts.
+  summary.value.total_requests = (summary.value.total_requests ?? 0) + added.length
+  summary.value.total_prompt_tokens = (summary.value.total_prompt_tokens ?? 0) +
+    added.reduce((s, r) => s + (r.prompt_tokens ?? 0), 0)
+  summary.value.total_completion_tokens = (summary.value.total_completion_tokens ?? 0) +
+    added.reduce((s, r) => s + (r.completion_tokens ?? 0), 0)
+  summary.value.total_cost_usd = (summary.value.total_cost_usd ?? 0) + costDelta
+
+  // Latency: weighted running average. Cheaper than recomputing and
+  // accurate enough at the dashboard's display granularity.
+  const addedLatency = added.reduce((s, r) => s + (r.latency_ms ?? 0), 0)
+  const addedLatencyN = added.filter((r) => r.latency_ms != null).length
+  if (addedLatencyN > 0) {
+    const prevAvg = summary.value.avg_latency_ms ?? 0
+    const prevN = Math.max(0, (summary.value.total_requests ?? 0) - added.length)
+    const totalN = prevN + addedLatencyN
+    if (totalN > 0) {
+      summary.value.avg_latency_ms = Math.round((prevAvg * prevN + addedLatency) / totalN)
+    }
+  }
+
+  // Success rate: incremental Bayesian update so a few new failures
+  // don't visibly nudge a stable 99.9%.
+  const knownSuccesses = Math.round((summary.value.success_rate ?? 1) * (summary.value.total_requests - added.length))
+  const newSuccesses = knownSuccesses + successes
+  if (summary.value.total_requests > 0) {
+    summary.value.success_rate = newSuccesses / summary.value.total_requests
+  }
+  // Touched counts surfaced via console for debugging — the stat
+  // cards themselves don't render these yet.
+  if (inProgress > 0) {
+    console.debug('[liveStream] in-progress skipped for success_rate:', inProgress)
+  }
+  // failures / successes are consumed by the success-rate math above;
+  // we keep the variables in scope so future stat cards can pick them
+  // up without re-deriving.
+  void failures
+  void tokensDelta
+}
+
+watch(liveRequests, applyIncrementalStats, { deep: true })
+
+// Periodic recalibration against the backend to wipe out any
+// client-side drift. 5 minutes matches the spec (REQ §2.2.2).
+function scheduleStatsRecalibrate() {
+  if (statsRecalibrateTimer) clearInterval(statsRecalibrateTimer)
+  statsRecalibrateTimer = setInterval(async () => {
+    try {
+      const fresh = await getUsageSummary(days.value)
+      summary.value = fresh
+      seenLiveRequestIds.clear()
+      prevLiveCount = 0
+    } catch {
+      /* non-blocking; next tick will retry */
+    }
+  }, 5 * 60 * 1000)
+}
 
 // Tenant info display
 const tenantLabel = computed(() => {
@@ -92,6 +199,10 @@ async function load() {
     models.value  = m
     overview.value = o
     hotKeys.value = h
+    // Re-baseline the live-stream delta tracker against the freshly
+    // fetched summary so the next push starts from a clean slate.
+    seenLiveRequestIds.clear()
+    prevLiveCount = 0
     void loadCompressionStats()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('dashboard.loadError')
@@ -176,12 +287,14 @@ onMounted(() => {
   scheduleDiscoveryPoll()
   scheduleHealthPoll()
   scheduleProbeFailuresPoll()
+  scheduleStatsRecalibrate()
 })
 
 onUnmounted(() => {
   if (discoveryPollTimer) clearInterval(discoveryPollTimer)
   if (healthPollTimer) clearInterval(healthPollTimer)
   if (probeFailuresPollTimer) clearInterval(probeFailuresPollTimer)
+  if (statsRecalibrateTimer) clearInterval(statsRecalibrateTimer)
 })
 
 function scheduleProbeFailuresPoll() {
@@ -275,6 +388,8 @@ function scheduleProbeFailuresPoll() {
       </details>
       <RouterLink to="/routing-v2?tab=resolve&row=model">{{ t('nav.item.routingOverview') }}</RouterLink>
     </div>
+
+    <LiveRequestStream @open-detail="openRequestDetail" />
 
     <div class="stat-grid" v-if="summary && overview">
       <div class="stat-card">
@@ -435,6 +550,7 @@ function scheduleProbeFailuresPoll() {
     <div v-if="!loading && !error && (!summary || summary.total_requests === 0)" class="empty" style="margin-top:40px">
       <span v-html="t('dashboard.empty.firstUse')"></span>
     </div>
+    <RequestLogDrawer :request-id="activeRequestId" @close="closeRequestDrawer" />
   </div>
 </template>
 

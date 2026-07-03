@@ -105,6 +105,17 @@ type Handler struct {
 		Stats(ctx context.Context) interface{}
 		SetMaxIdentities(n int)
 	}
+
+	// liveStreamHub (2026-07-03) fans out newly-persisted request_logs
+	// rows to dashboard WebSocket clients. nil disables the
+	// /api/admin/live-stream endpoint.
+	liveStreamHub *LiveStreamHub
+}
+
+// SetLiveStreamHub wires the WebSocket hub that powers the dashboard
+// real-time swim lane. Registered via /api/admin/live-stream.
+func (h *Handler) SetLiveStreamHub(hub *LiveStreamHub) {
+	h.liveStreamHub = hub
 }
 
 func NewHandler(db *pgxpool.Pool, secretKey string, encKey []byte) *Handler {
@@ -331,6 +342,15 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/data-lifecycle/cleanup-logs", admin(h.handleCleanupLogs))
 	mux.HandleFunc("/api/admin/data-lifecycle/config", admin(h.handleUpdateLifecycleConfig))
 	mux.HandleFunc("/api/admin/data-lifecycle/log-config", admin(h.handleUpdateLogConfig))
+
+	// Live request stream WebSocket endpoint (2026-07-03).
+	// Powers the dashboard swim lane. We do NOT wrap with admin()
+	// here because browsers cannot send Authorization headers on a
+	// WebSocket upgrade; the hub promotes ?token= into the header
+	// and runs the same JWT/admin-key verification internally.
+	if h.liveStreamHub != nil {
+		mux.HandleFunc("/api/admin/live-stream", h.liveStreamHub.HandleLiveStream)
+	}
 
 	// settings-management (Q1: B, Q2: A, Q3: B): 4 platform + 4 tenant endpoints.
 	// Tenant endpoints require super_admin (enforced inside the handler).
