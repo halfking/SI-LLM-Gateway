@@ -14,55 +14,47 @@ export default {
   featuresTitle: 'Core Capabilities',
   featuresSubtitle: 'Covering the full chain from access to operations',
   heroPoints: [
-    'Smart Routing',
-    'Call Safety',
-    'Cache Cost-down',
-    'Agent Ready',
-    'Full-chain Audit',
-    'MaaS Billing',
+    'Enterprise AI Entry',
+    'Vibe Coding Governance',
+    'AI Session Assets',
+    'Enterprise Knowledge',
+    'Data Security Shield',
+    'Private Deployment',
   ],
   features: {
     smartRouting: {
-      title: 'Smart Routing & Credential Pool',
+      title: 'Enterprise AI Entry',
       description:
-        'Auto-selects by tenant, model, and task type. Multi-credential fingerprint pool plus adaptive probing — sub-second failover, near-zero ban rate.',
+        '1045 Offers / 410 Models / 100% Coverage. Unified access to global LLMs and AI tools with smart routing and sticky binding. Every AI call is controllable, observable, billable, and governable.',
     },
     safety: {
-      title: 'Call Safety Shield',
+      title: 'Vibe Coding Governance',
       description:
-        'LLM-as-judge prompt-injection detection (v1 observable mode) and sensitive-data masking planning — enterprise-grade compliance defense.',
-      badge: 'beta',
+        'Code quality +35% · Security vulnerabilities -78% · Tech debt -60%. Full-lifecycle AI-assisted coding governance with complete quality assurance from prompts to code output.',
     },
     cache: {
-      title: 'Cache Alignment & Cost-down',
-      description:
-        'Prompt prefix stabilization plus semantic caching maximize KV-cache hit rate and reduce token compute cost.',
+      title: 'AI Session Assets',
+      description: '13,000+ sessions archived · Onboarding -40%. Transform every AI conversation into searchable, reusable enterprise knowledge assets, sharing wisdom across teams.',
     },
     agent: {
-      title: 'Agent & MCP Gateway',
-      description:
-        'Agent registry, A2A protocol, MCP tool hosting and protocol conversion — evolve from an LLM proxy to the agent orchestration entry point.',
-      badge: 'Coming soon',
+      title: 'Enterprise Knowledge Deposition',
+      description: 'Knowledge auto-grows · Cross-generation inheritance. Models change, Agents change, but enterprise memory persists. Build a knowledge foundation independent of specific tools.',
     },
     observability: {
-      title: 'Full-chain Observability',
-      description:
-        'Request logs, routing-decision audit, OpenTelemetry tracing, SIEM/CEF event export — ready for MLPS 2.0 and GDPR.',
+      title: 'Data Security Shield',
+      description: 'Injection blocking 98% · Compliance risk 0. LLM-as-judge prompt injection detection, sensitive data masking, SIEM/SOAR integration, MLPS 2.0 and GDPR ready.',
     },
     billing: {
-      title: 'MaaS Billing System',
-      description:
-        'Plans + credits + three-pool wallet (subscription / credit / top-up) — full self-service commercialization loop for tenants.',
+      title: 'Multi-credential Fingerprint Pool + Anti-ban',
+      description: '50+ UA · 35 lang · 11 utls · 5min rotation. Adaptive probing with sub-second failover, near-zero ban rate, ensuring service continuity.',
     },
     multiProtocol: {
-      title: 'Multi-protocol Compatibility',
-      description:
-        'OpenAI Chat / Anthropic Messages / Responses — three inbound formats normalized, seamless integration of Chinese and global models.',
+      title: 'Fully Private Deployment',
+      description: '184 k3s + 71 docker · 10-minute installation. Data stays in-house, zero external dependencies, open-source architecture and compliance requirements.',
     },
     multiTenant: {
-      title: 'Multi-tenant Isolation',
-      description:
-        'PostgreSQL RLS row-level security + 43-round audit L1=0, zero cross-tenant data leakage, per-tenant policy and quota.',
+      title: 'Enterprise Management + MaaS',
+      description: 'Plans + credits + top-up · 60%+ cheaper than SaaS. Complete commercialization loop with multi-tenant isolation, PostgreSQL RLS row-level security L1=0.',
     },
   },
   advantagesTitle: 'Differentiated Advantages',
@@ -70,7 +62,7 @@ export default {
   advantages: {
     local: {
       title: 'China Localization',
-      description: 'Full Chinese UI, domestic-model priority, Alipay / WeChat Pay, MLPS-compliant templates',
+      description: 'Full Chinese UI, open-source model priority, Alipay / WeChat Pay, MLPS-compliant templates',
     },
     private: {
       title: 'Private Deployment',
@@ -91,28 +83,28 @@ export default {
     title: 'Product Evolution Roadmap',
     subtitle: 'From LLM dataplane to enterprise Agent gateway — built continuously',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'API Hub Asset Center + MCP Tool Hosting',
       description:
-        'Unified registration of LLM endpoints, MCP services, and Agents. Developer self-service discovery and reuse.',
+        'Unified registration of LLM endpoints, MCP services, and Agents. Developer self-service discovery and reuse. Credential SLA guarantee + semantic cache API.',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
-      title: 'Safety Shield GA + SIEM Integration + SpecBoost',
+      phase: 'Step 2',
+      title: 'Model Armor Security Shield + SIEM Integration',
       description:
-        'Prompt-injection blocking, sensitive-data masking, smart API description enrichment to improve Function Calling accuracy.',
+        'Prompt injection blocking GA, sensitive data masking (SDP), SIEM/SOAR integration. SpecBoost smart enrichment to improve Function Calling accuracy.',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'Agent Registry + A2A Protocol Gateway',
       description:
-        'Cross-agent task delegation and orchestration, OpenClaw and business Agents unified entry.',
+        'Cross-agent task delegation and orchestration, OpenClaw and business Agents unified entry. Auto asset discovery + compliance GA + SpecBoost GA.',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
-      title: 'Industry Solutions GA',
+      phase: 'Step 4',
+      title: 'Industry Solutions GA + External Customers',
       description:
-        'Customer service, HR, sales, logistics industry templates — out-of-the-box agent solutions.',
+        'Customer service, HR, sales, logistics industry templates — out-of-the-box agent solutions. 2 external customers + documentation system + billing online.',
     },
   },
 }
