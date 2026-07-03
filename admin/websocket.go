@@ -407,10 +407,10 @@ func (h *LiveStreamHub) HandleLiveStream(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if h.db == nil {
-		writeError(w, http.StatusServiceUnavailable, "database not configured")
-		return
-	}
+	// DB is optional: if missing, initial replay will be empty but live
+	// broadcast still works. This allows 71 (stateless proxy) to run the
+	// hub without a local database — it just relays whatever telemetry
+	// pushes into it.
 
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -483,6 +483,11 @@ func (h *LiveStreamHub) HandleLiveStream(w http.ResponseWriter, r *http.Request)
 // replay loads the most recent N requests. ASC order so the client
 // renders them left-to-right.
 func (h *LiveStreamHub) replay(ctx context.Context, tenantID string, isSuper bool, limit int) ([]LiveRequest, error) {
+	if h.db == nil {
+		// No DB: return empty replay. The hub can still relay live
+		// broadcasts from telemetry hooks.
+		return nil, nil
+	}
 	if limit <= 0 {
 		limit = 50
 	}
