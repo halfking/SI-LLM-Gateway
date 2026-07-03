@@ -71,6 +71,16 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
   const endpoint = options.endpoint ?? '/api/admin/live-stream'
 
   const requests = ref<LiveRequest[]>([])
+  // Track which IDs have already been counted so callers (e.g. the
+  // dashboard stat-card incremental updater) can be notified when an
+  // ID leaves the buffer. Keeps memory predictable: even at QPS=200
+  // the buffer is bounded by `capacity`.
+  const idIndex = new Set<string>()
+  // Push-out callback: fired with the request_id that was just evicted
+  // by the new arrival. Lets the dashboard reconcile stat-card
+  // accumulators without re-counting an evicted entry on the next
+  // initial_data replay.
+  let onEvict: ((requestId: string) => void) | null = null
   const connection = ref<ConnectionState>('idle')
   const paused = ref(false)
   const lastEventAt = ref<number>(0)
@@ -82,28 +92,57 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
   const pending: LiveRequest[] = []
   let disposed = false
 
+  /**
+   * O(n) trim: when buffer is at capacity, drop the oldest entry,
+   * drop its ID from idIndex, and notify any eviction listener.
+   * One shift per eviction is fine for capacity ≤ 60.
+   */
+  function trimOldest() {
+    if (requests.value.length < capacity) return
+    const dropped = requests.value.shift()
+    if (!dropped) return
+    if (dropped.type === 'request' && dropped.request_id) {
+      idIndex.delete(dropped.request_id)
+      if (onEvict) onEvict(dropped.request_id)
+    }
+  }
+
   function appendRequest(item: LiveRequest) {
     if (paused.value) {
       pending.push(item)
       // Bound the pending queue too — keeps memory predictable when
       // a tab is backgrounded for hours.
       if (pending.length > capacity * 4) {
-        pending.splice(0, pending.length - capacity * 4)
+        const dropped = pending.splice(0, pending.length - capacity * 4)
+        for (const d of dropped) {
+          if (d.type === 'request' && d.request_id) {
+            idIndex.delete(d.request_id)
+            if (onEvict) onEvict(d.request_id)
+          }
+        }
       }
       return
     }
+    // If we have already seen this ID (e.g. WS broadcast + telemetry
+    // replay), skip — it would otherwise inflate the buffer and
+    // double-count stats downstream.
+    if (item.type === 'request' && item.request_id && idIndex.has(item.request_id)) {
+      return
+    }
+    if (item.type === 'request' && item.request_id) {
+      idIndex.add(item.request_id)
+    }
     requests.value.push(item)
     while (requests.value.length > capacity) {
-      requests.value.shift()
+      trimOldest()
     }
   }
 
   function flushPending() {
     if (pending.length === 0) return
     const drained = pending.splice(0, pending.length)
-    requests.value.push(...drained)
-    while (requests.value.length > capacity) {
-      requests.value.shift()
+    for (const item of drained) {
+      appendRequest(item)
     }
   }
 
@@ -124,9 +163,29 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
     lastEventAt.value = Date.now()
     if (e.type === 'initial_data' && Array.isArray(e.requests)) {
       // Replace buffer with replay — sort ASC so older entries end up
-      // on the left as required.
+      // on the left as required. We also clear idIndex first so the
+      // replay IDs become the new source of truth (the previous IDs
+      // are now considered evicted).
       const sorted = [...e.requests].sort((a, b) => a.ts.localeCompare(b.ts))
-      requests.value = sorted.slice(-capacity)
+      const kept = sorted.slice(-capacity)
+      // Notify eviction for every ID that was in the OLD buffer but
+      // not in the NEW replay. Best-effort: if an old ID is also in
+      // the new replay, the caller will treat it as "still present"
+      // because the Set membership is preserved for IDs we keep.
+      const newIds = new Set<string>()
+      for (const r of kept) {
+        if (r.type === 'request' && r.request_id) newIds.add(r.request_id)
+      }
+      if (onEvict) {
+        for (const oldId of idIndex) {
+          if (!newIds.has(oldId)) onEvict(oldId)
+        }
+      }
+      idIndex.clear()
+      for (const r of kept) {
+        if (r.type === 'request' && r.request_id) idIndex.add(r.request_id)
+      }
+      requests.value = kept
       return
     }
     if (e.type === 'request' && e.request) {
