@@ -304,11 +304,9 @@ si-llm-gateway-v1.0.0-installer.tar.gz (2GB)
 
 ---
 
-## 📞 联系方式
+## 📞 演示地址
 
-- **公司**：开轩（kxpms.cn）
-- **产品**：AI-Native 组织核心网关（内含 SI-LLM-Gateway 引擎）
-- **生产部署**：184 k3s（`llmgo.kxpms.cn`）+ 71 host docker（`llm.kxpms.cn`，备用）
+**网关示例地址**：https://llm.kxpms.cn
 
 ---
 
