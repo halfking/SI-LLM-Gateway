@@ -5,10 +5,12 @@
 // Keys use camelCase nested objects so vue-i18n's `t()` interpolation and
 // `t('landing.features.X.title', { ... })` substitution both work.
 export default {
-  kicker: 'Enterprise AI & Agent Gateway',
-  title: 'Kaixuan Enterprise AI & Agent Gateway',
-  subtitle:
-    'The unified gateway from LLM proxy to agent orchestration. One entry point for every LLM — intelligent routing, safety shields, cache-driven cost control, full-chain audit. Every AI call is observable, controllable, and billable.',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'AI-Native Organization Core Gateway',
+  subtitle: [
+    'Make AI a native capability of your organization.',
+    'Open core + enterprise enhancement + Vibe Coding governance + session asset-ification.',
+  ],
   featuresTitle: 'Core Capabilities',
   featuresSubtitle: 'Covering the full chain from access to operations',
   heroPoints: [

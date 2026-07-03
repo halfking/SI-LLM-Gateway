@@ -1,10 +1,12 @@
 // Auto-translated draft (es-ES) · 2026-07-02 · please review
 // landing.ts — Página de aterrizaje pública.
 export default {
-  kicker: 'Enterprise AI & Agent Gateway',
-  title: 'Kaixuan Enterprise AI & Agent Gateway',
-  subtitle:
-    'La pasarela unificada desde el proxy de LLM hasta la orquestación de agentes. Un único punto de entrada para cada LLM: enrutamiento inteligente, escudos de seguridad, reducción de costes por caché y auditoría de extremo a extremo. Cada llamada de IA es observable, controlable y facturable.',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'Pasarela núcleo de organización AI-Native',
+  subtitle: [
+    'Haz que la IA sea una capacidad nativa de tu organización.',
+    'Núcleo abierto + refuerzo empresarial + gobernanza Vibe Coding + capitalización de sesiones.',
+  ],
   featuresTitle: 'Capacidades principales',
   featuresSubtitle: 'Cubriendo toda la cadena, desde el acceso hasta las operaciones',
   heroPoints: [

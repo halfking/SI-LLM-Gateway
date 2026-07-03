@@ -2068,6 +2068,9 @@ func (h *ChatHandler) emitTelemetry(evt audit.Event, result *routing.ExecuteResu
 		if v, ok := m["stream_chunk_count"].(int); ok {
 			reqLog.StreamChunkCount = &v
 		}
+		if v, ok := m["stream_chunks_sent"].(int); ok {
+			reqLog.StreamChunksSent = &v
+		}
 		if v, ok := m["response_checksum"].(string); ok {
 			reqLog.ResponseChecksum = &v
 		}

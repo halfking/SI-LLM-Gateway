@@ -4,10 +4,12 @@
 //
 // camelCase のネストされたオブジェクトを使用し、vue-i18n の t() 補間と t('landing.features.X.title', {...}) の置換に対応します。
 export default {
-  kicker: 'Enterprise AI & Agent Gateway',
-  title: 'Kaixuan 企業 AI とエージェントゲートウェイ',
-  subtitle:
-    '大規模モデルのプロキシからエージェントオーケストレーションまでの一貫したエントリーポイント。複数の LLM を統一的に接続し、スマートルーティング、セーフティシールド、キャッシュによるコスト削減、エンドツーエンドの監査を実現します。企業のすべての AI 呼び出しを、コントロール可能、可観測、課金可能にします。',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'AI-Native 組織コアゲートウェイ',
+  subtitle: [
+    'AI を組織のネイティブ能力に。',
+    'オープンコア + エンタープライズ強化 + Vibe Coding ガバナンス + セッション資産化。',
+  ],
   featuresTitle: 'コア機能',
   featuresSubtitle: '接続から運用までの重要なステップをカバー',
   heroPoints: ['スマートルーティング', '呼び出しのセキュリティ', 'キャッシュによるコスト削減', 'Agent 対応', 'エンドツーエンド監査', 'MaaS 課金'],
