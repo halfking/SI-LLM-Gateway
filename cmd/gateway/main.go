@@ -101,6 +101,14 @@ func main() {
 	var memoraSink *memora.Sink
 	var memoraClient *memora.Client
 
+	// liveStreamHub is the WebSocket fan-out point for the dashboard
+	// swim lane. Held at function scope (not a package global) for
+	// consistency with the other tunables above, BUT the
+	// adminLiveRequestFromEntry helper below (which is called on
+	// every telemetry persist) reads from the closure-captured
+	// variable. See "Live request stream WebSocket hub" below.
+	var liveStreamHub *admin.LiveStreamHub
+
 	// ── Logging ───────────────────────────────────────────────────────────
 	cfg := config.Load()
 
@@ -797,7 +805,6 @@ func main() {
 	// can wire the telemetry hook at startup. The hub works without DB
 	// (initial replay returns empty) so stateless proxies like 71 can
 	// still relay live broadcasts from upstream.
-	var liveStreamHub *admin.LiveStreamHub
 	if cfg.SecretKey != "" {
 		var dbPoolPtr *pgxpool.Pool
 		if dbConn != nil && dbConn.Enabled() {
@@ -813,8 +820,9 @@ func main() {
 		})
 		go liveStreamHub.Run()
 		if telemetryClient.Enabled() {
+			hub := liveStreamHub
 			telemetryClient.SetOnRequestLogPersisted(func(entry *telemetry.RequestLogEntry) {
-				liveStreamHub.Publish(adminLiveRequestFromEntry(entry))
+				hub.Publish(adminLiveRequestFromEntry(entry, hub))
 			})
 		}
 		slog.Info("live request stream hub enabled (websocket /api/admin/live-stream)", "has_db", dbPoolPtr != nil, "has_telemetry", telemetryClient.Enabled())
@@ -1881,7 +1889,7 @@ func (a *irAdapter) SerializeAnthropicResponse(irResp *ir.InternalResponse, clie
 // time.Now() as a UI-freshness approximation; total_tokens is computed
 // here from prompt + completion when both are set, otherwise left nil
 // so the frontend treats it as unknown.
-func adminLiveRequestFromEntry(entry *telemetry.RequestLogEntry) admin.LiveRequest {
+func adminLiveRequestFromEntry(entry *telemetry.RequestLogEntry, hub *admin.LiveStreamHub) admin.LiveRequest {
 	clientModel := ""
 	if entry.ClientModel != nil {
 		clientModel = strings.TrimSpace(*entry.ClientModel)
@@ -1900,13 +1908,27 @@ func adminLiveRequestFromEntry(entry *telemetry.RequestLogEntry) admin.LiveReque
 		totalTokens = &t
 	}
 
+	// 2026-07-03: resolve provider_id → catalog_code so the swim-lane
+	// tile shows the right vendor code (OPEN/ANTH/...) instead of
+	// "???". The provider cache is a sync.Map inside the hub so this
+	// is one DB hit per distinct provider_id, ever.
+	providerCode := ""
+	if entry.ProviderID != nil && hub != nil {
+		// Use a short timeout so a slow DB cannot block the telemetry
+		// worker. On timeout / DB-down / no-hub we fall back to ""
+		// and the frontend's providerShortLabel degrades to "???".
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		providerCode = hub.ProviderCodeFor(ctx, *entry.ProviderID)
+		cancel()
+	}
+
 	return admin.LiveRequestFromTelemetry(
 		entry.RequestID,
 		time.Now().UTC(),
 		entry.TenantID,
 		clientModel,
 		outboundModel,
-		"",
+		providerCode,
 		status,
 		entry.Success,
 		entry.ErrorKind,

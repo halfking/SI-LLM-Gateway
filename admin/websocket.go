@@ -144,6 +144,13 @@ type LiveStreamHub struct {
 	lastActivityMu sync.RWMutex
 	lastActivity   time.Time
 
+	// providerCache is a sync.Map of provider_id → catalog_code.
+	// Populated lazily on first miss by ProviderCodeFor() so the
+	// telemetry hot path can resolve a provider_id from a freshly
+	// persisted RequestLogEntry to the human-readable code the
+	// dashboard swim lane expects.
+	providerCache sync.Map
+
 	stopCh chan struct{}
 }
 
@@ -245,6 +252,37 @@ func (h *LiveStreamHub) Stop() {
 	default:
 		close(h.stopCh)
 	}
+}
+
+// ProviderCodeFor resolves a providers.id to its catalog_code, with
+// a one-shot per-id DB lookup cached in memory. The telemetry
+// hook uses this to enrich the broadcast envelope so the dashboard
+// swim lane shows the right vendor code (e.g. "OPEN" / "ANTH")
+// without the frontend having to look it up.
+//
+// If db is nil (the 71 no-DB relay mode) or the id is invalid
+// the function returns "" — the frontend's providerShortLabel
+// gracefully degrades to "???".
+func (h *LiveStreamHub) ProviderCodeFor(ctx context.Context, providerID int) string {
+	if providerID == 0 {
+		return ""
+	}
+	if h.db == nil {
+		return ""
+	}
+	if cached, ok := h.providerCache.Load(providerID); ok {
+		return cached.(string)
+	}
+	var code string
+	row := h.db.QueryRow(ctx, "SELECT COALESCE(NULLIF(catalog_code, ''), '') FROM providers WHERE id = $1", providerID)
+	if err := row.Scan(&code); err != nil {
+		// Negative cache: 5-minute TTL so a deleted provider
+		// eventually gets a re-lookup but we don't pound the DB.
+		h.providerCache.Store(providerID, "")
+		return ""
+	}
+	h.providerCache.Store(providerID, code)
+	return code
 }
 
 func (h *LiveStreamHub) closeAll() {
