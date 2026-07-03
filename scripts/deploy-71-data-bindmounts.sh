@@ -93,9 +93,12 @@ echo
 # ── 3. Write env file ──────────────────────────────────────────────────
 log_info "[3/5] 写入 $ENV_FILE..."
 $SSH "mkdir -p '\$(dirname $ENV_FILE)' && cat > '$ENV_FILE' <<'EOF'
-# /etc/llm-gateway-go/env — 2026-07-02 V2.3.3
+# /etc/llm-gateway-go/env — 2026-07-03 V2.3.4
 # Consumed by 'docker run --env-file $ENV_FILE' in the systemd unit.
 # These env vars override the gateway built-in defaults.
+
+# Database connection (required for routing executor, API key auth, request_logs)
+LLM_GATEWAY_DATABASE_URL=postgres://llm_gateway:4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg@172.31.0.3:5432/llm_gateway?sslmode=disable
 
 # Attachment storage (must match the host bind-mount in override.conf)
 ATTACHMENT_ENABLED=true
