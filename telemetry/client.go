@@ -856,6 +856,7 @@ func (c *Client) updateRequestLog(entry *RequestLogEntry) error {
 			       success = COALESCE($9, success),
 			       error_kind = COALESCE($10, error_kind)
 			 WHERE request_id = $1
+			   AND ts >= NOW() - INTERVAL '1 hour'
 		`,
 			entry.RequestID,
 			entry.PromptTokens,
@@ -879,6 +880,7 @@ func (c *Client) updateRequestLog(entry *RequestLogEntry) error {
 			       error_kind = COALESCE($4, error_kind),
 			       cost_usd = COALESCE($5, cost_usd)
 			 WHERE request_id = $1
+			   AND ts >= NOW() - INTERVAL '1 hour'
 		`,
 			entry.RequestID,
 			entry.LatencyMs,
@@ -985,6 +987,7 @@ func (c *Client) updateRequestLog(entry *RequestLogEntry) error {
 		   has_attachments  = COALESCE($65, has_attachments),
 		   attachment_count = COALESCE($66, attachment_count)
 		 WHERE request_id = $1
+		   AND ts >= NOW() - INTERVAL '1 hour'
 `,
 		entry.RequestID,
 		entry.ClientModel,
