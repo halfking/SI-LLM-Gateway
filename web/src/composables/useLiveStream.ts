@@ -45,14 +45,22 @@ export interface LiveStreamEnvelope {
 
 export type ConnectionState = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed'
 
-const MAX_VISIBLE = 100
+// 2026-07-03 revision: dropped from 100 → 60. Each tile is now 22px
+// wide and the swim lane shows the latest ~1 minute of traffic by
+// default. 60 keeps a full minute of peak traffic on screen while
+// staying readable (≈1300px of track for 60 tiles + gaps + legend).
+const MAX_VISIBLE = 60
 const MAX_RECONNECT_DELAY_MS = 15_000
 const BASE_RECONNECT_DELAY_MS = 1_000
 
 export interface UseLiveStreamOptions {
   /** Override the WS endpoint (default: `/api/admin/live-stream`). */
   endpoint?: string
-  /** Max requests kept in the rendered buffer (default 100). */
+  /**
+   * Max requests kept in the rendered buffer (default 60). 30-50 is
+   * the sweet spot: enough to see the last ~30 seconds of peak
+   * traffic at a glance, small enough to fit on a 1366px display.
+   */
   capacity?: number
   /** Disable auto-reconnect (used in unit tests). */
   noAutoReconnect?: boolean

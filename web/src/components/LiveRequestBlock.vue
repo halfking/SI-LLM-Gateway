@@ -1,17 +1,22 @@
 <script setup lang="ts">
 // LiveRequestBlock — single tile in the swim lane.
 //
-// Two horizontal halves:
-//   - top: model family colour + abbreviated model name
-//   - bottom: status colour + latency (or spinner for in_progress)
+// 2026-07-03 revision: shrunk the tile from 56x80 to 22x40 so 30-50
+// requests fit in one viewport, and replaced the model-abbrev label
+// with a single uppercase family letter. The full model name and
+// every other request detail (latency / tokens / cost / error / time
+// / provider) is now surfaced only in the hover tooltip — the tile
+// itself shows the family + status at a glance.
 //
-// Idle markers render as a wide dashed block with a relative-time
-// label instead of the two-half layout, so a long silence is visually
-// distinct from a row of real requests.
+// Why: the dashboard's first impression is the silhouette of the
+// last minute. A wall of 100 wide tiles was unreadable; 50 narrow
+// tiles each carry one glyph + status colour, and the tooltip
+// carries the rest on demand.
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { LiveRequest } from '../composables/useLiveStream'
 import { getModelCategoryColor, getStatusColor } from '../composables/liveStreamColors'
+import { modelGlyph } from '../composables/liveStreamDisplay'
 
 const props = defineProps<{
   request: LiveRequest
@@ -26,9 +31,9 @@ const { t, locale } = useI18n()
 
 const isIdle = computed(() => props.request.type === 'idle_marker')
 
-// Idle label: "Idle 1 min" / "Idle 2 min" — approximate, computed
-// from ts vs now. Backend guarantees one idle_marker per minute of
-// silence, so this is purely cosmetic.
+// Idle label: "Idle 1 min" / "Idle 2 min" — cosmetic, derived from
+// the timestamp vs now. The backend emits one idle_marker per minute
+// of silence, so this stays accurate enough.
 const idleLabel = computed(() => {
   if (!isIdle.value) return ''
   const start = Date.parse(props.request.ts)
@@ -37,21 +42,7 @@ const idleLabel = computed(() => {
   return t('dashboard.liveStream.idleLabel', { duration: `${minutes}m` })
 })
 
-const modelShort = computed(() => {
-  const m = props.request.model || ''
-  if (!m) return '—'
-  // Strip leading vendor prefix for readability: gpt-4o-mini → 4o-mini.
-  // Common prefixes the classifier already mapped.
-  return m
-    .replace(/^gpt-/, '')
-    .replace(/^claude-/, '')
-    .replace(/^qwen-/, '')
-    .replace(/^qwen2-/, '')
-    .replace(/^glm-/, '')
-    .replace(/^deepseek-/, '')
-    .replace(/^moonshot-/, '')
-    .slice(0, 12)
-})
+const modelLabel = computed(() => modelGlyph(props.request.model))
 
 const latencyLabel = computed(() => {
   if (props.request.status === 'in_progress') return '…'
@@ -61,16 +52,37 @@ const latencyLabel = computed(() => {
   return `${(ms / 1000).toFixed(1)}s`
 })
 
+/**
+ * Multi-line tooltip rendered on hover. Built once per request so
+ * `request_id`, `model`, `status`, `latency_ms`, `total_tokens`,
+ * `cost_usd`, `error_kind` and a localised time are all reachable
+ * without leaving the swim lane.
+ *
+ * Native `title` is used on purpose (vs a custom popover):
+ *   - the swim lane lives inside an overflow:auto track; a popover
+ *     would clip on the right edge of the viewport
+ *   - the track is already keyboard-navigable; native title bubbles
+ *     to screen readers
+ *   - the operator reads ~50 tiles in a sweep, native title is the
+ *     lowest-friction way to surface detail on demand
+ */
 const tooltip = computed(() => {
   const r = props.request
   const lines: string[] = []
   if (r.model) lines.push(`${t('dashboard.liveStream.tooltip.model')}: ${r.model}`)
   if (r.provider_code) lines.push(`${t('dashboard.liveStream.tooltip.provider')}: ${r.provider_code}`)
-  if (r.status) lines.push(`${t('dashboard.liveStream.tooltip.status')}: ${r.status}`)
+  lines.push(`${t('dashboard.liveStream.tooltip.status')}: ${r.status ?? '?'}`)
   if (r.latency_ms != null) lines.push(`${t('dashboard.liveStream.tooltip.latency')}: ${latencyLabel.value}`)
-  if (r.total_tokens != null) lines.push(`${t('dashboard.liveStream.tooltip.tokens')}: ${r.total_tokens}`)
+  if (r.total_tokens != null) {
+    lines.push(`${t('dashboard.liveStream.tooltip.tokens')}: ${r.total_tokens}`)
+  } else if (r.prompt_tokens != null || r.completion_tokens != null) {
+    const p = r.prompt_tokens ?? 0
+    const c = r.completion_tokens ?? 0
+    lines.push(`${t('dashboard.liveStream.tooltip.tokens')}: ${p}+${c}`)
+  }
   if (r.cost_usd != null) lines.push(`${t('dashboard.liveStream.tooltip.cost')}: $${r.cost_usd.toFixed(4)}`)
   if (r.error_kind) lines.push(`${t('dashboard.liveStream.tooltip.error')}: ${r.error_kind}`)
+  if (r.request_id) lines.push(`ID: ${r.request_id.slice(0, 8)}`)
   try {
     lines.push(`${t('dashboard.liveStream.tooltip.time')}: ${new Date(r.ts).toLocaleTimeString(locale.value)}`)
   } catch {
@@ -107,47 +119,43 @@ function onClick() {
     @keyup.enter="onClick"
     @keyup.space.prevent="onClick"
   >
+    <!--
+      Single-letter family glyph + a thin status stripe at the
+      bottom. Background of the top half is the model-family colour
+      so the swim lane is still a heatmap of model usage.
+    -->
     <div
       class="live-block__top"
       :style="{ background: getModelCategoryColor(request.model_category) }"
     >
-      {{ modelShort }}
+      {{ modelLabel }}
     </div>
     <div
       class="live-block__bottom"
       :style="{ background: getStatusColor(request.status) }"
-    >
-      {{ latencyLabel }}
-    </div>
+    />
   </div>
 </template>
 
 <style scoped>
-/* 2026-07-03 dark-mode audit:
- * The project skin is GitHub-Dark-Dimmed with --card #1c2128 /
- * --border #30363d. We follow those tokens rather than hand-picking
- * our own pale defaults so the swim lane sits inside the same
- * surface as the rest of the dashboard.
+/* 2026-07-03 dark-mode + narrow-tile revision.
  *
- * The two coloured halves are filled by inline :style bindings
- * from getModelCategoryColor / getStatusColor, which were tuned
- * for #1c2128 (see composables/liveStreamColors.ts).
- */
+ * The tile is 22x40px so 50 of them line up in ~1100px of track.
+ * The model's first letter sits in the top half; the status
+ * colour shows up only as a 4px stripe at the bottom so the family
+ * colour still dominates the visual weight of the swim lane. */
 .live-block {
-  width: 56px;
-  height: 80px;
-  border-radius: 6px;
+  width: 22px;
+  height: 40px;
+  border-radius: 3px;
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  /* A thin border from the project's palette keeps the tile from
-   * melting into the track on dark backgrounds. We omit it when the
-   * top half already supplies a saturated fill (the bind below sets
-   * the background on .live-block__top/.live-block__bottom). */
   border: 1px solid rgba(255, 255, 255, 0.04);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
   background: transparent;
+  position: relative;
 }
 
 .live-block--clickable {
@@ -155,36 +163,42 @@ function onClick() {
 }
 .live-block--clickable:hover,
 .live-block--clickable:focus-visible {
-  transform: translateY(-2px) scale(1.04);
-  /* Shadow softened for dark theme — pure black on dark is invisible,
-   * a slight blue tint matches --accent and keeps the depth cue. */
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  transform: translateY(-2px) scale(1.18);
+  /* z-index lifts the tile above the track's overflow:hidden so the
+   * scale doesn't get clipped at the track edges. */
+  z-index: 2;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
   outline: none;
 }
 
-.live-block__top,
-.live-block__bottom {
-  flex: 1 1 50%;
+.live-block__top {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-size: 11px;
-  font-weight: 600;
-  padding: 2px 4px;
-  text-align: center;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  /* Slight inner shadow makes the colour readable when blocks sit
-   * next to similarly-saturated neighbours (e.g. amber + orange). */
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  /* Top half is the model-family colour (the dominant signal). */
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
+.live-block__bottom {
+  /* Status stripe: only 4px so the family colour still carries the
+   * visual weight. The full block stays <= 40px tall. */
+  flex: 0 0 4px;
+  width: 100%;
+}
+
+/* Idle marker stays a wide dashed block so 1 minute of silence
+ * reads as a different shape from a real request. */
 .live-block--idle {
-  width: 110px;
+  width: 90px;
+  height: 40px;
   border: 2px dashed var(--border, #30363d);
   background: transparent;
+  display: flex;
   align-items: center;
   justify-content: center;
   color: var(--muted, #8b949e);
