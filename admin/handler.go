@@ -352,6 +352,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		mux.HandleFunc("/api/admin/live-stream", h.liveStreamHub.HandleLiveStream)
 	}
 
+	// Top providers endpoint (2026-07-04) - returns top N providers by request count
+	mux.HandleFunc("/api/admin/top-providers", admin(h.handleTopProviders))
+
 	// settings-management (Q1: B, Q2: A, Q3: B): 4 platform + 4 tenant endpoints.
 	// Tenant endpoints require super_admin (enforced inside the handler).
 	h.registerSettingsRoutes(mux)

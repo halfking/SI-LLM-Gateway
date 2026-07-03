@@ -105,11 +105,10 @@ export default {
     countAria: '{buffer} requests in buffer, {visible} visible',
     legend: {
       title: 'Legend',
-      model: 'Model family',
+      model: 'Provider',
       status: 'Status',
       openai: 'OpenAI',
       anthropic: 'Anthropic',
-      domestic: 'Domestic',
       oss: 'Open source',
       other: 'Other',
       success: 'Success',

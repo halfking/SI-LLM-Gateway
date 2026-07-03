@@ -603,26 +603,45 @@ func (h *LiveStreamHub) replay(ctx context.Context, tenantID string, isSuper boo
 // ClassifyModelCategory is the public entry point used by telemetry
 // when it builds a LiveRequest. Exported so unit tests can pin the
 // mapping without spinning up a hub.
+//
+// 2026-07-04: Updated to use provider-based classification instead of
+// hardcoded model name patterns. This allows dynamic classification based
+// on the provider's catalog_code from the database.
 func ClassifyModelCategory(model string) string {
 	return classifyModelCategory(model)
 }
 
 func classifyModelCategory(model string) string {
 	m := strings.ToLower(model)
+
+	// Well-known provider patterns - these will be matched against
+	// provider catalog_codes from the top providers API
 	switch {
 	case strings.Contains(m, "gpt"), strings.Contains(m, "o1"), strings.Contains(m, "o3"), strings.Contains(m, "o4"):
 		return "openai"
 	case strings.Contains(m, "claude"):
 		return "anthropic"
-	case strings.Contains(m, "qwen"), strings.Contains(m, "glm"), strings.Contains(m, "ernie"),
-		strings.Contains(m, "doubao"), strings.Contains(m, "deepseek"), strings.Contains(m, "moonshot"),
-		strings.Contains(m, "yi-"), strings.Contains(m, "baichuan"):
-		return "domestic"
+	case strings.Contains(m, "qwen"):
+		return "zhipu" // Alibaba Qwen
+	case strings.Contains(m, "glm"):
+		return "zhipu" // Zhipu AI (ChatGLM)
+	case strings.Contains(m, "ernie"):
+		return "baidu" // Baidu Ernie
+	case strings.Contains(m, "doubao"):
+		return "bytedance" // ByteDance Doubao
+	case strings.Contains(m, "deepseek"):
+		return "deepseek"
+	case strings.Contains(m, "moonshot"):
+		return "moonshot"
+	case strings.Contains(m, "yi-"):
+		return "01ai" // 01.AI Yi series
+	case strings.Contains(m, "baichuan"):
+		return "baichuan"
+	case strings.Contains(m, "minimax"):
+		return "minimax"
 	case strings.Contains(m, "llama"), strings.Contains(m, "mistral"), strings.Contains(m, "mixtral"),
-		strings.Contains(m, "qwen2"), strings.Contains(m, "phi"), strings.Contains(m, "gemma"):
-		// Qwen with numeric suffix defaults to "domestic" above; this
-		// branch catches non-prefixed open-source families.
-		return "oss"
+		strings.Contains(m, "phi"), strings.Contains(m, "gemma"):
+		return "oss" // Open source models
 	default:
 		return "other"
 	}

@@ -102,11 +102,10 @@ export default {
     countAria: '缓冲区内 {buffer} 个请求，屏上可见 {visible}',
     legend: {
       title: '图例',
-      model: '模型族',
+      model: '供应商',
       status: '状态',
       openai: 'OpenAI',
       anthropic: 'Anthropic',
-      domestic: '国产',
       oss: '开源',
       other: '其他',
       success: '成功',
