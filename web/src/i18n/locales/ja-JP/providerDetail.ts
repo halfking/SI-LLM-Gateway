@@ -161,6 +161,12 @@ export default {
       compute_time: 'compute_time (コンピュート単位)',
       flat_quota: 'flat_quota (固定クォータ)',
       free: 'free (無料)',
+      // camelCase aliases — see zh-CN/providerDetail.ts for the rationale.
+      tokenPlan: 'token_plan (サブスクリプション)',
+      codePlan: 'code_plan (コードプラン)',
+      agentPlan: 'agent_plan (Agent プラン)',
+      computeTime: 'compute_time (コンピュート単位)',
+      flatQuota: 'flat_quota (固定クォータ)',
     },
     health: {
       healthy: '正常',

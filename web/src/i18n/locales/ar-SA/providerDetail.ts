@@ -161,6 +161,12 @@ export default {
       compute_time: 'compute_time (لكل حوسبة)',
       flat_quota: 'flat_quota (حصة ثابتة)',
       free: 'free (مجاني)',
+      // camelCase aliases — see zh-CN/providerDetail.ts for the rationale.
+      tokenPlan: 'token_plan (اشتراك)',
+      codePlan: 'code_plan (خطة برمجية)',
+      agentPlan: 'agent_plan (خطة وكيل)',
+      computeTime: 'compute_time (لكل حوسبة)',
+      flatQuota: 'flat_quota (حصة ثابتة)',
     },
     health: {
       healthy: 'عادي',
