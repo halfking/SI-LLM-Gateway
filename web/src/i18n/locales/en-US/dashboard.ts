@@ -95,6 +95,8 @@ export default {
     filterFailure: 'Failure only',
     filterInProgress: 'In progress only',
     idleLabel: 'Idle {duration}',
+    countTooltip: '{buffer} in buffer / {visible} visible on screen',
+    countAria: '{buffer} requests in buffer, {visible} visible',
     legend: {
       title: 'Legend',
       model: 'Model family',

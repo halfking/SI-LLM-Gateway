@@ -117,8 +117,14 @@ function onSelect(requestId: string) {
           <option value="in_progress">{{ t('dashboard.liveStream.filterInProgress') }}</option>
           <option value="failure">{{ t('dashboard.liveStream.filterFailure') }}</option>
         </select>
-        <span class="live-stream__count" :title="`${realTileCount} total / ${visibleTileCount} visible`">
-          {{ realTileCount }} / {{ visibleTileCount }}
+        <span
+          class="live-stream__count"
+          :title="t('dashboard.liveStream.countTooltip', { buffer: realTileCount, visible: visibleTileCount })"
+          :aria-label="t('dashboard.liveStream.countAria', { buffer: realTileCount, visible: visibleTileCount })"
+        >
+          <span class="live-stream__count-num">{{ realTileCount }}</span>
+          <span class="live-stream__count-sep">/</span>
+          <span class="live-stream__count-num">{{ visibleTileCount }}</span>
         </span>
       </div>
     </div>

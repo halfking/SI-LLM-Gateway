@@ -162,4 +162,83 @@ describe('useLiveStream', () => {
     expect(FakeWebSocket.instances.length).toBeGreaterThanOrEqual(2)
     wrapper.unmount()
   })
+
+  it('fires onRequestEvicted when the buffer rolls over', async () => {
+    const evicted: string[] = []
+    const wrapper = mount(harness({ capacity: 3, noAutoReconnect: true }))
+    await nextTick()
+    const api = wrapper.vm.api as ReturnType<typeof useLiveStream>
+    api.onRequestEvicted((id) => evicted.push(id))
+
+    const ws = FakeWebSocket.instances[0]
+    ws.fakeOpen()
+    await nextTick()
+    // Push 5 requests with a buffer cap of 3. The first 2 should be
+    // evicted; the last 3 should remain.
+    for (let i = 0; i < 5; i++) {
+      ws.fakeMessage({
+        type: 'request',
+        ts: `2026-07-03T10:00:0${i}Z`,
+        request: { type: 'request', ts: `2026-07-03T10:00:0${i}Z`, request_id: `r${i}`, status: 'success' },
+      })
+    }
+    await nextTick()
+    expect(api.requests.value.map((r) => r.request_id)).toEqual(['r2', 'r3', 'r4'])
+    expect(evicted).toEqual(['r0', 'r1'])
+    wrapper.unmount()
+  })
+
+  it('rejects duplicate request_ids without growing the buffer', async () => {
+    const wrapper = mount(harness({ capacity: 5, noAutoReconnect: true }))
+    await nextTick()
+    const api = wrapper.vm.api as ReturnType<typeof useLiveStream>
+
+    const ws = FakeWebSocket.instances[0]
+    ws.fakeOpen()
+    await nextTick()
+    ws.fakeMessage({
+      type: 'request',
+      ts: '2026-07-03T10:00:00Z',
+      request: { type: 'request', ts: '2026-07-03T10:00:00Z', request_id: 'dup-1', status: 'success' },
+    })
+    ws.fakeMessage({
+      type: 'request',
+      ts: '2026-07-03T10:00:01Z',
+      request: { type: 'request', ts: '2026-07-03T10:00:01Z', request_id: 'dup-1', status: 'success' },
+    })
+    await nextTick()
+    expect(api.requests.value).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('reset() clears the buffer AND the id index so the next replay is treated as fresh', async () => {
+    const evicted: string[] = []
+    const wrapper = mount(harness({ capacity: 5, noAutoReconnect: true }))
+    await nextTick()
+    const api = wrapper.vm.api as ReturnType<typeof useLiveStream>
+    api.onRequestEvicted((id) => evicted.push(id))
+
+    const ws = FakeWebSocket.instances[0]
+    ws.fakeOpen()
+    await nextTick()
+    ws.fakeMessage({
+      type: 'request',
+      ts: '2026-07-03T10:00:00Z',
+      request: { type: 'request', ts: '2026-07-03T10:00:00Z', request_id: 'r1', status: 'success' },
+    })
+    await nextTick()
+    api.reset()
+    expect(api.requests.value).toHaveLength(0)
+    // Replay the same ID — should be accepted (idIndex is cleared).
+    ws.fakeMessage({
+      type: 'request',
+      ts: '2026-07-03T10:00:01Z',
+      request: { type: 'request', ts: '2026-07-03T10:00:01Z', request_id: 'r1', status: 'success' },
+    })
+    await nextTick()
+    expect(api.requests.value).toHaveLength(1)
+    expect(api.requests.value[0].request_id).toBe('r1')
+    expect(evicted).toEqual([]) // nothing evicted
+    wrapper.unmount()
+  })
 })
