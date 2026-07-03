@@ -74,7 +74,7 @@ const vendorLabel = computed(() => modelShortLabel(props.request.model))
 // signal, but critical when an incident is on a specific vendor.
 const providerLabel = computed(() => providerShortLabel(props.request.provider_code))
 
-// Line 4: latency.
+// Line 4: latency OR error message (for failures).
 const latencyText = computed(() => {
   if (props.request.status === 'in_progress') return '…'
   const ms = props.request.latency_ms
@@ -83,6 +83,43 @@ const latencyText = computed(() => {
   if (ms < 1000) return `${Math.round(ms)}ms`
   if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`
   return `${Math.round(ms / 1000)}s`
+})
+
+/**
+ * When status=failure, show a brief error message on line 4 instead
+ * of latency. The operator scans the swim lane looking for red tiles
+ * with readable error labels (e.g. "Timeout", "5xx", "Auth").
+ */
+const line4Text = computed(() => {
+  if (props.request.status !== 'failure' || !props.request.error_kind) {
+    return latencyText.value
+  }
+  const k = props.request.error_kind.toLowerCase()
+  if (/(timeout|timedout)/.test(k)) return 'Timeout'
+  if (/(5xx|server|upstream|provider|overloaded|backend)/.test(k)) return '5xx'
+  if (/(4xx|auth|unauthor|forbidden|quota|rate|billing|payment)/.test(k)) return 'Auth'
+  if (/(not_found|model_not|route|no_route|resolve|policy)/.test(k)) return 'NotFound'
+  // Fallback: show first 8 chars of error_kind
+  return props.request.error_kind.slice(0, 8)
+})
+
+/**
+ * Dynamic width based on content length. The tile is at least 60px
+ * wide (the baseline that fits "14:35" / "4O-MINI" / "anthropic" /
+ * "1.2s" in a tight layout). When the model name or provider name
+ * is long (e.g. "2-72B-INSTRUCT" / "azure-openai"), the tile grows
+ * to ~75-80px so the full label is visible (or at least more of it
+ * before the ellipsis kicks in). CSS clamps at 90px so a pathological
+ * "custom-provider-east-2-replica-1" doesn't break the layout.
+ */
+const tileWidth = computed(() => {
+  const modelLen = vendorLabel.value.length
+  const providerLen = providerLabel.value.length
+  const maxLen = Math.max(modelLen, providerLen)
+  // Each char is ~5-6px at 11px/8px font. Base is 60px.
+  // For every char beyond 8, add 4px so longer labels get more space.
+  const extra = Math.max(0, maxLen - 8) * 4
+  return Math.min(90, 60 + extra)
 })
 
 /**
@@ -203,6 +240,7 @@ function hexToRgba(hex: string, alpha: number): string {
       background: familyBg,
       borderColor: statusBorder,
       borderWidth: statusBorderWidth + 'px',
+      width: tileWidth + 'px',
     }"
     @click="onClick"
     @keyup.enter="onClick"
@@ -211,7 +249,10 @@ function hexToRgba(hex: string, alpha: number): string {
     <span class="live-block__time">{{ timeLabel }}</span>
     <span class="live-block__vendor">{{ vendorLabel }}</span>
     <span class="live-block__provider">{{ providerLabel }}</span>
-    <span class="live-block__latency">{{ latencyText }}</span>
+    <span 
+      class="live-block__latency"
+      :class="{ 'live-block__latency--error': request.status === 'failure' }"
+    >{{ line4Text }}</span>
     <span
       v-if="errorBadge"
       class="live-block__error-badge"
@@ -222,16 +263,18 @@ function hexToRgba(hex: string, alpha: number): string {
 </template>
 
 <style scoped>
-/* 2026-07-03 v5 — 4-row tile (60×76).
+/* 2026-07-03 v5 — 4-row tile (60-90px × 76px, dynamic width).
  *
- *   width  60px   ← 8px wider than v3 so 4-char OPEN/ANTH fit
- *   height 76px   ← 4 rows × 14px + 4px padding (top+bottom)
- *   border 2-3px  ← thicker on failure
- *   font   8-11px ← model is the loudest; provider is the quietest
+ *   width  60-90px  ← dynamic: 60px baseline, grows for long labels
+ *   height 76px     ← 4 rows × 14px + 4px padding (top+bottom)
+ *   border 2-3px    ← thicker on failure
+ *   font   8-11px   ← model is the loudest; provider is the quietest
  */
 .live-block {
   box-sizing: border-box;
-  width: 60px;
+  width: 60px; /* fallback; overridden by :style */
+  min-width: 60px;
+  max-width: 90px;
   height: 76px;
   border-radius: 4px;
   border: 2px solid rgba(139, 148, 158, 0.4);
@@ -316,12 +359,31 @@ function hexToRgba(hex: string, alpha: number): string {
   opacity: 0.9;
 }
 
-/* Line 4: latency. */
+/* Line 4: latency OR error message (for failures). */
 .live-block__latency {
   font-size: 9px;
   line-height: 1.1;
-  color: var(--muted, #8b949e);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
+  color: var(--muted, #8b949e);
+  letter-spacing: 0.2px;
+}
+
+/* When status=failure, line 4 shows the error kind (e.g. "Timeout",
+ * "5xx", "Auth") in a bright amber/red so the operator's eye can
+ * scan the swim lane for red tiles with readable error labels. */
+.live-block__latency--error {
+  font-size: 8px;
+  font-weight: 700;
+  color: #fbbf24; /* amber-400 */
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* When the tile is a failure (red border), boost the error text
+ * to full red so it's impossible to miss. */
+.live-block--failure .live-block__latency--error {
+  color: #ef4444; /* red-500 */
 }
 
 /* Error badge — top-right corner. */
