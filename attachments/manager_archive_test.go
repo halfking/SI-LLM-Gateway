@@ -3,25 +3,22 @@ package attachments
 import (
 	"context"
 	"encoding/base64"
-	"os"
 	"path/filepath"
 	"testing"
 )
 
-// TestArchiveFileWrittenWithoutDB verifies the on-disk archival path
-// works end to end when no DB pool is configured (the manager's save()
-// is a no-op when pool == nil). We assert:
-//   - the image is decoded and written to storagePath/<date>/...
-//   - the returned count is 1
-//   - the original body is returned byte-for-byte unchanged (the
-//     "observer" contract that the relay handler relies on)
+// TestArchiveFileWrittenWithoutDB verifies that archival fails gracefully
+// when no DB pool is configured. After 2026-07-02 fix, save() returns an
+// error when pool == nil (instead of silent no-op) to avoid phantom
+// "has_attachments=t" rows with no actual DB records. The file is written
+// then removed on save failure.
 func TestArchiveFileWrittenWithoutDB(t *testing.T) {
 	tmp := t.TempDir()
 	m := &Manager{
 		storagePath: tmp,
 		enabled:     true,
 		maxSizeMB:   10,
-		// pool intentionally nil → save() is a no-op
+		// pool intentionally nil → save() returns error
 	}
 
 	// 1x1 red PNG.
@@ -48,24 +45,18 @@ func TestArchiveFileWrittenWithoutDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ArchiveAttachments: %v", err)
 	}
-	if n != 1 {
-		t.Fatalf("archived %d, want 1", n)
+	// After 2026-07-02 fix: DB save failure causes file removal, count=0
+	if n != 0 {
+		t.Fatalf("archived %d, want 0 (no DB pool)", n)
 	}
 
-	// A file should exist under <tmp>/<year>/<month>/<day>/*.png
+	// No files should remain (cleaned up on save failure)
 	matches, err := filepath.Glob(filepath.Join(tmp, "*", "*", "*", "*.png"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(matches) != 1 {
-		t.Fatalf("expected 1 archived file, got %d: %v", len(matches), matches)
-	}
-	got, err := os.ReadFile(matches[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != len(png) {
-		t.Errorf("archived file size %d, want %d", len(got), len(png))
+	if len(matches) != 0 {
+		t.Fatalf("expected 0 archived files (no DB), got %d: %v", len(matches), matches)
 	}
 }
 
@@ -95,12 +86,14 @@ func TestArchiveAnthropicImageBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ArchiveAttachments: %v", err)
 	}
-	if n != 1 {
-		t.Fatalf("archived %d, want 1", n)
+	// After 2026-07-02 fix: no DB pool → count=0
+	if n != 0 {
+		t.Fatalf("archived %d, want 0 (no DB pool)", n)
 	}
+	// No files should remain (cleaned up on save failure)
 	matches, _ := filepath.Glob(filepath.Join(tmp, "*", "*", "*", "*.png"))
-	if len(matches) != 1 {
-		t.Fatalf("expected 1 file, got %d", len(matches))
+	if len(matches) != 0 {
+		t.Fatalf("expected 0 archived files (no DB), got %d", len(matches))
 	}
 }
 

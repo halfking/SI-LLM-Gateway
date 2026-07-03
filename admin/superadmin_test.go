@@ -23,7 +23,8 @@ func TestSuperAdminMiddleware_RejectsTenantAdminJWT(t *testing.T) {
 		t.Fatalf("SignToken: %v", err)
 	}
 
-	var nextCalled bool; _ = nextCalled
+	var nextCalled bool
+	_ = nextCalled
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 		w.WriteHeader(http.StatusOK)
@@ -49,7 +50,8 @@ func TestSuperAdminMiddleware_AllowsSuperAdminJWT(t *testing.T) {
 		t.Fatalf("SignToken: %v", err)
 	}
 
-	var nextCalled bool; _ = nextCalled
+	var nextCalled bool
+	_ = nextCalled
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 		w.WriteHeader(http.StatusOK)
@@ -70,7 +72,8 @@ func TestSuperAdminMiddleware_AllowsSuperAdminJWT(t *testing.T) {
 }
 
 func TestSuperAdminMiddleware_RejectsInvalidJWT(t *testing.T) {
-	var nextCalled bool; _ = nextCalled
+	var nextCalled bool
+	_ = nextCalled
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 	})
@@ -91,7 +94,8 @@ func TestSuperAdminMiddleware_RejectsInvalidJWT(t *testing.T) {
 }
 
 func TestSuperAdminMiddleware_RejectsNoAuth(t *testing.T) {
-	var nextCalled bool; _ = nextCalled
+	var nextCalled bool
+	_ = nextCalled
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 	})
@@ -112,7 +116,8 @@ func TestAdminMiddleware_AllowsTenantAdminJWT(t *testing.T) {
 		t.Fatalf("SignToken: %v", err)
 	}
 
-	var nextCalled bool; _ = nextCalled
+	var nextCalled bool
+	_ = nextCalled
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 	})
@@ -145,7 +150,8 @@ func TestAdminMiddleware_RejectsExpiredJWT(t *testing.T) {
 	// Sleep so the token expires
 	time.Sleep(10 * time.Millisecond)
 
-	var nextCalled bool; _ = nextCalled
+	var nextCalled bool
+	_ = nextCalled
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 	})
@@ -167,43 +173,45 @@ func TestAdminMiddleware_RejectsExpiredJWT(t *testing.T) {
 func TestRateLimiter_Allows5ThenBlocks(t *testing.T) {
 	rl := NewRateLimiter(5, time.Minute)
 	for i := 1; i <= 5; i++ {
-		if !rl.Allow("192.168.1.100") {
+		if !rl.Check("192.168.1.100") {
 			t.Errorf("attempt %d: should be allowed", i)
 		}
+		rl.Record("192.168.1.100")
 	}
 	// 6th attempt should be blocked
-	if rl.Allow("192.168.1.100") {
+	if rl.Check("192.168.1.100") {
 		t.Error("6th attempt should be blocked")
 	}
 	// Different IP should be allowed
-	if !rl.Allow("192.168.2.100") {
+	if !rl.Check("192.168.2.100") {
 		t.Error("different IP should be allowed")
 	}
 }
 
 func TestRateLimiter_Reset(t *testing.T) {
 	rl := NewRateLimiter(2, time.Minute)
-	rl.Allow("1.1.1.1")
-	rl.Allow("1.1.1.1")
-	if rl.Allow("1.1.1.1") {
+	rl.Record("1.1.1.1")
+	rl.Record("1.1.1.1")
+	if rl.Check("1.1.1.1") {
 		t.Error("3rd should be blocked")
 	}
 	rl.Reset("1.1.1.1")
-	if !rl.Allow("1.1.1.1") {
+	if !rl.Check("1.1.1.1") {
 		t.Error("after reset should be allowed again")
 	}
 }
 
 func TestRateLimiter_WindowExpires(t *testing.T) {
 	rl := NewRateLimiter(1, 50*time.Millisecond)
-	if !rl.Allow("k") {
+	if !rl.Check("k") {
 		t.Error("1st should be allowed")
 	}
-	if rl.Allow("k") {
+	rl.Record("k")
+	if rl.Check("k") {
 		t.Error("2nd should be blocked")
 	}
 	time.Sleep(60 * time.Millisecond)
-	if !rl.Allow("k") {
+	if !rl.Check("k") {
 		t.Error("after window, should be allowed again")
 	}
 }

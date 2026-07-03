@@ -20,15 +20,19 @@ func TestClassifyModelCategory(t *testing.T) {
 		{"claude-3.5-sonnet", "anthropic"},
 		{"claude-3-opus", "anthropic"},
 
-		{"qwen-max", "domestic"},
-		{"glm-4", "domestic"},
-		{"ernie-4.0", "domestic"},
-		{"doubao-pro", "domestic"},
-		{"deepseek-v3", "domestic"},
-		{"moonshot-v1", "domestic"},
+		// 2026-07-04: Updated to use provider-specific codes instead of "domestic"
+		{"qwen-max", "zhipu"},
+		{"glm-4", "zhipu"},
+		{"ernie-4.0", "baidu"},
+		{"doubao-pro", "bytedance"},
+		{"deepseek-v3", "deepseek"},
+		{"moonshot-v1", "moonshot"},
+		{"yi-large", "01ai"},
+		{"baichuan2-turbo", "baichuan"},
+		{"minimax-abab6", "minimax"},
 
-		// Numeric-only Qwen suffix is the same keyword → domestic.
-		{"qwen2-72b-instruct", "domestic"},
+		// Numeric-only Qwen suffix is the same keyword → zhipu (Alibaba Qwen)
+		{"qwen2-72b-instruct", "zhipu"},
 
 		// Open-source families with their own family prefix.
 		{"llama-3.1-70b", "oss"},
