@@ -966,6 +966,9 @@ func main() {
 	slog.Info("CHECKPOINT: after discovery section")
 
 	// ── Admin API ───────────────────────────────────────────────────────
+	// Create adminHandler even if DB is unavailable (71 case) so we can
+	// still register WebSocket routes. Most endpoints will 503 without DB,
+	// but /api/admin/live-stream can work in relay mode.
 	var adminHandler *admin.Handler
 	if dbConn != nil && dbConn.Enabled() {
 		slog.Info("CHECKPOINT: before admin.NewHandler")
@@ -976,12 +979,6 @@ func main() {
 		}
 		if discoverySvc != nil {
 			adminHandler.SetDiscoveryService(discoverySvc)
-		}
-		// Wire the live request stream hub so /api/admin/live-stream
-		// is registered. Hub itself is created earlier so the
-		// telemetry hook can call back into it.
-		if liveStreamHub != nil {
-			adminHandler.SetLiveStreamHub(liveStreamHub)
 		}
 		// settings-management: inject the DB-backed settings store so the
 		// /api/admin/settings/* endpoints can read/write settings_kv.
@@ -1019,6 +1016,17 @@ func main() {
 				slog.Info("seeded providers from catalog", "created", created)
 			}
 		}()
+	} else if cfg.SecretKey != "" {
+		// No DB available (71 stateless proxy case): create a minimal
+		// adminHandler just to register WebSocket routes. Most endpoints
+		// will 503, but /api/admin/live-stream can relay live broadcasts.
+		adminHandler = admin.NewHandler(nil, cfg.SecretKey, fernetKey)
+		slog.Info("admin handler created without DB (WebSocket relay mode)")
+	}
+
+	// Wire live request stream hub (outside DB condition so 71 can register it)
+	if adminHandler != nil && liveStreamHub != nil {
+		adminHandler.SetLiveStreamHub(liveStreamHub)
 	}
 
 	slog.Info("CHECKPOINT: after admin handler init block")
