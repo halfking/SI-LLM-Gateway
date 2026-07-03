@@ -73,6 +73,22 @@ const roadmapPhases = computed(() =>
 const heroPoints = computed(() =>
   [0, 1, 2, 3, 4, 5].map((i) => t(`landing.heroPoints.${i}`)),
 )
+
+// The hero subtitle / AI-Native proposition is shipped as a 2-line array in
+// every locale (`landing.subtitle: [line1, line2]`). We deliberately do NOT
+// use `t('landing.subtitle', {}, { returnObjects: true })` here — per the
+// note above on heroPoints, vue-i18n v9 does not auto-traverse a nested
+// message object under `returnObjects`, so we look up each element via its
+// full dot path. If a future locale ships a single-string subtitle, fall back
+// to a one-line array.
+const tagline = computed<string[]>(() => {
+  const line0 = t('landing.subtitle.0')
+  const line1 = t('landing.subtitle.1')
+  const lines: string[] = []
+  if (line0 && !line0.startsWith('landing.subtitle.0')) lines.push(line0)
+  if (line1 && !line1.startsWith('landing.subtitle.1')) lines.push(line1)
+  return lines.length > 0 ? lines : [t('landing.subtitle')]
+})
 </script>
 
 <template>
@@ -80,7 +96,7 @@ const heroPoints = computed(() =>
     <ServiceLandingPage
       :kicker="t('landing.kicker')"
       :title="t('landing.title')"
-      :subtitle="t('landing.subtitle')"
+      :subtitle="tagline"
       :hero-points="heroPoints"
       :features="features"
       :advantages="advantages"

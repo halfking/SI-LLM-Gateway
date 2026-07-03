@@ -3,10 +3,12 @@
 //
 // 使用 camelCase 嵌套对象，便于 vue-i18n 的 t() 插值与 t('landing.features.X.title', {...}) 替换。
 export default {
-  kicker: 'Enterprise AI & Agent Gateway',
-  title: '开轩企业 AI 与智能体网关',
-  subtitle:
-    '从大模型代理到智能体编排的统一入口。统一接入多家 LLM，智能路由、安全护盾、缓存降本、全链路审计——让企业的每一次 AI 调用可控、可观测、可计费。',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'AI-Native 组织核心网关',
+  subtitle: [
+    '让 AI 成为组织的原生能力。',
+    '核心开源 + 企业增强 + Vibe Coding 治理 + 会话资产化。',
+  ],
   featuresTitle: '核心能力',
   featuresSubtitle: '覆盖从接入到运营的关键环节',
   heroPoints: ['智能路由', '调用安全', '缓存降本', 'Agent 就绪', '全链路审计', 'MaaS 计费'],

@@ -22,7 +22,12 @@ const props = withDefaults(
   defineProps<{
     kicker: string;
     title: string;
-    subtitle: string;
+    /**
+     * Hero subtitle / tagline shown beneath the title. May be a single string
+     * (renders as one paragraph) or an array of strings (renders as one
+     * bold line per entry — used for the multi-line AI-Native proposition).
+     */
+    subtitle: string | string[];
     heroPoints?: string[];
     features: LandingFeature[];
     advantages?: LandingAdvantage[];
@@ -45,6 +50,12 @@ const props = withDefaults(
   },
 );
 
+// Normalize the subtitle (string | string[]) into a string[] so the template
+// can iterate uniformly. Single-string inputs become a one-line array.
+const subtitleLines = computed<string[]>(() =>
+  Array.isArray(props.subtitle) ? props.subtitle : [props.subtitle],
+);
+
 const emit = defineEmits<{ login: [] }>();
 
 const { t } = useI18n()
@@ -59,7 +70,11 @@ const accentStyle = computed(() =>
     <section class="kx-landing__hero">
       <p class="kx-landing__kicker">{{ kicker }}</p>
       <h1 class="kx-landing__title">{{ title }}</h1>
-      <p class="kx-landing__subtitle">{{ subtitle }}</p>
+      <div class="kx-landing__subtitle" :class="{ 'kx-landing__subtitle--multi': subtitleLines.length > 1 }">
+        <p v-for="(line, i) in subtitleLines" :key="i" class="kx-landing__subtitle-line">
+          <strong>{{ line }}</strong>
+        </p>
+      </div>
       <ul v-if="heroPoints.length" class="kx-landing__points" :aria-label="t('landing.ariaPoints')">
         <li v-for="point in heroPoints" :key="point">{{ point }}</li>
       </ul>
@@ -152,6 +167,34 @@ const accentStyle = computed(() =>
   font-size: 15px;
   line-height: 1.65;
   color: var(--kx-text-secondary);
+}
+
+.kx-landing__subtitle--multi {
+  max-width: 64ch;
+}
+
+.kx-landing__subtitle-line {
+  margin: 0;
+}
+
+.kx-landing__subtitle-line + .kx-landing__subtitle-line {
+  margin-top: 4px;
+}
+
+.kx-landing__subtitle--multi .kx-landing__subtitle-line strong {
+  display: inline-block;
+  font-size: clamp(17px, 2.6vw, 22px);
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--kx-text-primary);
+}
+
+.kx-landing__subtitle--multi .kx-landing__subtitle-line:first-child strong {
+  background: linear-gradient(120deg, var(--landing-accent), #a5b4fc 60%, #c7d2fe);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .kx-landing__points {

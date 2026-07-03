@@ -6,10 +6,12 @@
 // Keys use camelCase nested objects so vue-i18n's `t()` interpolation and
 // `t('landing.features.X.title', { ... })` substitution both work.
 export default {
-  kicker: 'Enterprise KI & Agent-Gateway',
-  title: 'Kaixuan Enterprise KI & Agent-Gateway',
-  subtitle:
-    'Das einheitliche Gateway vom LLM-Proxy bis zur Agent-Orchestrierung. Ein Einstiegspunkt für jedes LLM — intelligentes Routing, Sicherheits-Schilde, Cache-gesteuerte Kostenkontrolle, vollständige Audit-Kette. Jeder KI-Aufruf ist beobachtbar, steuerbar und abrechenbar.',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'KI-native Organisations-Kern-Gateway',
+  subtitle: [
+    'Machen Sie KI zur nativen Fähigkeit Ihrer Organisation.',
+    'Open Core + Enterprise-Erweiterung + Vibe-Coding-Governance + Sitzungs-Assetisierung.',
+  ],
   featuresTitle: 'Kernfunktionen',
   featuresSubtitle: 'Deckt die gesamte Kette vom Zugang bis zum Betrieb ab',
   heroPoints: [
