@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLM Gateway · 部署中</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+        color: #e4e4e7;
+        padding: 20px;
+      }
+      body[dir="rtl"] { direction: rtl; }
+      .container { text-align: center; max-width: 600px; }
+      .spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid rgba(255,255,255,0.1);
+        border-top-color: #22c55e;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 32px;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      h1 {
+        font-size: 2rem;
+        font-weight: 600;
+        margin-bottom: 16px;
+        color: #fff;
+      }
+      .status {
+        font-size: 1.125rem;
+        color: #a1a1aa;
+        margin-bottom: 32px;
+      }
+      .info-card {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 32px;
+        text-align: left;
+      }
+      body[dir="rtl"] .info-card { text-align: right; }
+      .info-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+      }
+      .info-item:last-child { border-bottom: none; }
+      .info-label { color: #71717a; font-size: 0.875rem; }
+      .info-value { color: #e4e4e7; font-weight: 500; }
+      .progress-bar {
+        width: 100%;
+        height: 4px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 24px;
+      }
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #22c55e, #16a34a);
+        border-radius: 2px;
+        animation: progress 2s ease-in-out infinite;
+      }
+      @keyframes progress {
+        0% { width: 0%; }
+        50% { width: 70%; }
+        100% { width: 100%; }
+      }
+      .footer {
+        font-size: 0.75rem;
+        color: #52525b;
+        margin-top: 16px;
+      }
+      .auto-refresh-hint {
+        font-size: 0.75rem;
+        color: #52525b;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="spinner"></div>
+      <h1 data-i18n="title">⚡ 正在部署</h1>
+      <p class="status" data-i18n="status">服务升级中，请稍候...</p>
+
+      <div class="progress-bar">
+        <div class="progress-fill"></div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-item">
+          <span class="info-label" data-i18n="eta_label">预计耗时</span>
+          <span class="info-value" id="eta">约 1-2 分钟</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label" data-i18n="changes_label">部署内容</span>
+          <span class="info-value" id="changes">系统升级与优化</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label" data-i18n="start_label">开始时间</span>
+          <span class="info-value" id="start-time"></span>
+        </div>
+      </div>
+
+      <p class="footer" data-i18n="footer">LLM Gateway · 开轩</p>
+      <p class="auto-refresh-hint" data-i18n="auto_refresh_hint">
+        部署完成后页面将自动刷新
+      </p>
+    </div>
+
+    <script>
+      // ── i18n translations ──
+      // Keep locale codes in sync with web/src/i18n/constants.ts
+      const RTL_LOCALES = ['ar-SA'];
+      const I18N = {
+        'zh-CN': {
+          title: '⚡ 正在部署',
+          status: '服务升级中，请稍候...',
+          eta_label: '预计耗时',
+          changes_label: '部署内容',
+          start_label: '开始时间',
+          eta_default: '约 1-2 分钟',
+          changes_default: '系统升级与优化',
+          footer: 'LLM Gateway · 开轩',
+          auto_refresh_hint: '部署完成后页面将自动刷新',
+        },
+        'en-US': {
+          title: '⚡ Deploying',
+          status: 'Service upgrade in progress, please wait...',
+          eta_label: 'Estimated Time',
+          changes_label: 'Deploy Content',
+          start_label: 'Start Time',
+          eta_default: 'About 1-2 minutes',
+          changes_default: 'System upgrade & optimization',
+          footer: 'LLM Gateway',
+          auto_refresh_hint: 'The page will auto-refresh when deployment completes',
+        },
+        'zh-TW': {
+          title: '⚡ 正在部署',
+          status: '服務升級中，請稍候...',
+          eta_label: '預計耗時',
+          changes_label: '部署內容',
+          start_label: '開始時間',
+          eta_default: '約 1-2 分鐘',
+          changes_default: '系統升級與優化',
+          footer: 'LLM Gateway · 開軒',
+          auto_refresh_hint: '部署完成後頁面將自動重新整理',
+        },
+        'ja-JP': {
+          title: '⚡ デプロイ中',
+          status: 'サービスアップグレード中、お待ちください...',
+          eta_label: '予想時間',
+          changes_label: 'デプロイ内容',
+          start_label: '開始時刻',
+          eta_default: '約 1-2 分',
+          changes_default: 'システムのアップグレードと最適化',
+          footer: 'LLM Gateway',
+          auto_refresh_hint: 'デプロイ完了後、ページは自動的に更新されます',
+        },
+        'de-DE': {
+          title: '⚡ Wird bereitgestellt',
+          status: 'Service-Upgrade läuft, bitte warten...',
+          eta_label: 'Geschätzte Zeit',
+          changes_label: 'Update-Inhalt',
+          start_label: 'Startzeit',
+          eta_default: 'ca. 1-2 Minuten',
+          changes_default: 'System-Upgrade & Optimierung',
+          footer: 'LLM Gateway',
+          auto_refresh_hint: 'Die Seite wird nach Abschluss automatisch aktualisiert',
+        },
+        'fr-FR': {
+          title: '⚡ Déploiement en cours',
+          status: 'Mise à niveau du service en cours, veuillez patienter...',
+          eta_label: 'Temps estimé',
+          changes_label: 'Contenu du déploiement',
+          start_label: 'Heure de début',
+          eta_default: 'Environ 1-2 minutes',
+          changes_default: 'Mise à niveau et optimisation du système',
+          footer: 'LLM Gateway',
+          auto_refresh_hint: 'La page se rafraîchira automatiquement une fois le déploiement terminé',
+        },
+        'es-ES': {
+          title: '⚡ Desplegando',
+          status: 'Actualización del servicio en curso, espere...',
+          eta_label: 'Tiempo estimado',
+          changes_label: 'Contenido del despliegue',
+          start_label: 'Hora de inicio',
+          eta_default: 'Aprox. 1-2 minutos',
+          changes_default: 'Actualización y optimización del sistema',
+          footer: 'LLM Gateway',
+          auto_refresh_hint: 'La página se actualizará automáticamente al finalizar el despliegue',
+        },
+        'ar-SA': {
+          title: '⚡ جارٍ النشر',
+          status: 'جارٍ ترقية الخدمة، يرجى الانتظار...',
+          eta_label: 'الوقت المتوقع',
+          changes_label: 'محتوى النشر',
+          start_label: 'وقت البدء',
+          eta_default: 'حوالي 1-2 دقيقة',
+          changes_default: 'ترقية وتحسين النظام',
+          footer: 'LLM Gateway',
+          auto_refresh_hint: 'سيتم تحديث الصفحة تلقائيًا عند اكتمال النشر',
+        },
+      };
+
+      // ── Locale detection ──
+      function detectLocale() {
+        const params = new URLSearchParams(window.location.search);
+        const override = params.get('lang');
+        if (override && I18N[override]) return override;
+
+        const stored = (function () {
+          try { return localStorage.getItem('lang'); } catch { return null; }
+        })();
+        if (stored && I18N[stored]) return stored;
+
+        const browser = (navigator.language || '').toLowerCase();
+        if (I18N[browser]) return browser;
+        if (browser.startsWith('zh-tw') || browser === 'zh-hk') return 'zh-TW';
+        if (browser.startsWith('zh')) return 'zh-CN';
+        if (browser.startsWith('ja')) return 'ja-JP';
+        if (browser.startsWith('de')) return 'de-DE';
+        if (browser.startsWith('fr')) return 'fr-FR';
+        if (browser.startsWith('es')) return 'es-ES';
+        if (browser.startsWith('ar')) return 'ar-SA';
+        if (browser.startsWith('en')) return 'en-US';
+        return 'zh-CN';
+      }
+
+      // ── Apply translations ──
+      function applyTranslations(locale) {
+        const dict = I18N[locale] || I18N['zh-CN'];
+        document.documentElement.lang = locale;
+        if (RTL_LOCALES.includes(locale)) {
+          document.documentElement.dir = 'rtl';
+          document.body.setAttribute('dir', 'rtl');
+        }
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+          const key = el.getAttribute('data-i18n');
+          if (dict[key] != null) el.textContent = dict[key];
+        });
+        const etaEl = document.getElementById('eta');
+        const changesEl = document.getElementById('changes');
+        if (etaEl && !etaEl.dataset.custom) etaEl.textContent = dict.eta_default;
+        if (changesEl && !changesEl.dataset.custom) changesEl.textContent = dict.changes_default;
+      }
+
+      // ── Optional inline overrides from deploy script ──
+      function applyOverrides(locale) {
+        const dict = I18N[locale] || I18N['zh-CN'];
+        const params = new URLSearchParams(window.location.search);
+        const eta = params.get('eta');
+        const changes = params.get('changes');
+        if (eta) {
+          const el = document.getElementById('eta');
+          if (el) { el.textContent = eta; el.dataset.custom = '1'; }
+        }
+        if (changes) {
+          const el = document.getElementById('changes');
+          if (el) { el.textContent = changes; el.dataset.custom = '1'; }
+        }
+      }
+
+      // ── Time formatting (locale-aware) ──
+      function formatTime(locale) {
+        try {
+          return new Date().toLocaleTimeString(locale, {
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+          });
+        } catch {
+          return new Date().toLocaleTimeString();
+        }
+      }
+
+      // ── Bootstrap ──
+      const activeLocale = detectLocale();
+      applyTranslations(activeLocale);
+      applyOverrides(activeLocale);
+      const startEl = document.getElementById('start-time');
+      if (startEl) startEl.textContent = formatTime(activeLocale);
+
+      // ── Auto refresh (fallback if deploy script forgets to restore) ──
+      setTimeout(() => location.reload(true), 120000);
+    </script>
+  </body>
+</html>
