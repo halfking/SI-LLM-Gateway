@@ -320,14 +320,25 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	--
 	-- Idempotent: WHERE request_status IS NULL OR request_status = ''
 	-- matches nothing once the first run completes.
-	UPDATE request_logs rl
-	SET request_status = CASE
-	    WHEN rl.success THEN 'success'
-	    WHEN rl.error_kind IS NOT NULL AND rl.error_kind <> '' THEN 'failure'
-	    ELSE 'in_progress'
-	END
-	WHERE rl.request_status IS NULL
-	   OR rl.request_status = '';
+	--
+	-- 2026-07-03 FIX: Wrap UPDATE in DO block to handle Citus columnar
+	-- table limitation (UPDATE with CTID scan not supported). If the
+	-- UPDATE fails (e.g., on columnar request_logs), the schema init
+	-- continues instead of disabling the entire database connection.
+	DO $$
+	BEGIN
+	    UPDATE request_logs rl
+	    SET request_status = CASE
+	        WHEN rl.success THEN 'success'
+	        WHEN rl.error_kind IS NOT NULL AND rl.error_kind <> '' THEN 'failure'
+	        ELSE 'in_progress'
+	    END
+	    WHERE rl.request_status IS NULL
+	       OR rl.request_status = '';
+	EXCEPTION
+	    WHEN OTHERS THEN
+	        RAISE NOTICE 'request_status backfill skipped (columnar table or other constraint): %', SQLERRM;
+	END $$;
 	-- 2026-07-01: migration 059 -- GIN trgm index on search_text to
 	-- accelerate the ?q= substring filter in /api/logs
 	-- (admin/logs.go:420). See
