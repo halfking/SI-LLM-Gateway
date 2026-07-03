@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kaixuan/llm-gateway-go/admin"
 	"github.com/kaixuan/llm-gateway-go/attachmentanalysis"
 	"github.com/kaixuan/llm-gateway-go/attachments"
@@ -793,10 +794,20 @@ func main() {
 	// ── Live request stream WebSocket hub (2026-07-03) ────────────────────
 	// Fans out newly-persisted request_logs rows to dashboard clients.
 	// Owned by admin; created here so we have access to dbConn and
-	// can wire the telemetry hook at startup.
+	// can wire the telemetry hook at startup. The hub works without DB
+	// (initial replay returns empty) so stateless proxies like 71 can
+	// still relay live broadcasts from upstream.
 	var liveStreamHub *admin.LiveStreamHub
-	if dbConn != nil && dbConn.Enabled() && telemetryClient.Enabled() {
-		liveStreamHub = admin.NewLiveStreamHub(dbConn.Pool(), cfg.SecretKey, admin.LiveStreamConfig{
+	if cfg.SecretKey != "" {
+		var dbPool = (func() interface{} {
+			if dbConn != nil && dbConn.Enabled() {
+				return dbConn.Pool()
+			}
+			return nil
+		})()
+		var hasDB = dbPool != nil
+		// Type assertion: dbPool is either *pgxpool.Pool or nil
+		liveStreamHub = admin.NewLiveStreamHub(dbPool.(*pgxpool.Pool), cfg.SecretKey, admin.LiveStreamConfig{
 			BroadcastQueueSize: 2048,
 			InitialReplayLimit: 50,
 			IdleThreshold:      60 * time.Second,
@@ -805,10 +816,12 @@ func main() {
 			WriteTimeout:       10 * time.Second,
 		})
 		go liveStreamHub.Run()
-		telemetryClient.SetOnRequestLogPersisted(func(entry *telemetry.RequestLogEntry) {
-			liveStreamHub.Publish(adminLiveRequestFromEntry(entry))
-		})
-		slog.Info("live request stream hub enabled (websocket /api/admin/live-stream)")
+		if telemetryClient.Enabled() {
+			telemetryClient.SetOnRequestLogPersisted(func(entry *telemetry.RequestLogEntry) {
+				liveStreamHub.Publish(adminLiveRequestFromEntry(entry))
+			})
+		}
+		slog.Info("live request stream hub enabled (websocket /api/admin/live-stream)", "has_db", hasDB, "has_telemetry", telemetryClient.Enabled())
 	}
 
 	// ── Request WAL (Request Logger) ───────────────────────────────────────
