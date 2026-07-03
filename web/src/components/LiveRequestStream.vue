@@ -182,7 +182,10 @@ function onSelect(requestId: string) {
 
 .live-stream__track {
   position: relative;
-  height: 110px;
+  /* 2026-07-03: tiles are now 22x40 so the track height drops to
+   * fit 40px tiles + 12px top/bottom padding + a few pixels of
+   * breathing room. Was 110px when tiles were 56x80. */
+  height: 64px;
   overflow-x: auto;
   overflow-y: hidden;
   /* --bg-subtle (#161b22) is one shade darker than --card, which
@@ -198,9 +201,11 @@ function onSelect(requestId: string) {
 .live-stream__track-inner {
   display: flex;
   align-items: center;
-  gap: 6px;
+  /* 3px gap so 50 tiles (~22+3 = 25px each) take ~1250px of track.
+   * The browser will horizontally scroll any overflow. */
+  gap: 3px;
   height: 100%;
-  min-height: 80px;
+  min-height: 40px;
 }
 
 .live-stream__empty {
@@ -215,14 +220,16 @@ function onSelect(requestId: string) {
 }
 
 /* Slide-in for new tiles appended on the right.
- * Shadow tuned to match the project's accent glow so the entrance
- * feels native to the dark theme. */
+ * 2026-07-03: shifted from 24px to 10px because the new tiles are
+ * only 22px wide — 24px translate would make new tiles visibly jump
+ * over an empty neighbour. Shadow tuned to match the project's
+ * accent glow so the entrance feels native to the dark theme. */
 .live-slide-enter-active {
-  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
 }
 .live-slide-enter-from {
   opacity: 0;
-  transform: translateX(24px);
+  transform: translateX(10px);
 }
 .live-slide-leave-active {
   transition: transform 0.3s ease, opacity 0.3s ease;
@@ -230,6 +237,6 @@ function onSelect(requestId: string) {
 }
 .live-slide-leave-to {
   opacity: 0;
-  transform: translateX(-24px);
+  transform: translateX(-10px);
 }
 </style>
