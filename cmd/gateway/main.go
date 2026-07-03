@@ -796,7 +796,7 @@ func main() {
 	// can wire the telemetry hook at startup.
 	var liveStreamHub *admin.LiveStreamHub
 	if dbConn != nil && dbConn.Enabled() && telemetryClient.Enabled() {
-		liveStreamHub = admin.NewLiveStreamHub(dbConn.Pool(), admin.LiveStreamConfig{
+		liveStreamHub = admin.NewLiveStreamHub(dbConn.Pool(), cfg.SecretKey, admin.LiveStreamConfig{
 			BroadcastQueueSize: 2048,
 			InitialReplayLimit: 50,
 			IdleThreshold:      60 * time.Second,

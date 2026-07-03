@@ -18,7 +18,7 @@ func TestHandleLiveStream_AuthShim(t *testing.T) {
 	// (503). What we want to test is that the auth shim ran FIRST
 	// and that, when no token is present, it falls through to
 	// AdminMiddleware and gets rejected with 401.
-	hub := NewLiveStreamHub(nil, LiveStreamConfig{})
+	hub := NewLiveStreamHub(nil, "test-secret", LiveStreamConfig{})
 
 	// 1) No token, no Authorization → must be rejected.
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/live-stream", nil)
@@ -79,7 +79,7 @@ func applyAuthShim(r *http.Request) *http.Request {
 }
 
 func TestHandleLiveStream_MethodNotAllowed(t *testing.T) {
-	hub := NewLiveStreamHub(nil, LiveStreamConfig{})
+	hub := NewLiveStreamHub(nil, "test-secret", LiveStreamConfig{})
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/live-stream", strings.NewReader(""))
 	rw := httptest.NewRecorder()
 	hub.HandleLiveStream(rw, req)

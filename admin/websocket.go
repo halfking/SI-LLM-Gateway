@@ -121,9 +121,10 @@ type liveStreamClient struct {
 // call Run() in a goroutine, and call HandleLiveStream on the admin
 // mux. Producers call Publish() to fan a new request out.
 type LiveStreamHub struct {
-	db       *pgxpool.Pool
-	cfg      LiveStreamConfig
-	upgrader websocket.Upgrader
+	db        *pgxpool.Pool
+	secretKey string // JWT secret for inline auth verification
+	cfg       LiveStreamConfig
+	upgrader  websocket.Upgrader
 
 	register   chan *liveStreamClient
 	unregister chan *liveStreamClient
@@ -142,10 +143,11 @@ type LiveStreamHub struct {
 
 // NewLiveStreamHub constructs a hub. The caller MUST call Run() once
 // in its own goroutine before the hub accepts traffic.
-func NewLiveStreamHub(db *pgxpool.Pool, cfg LiveStreamConfig) *LiveStreamHub {
+func NewLiveStreamHub(db *pgxpool.Pool, secretKey string, cfg LiveStreamConfig) *LiveStreamHub {
 	cfg.defaults()
 	hub := &LiveStreamHub{
 		db:           db,
+		secretKey:    secretKey,
 		cfg:          cfg,
 		register:     make(chan *liveStreamClient, 16),
 		unregister:   make(chan *liveStreamClient, 16),
@@ -351,14 +353,49 @@ func (h *LiveStreamHub) HandleLiveStream(w http.ResponseWriter, r *http.Request)
 
 	// WS auth shim: browsers cannot set Authorization on a WS upgrade,
 	// so the frontend passes the bearer as ?token=... We promote it
-	// into the Authorization header so the rest of AdminMiddleware
-	// is unchanged. Done BEFORE upgrade so rejection paths stay
-	// HTTP-shaped (401, JSON) instead of hanging the connection.
+	// into the Authorization header so we can verify it inline below.
+	// Done BEFORE upgrade so rejection paths stay HTTP-shaped (401, JSON)
+	// instead of hanging the connection.
 	if r.Header.Get("Authorization") == "" {
 		if t := strings.TrimSpace(r.URL.Query().Get("token")); t != "" {
 			r.Header.Set("Authorization", "Bearer "+t)
 		}
 	}
+
+	// Manual authentication (this route is NOT wrapped by AdminMiddleware
+	// so we do not have an AuthContext). We replicate the same logic:
+	// try JWT first, then fall back to admin API key.
+	var authCtx *AuthContext
+	if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		// Try JWT
+		claims, err := VerifyToken(tokenStr, h.secretKey)
+		if err == nil && claims.UserID > 0 {
+			authCtx = &AuthContext{
+				UserID:   claims.UserID,
+				TenantID: claims.TenantID,
+				Username: claims.Username,
+				Role:     claims.Role,
+				IsJWT:    true,
+			}
+		} else if h.db != nil {
+			// Fall back to admin API key (sk-...) from api_keys table
+			if verifyAdminAuth(r, h.db, h.secretKey) {
+				authCtx = &AuthContext{
+					TenantID: "default",
+					Username: "admin",
+					Role:     "admin_key",
+					IsJWT:    false,
+				}
+			}
+		}
+	}
+	if authCtx == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	// Store in context so IsSuperAdminOrLegacy / IsTenantAdmin work
+	r = SetAuthContext(r, authCtx)
 
 	tenantID := ""
 	isSuper := true

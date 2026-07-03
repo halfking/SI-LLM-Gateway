@@ -220,6 +220,25 @@ if [[ -n "$SSH_TARGET" ]] && [[ "$SKIP_UPLOAD" == "false" ]]; then
     SSH="ssh ${SSH_OPTS[*]}"
   fi
 
+  # ── Pre-deploy: show deploying page ──
+  DEPLOY_MSG="${DEPLOY_MSG:-系统升级与优化}"
+  DEPLOY_ETA="${DEPLOY_ETA:-约 1-2 分钟}"
+  if [[ -f web/dist/index-deploying.html ]]; then
+    log_info "备份原 index.html..."
+    $SSH "$USER_HOST" bash <<'BACKUP_HTML'
+set -e
+REMOTE_WEB="${REMOTE_WEB:-/opt/llm-gateway-go/web}"
+BAK_FILE="${REMOTE_WEB}/index.html.bak.$(date +%s)"
+if [[ -f "${REMOTE_WEB}/index.html" ]]; then
+  cp "${REMOTE_WEB}/index.html" "${BAK_FILE}"
+  echo "Backup: ${BAK_FILE}"
+fi
+BACKUP_HTML
+
+    log_info "显示部署中页面 (eta=$DEPLOY_ETA, changes=$DEPLOY_MSG)"
+    $SCP web/dist/index-deploying.html "${USER_HOST}:${REMOTE_DIR}/web/dist/index.html"
+  fi
+
   # Stop the running systemd unit BEFORE overwriting the binary, because
   # the binary on disk is mmap'd by the gateway process. Trying to scp
   # over a running binary fails with "dest open ... Failure" because the
@@ -272,6 +291,9 @@ ss -tlnp 2>/dev/null | grep ':8781' | head -2 || true
 echo
 echo '--- gateway starting log ---'
 docker logs --since 30s "$SERVICE_NAME" 2>&1 | grep -E 'gateway starting' | tail -3 || true
+echo
+echo '--- cleaning stale index.html.bak ---'
+rm -f "$REMOTE_DIR/web/dist/index.html.bak."* || true
 REMOTE
 fi
 

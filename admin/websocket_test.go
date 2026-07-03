@@ -65,7 +65,7 @@ func TestLiveStreamConfigDefaults(t *testing.T) {
 }
 
 func TestShouldDeliver_TenantIsolation(t *testing.T) {
-	hub := NewLiveStreamHub(nil, LiveStreamConfig{})
+	hub := NewLiveStreamHub(nil, "test-secret", LiveStreamConfig{})
 
 	superClient := &liveStreamClient{isSuper: true}
 	tenantAClient := &liveStreamClient{tenantID: "tenant-a", isSuper: false}
@@ -107,7 +107,7 @@ func TestShouldDeliver_TenantIsolation(t *testing.T) {
 }
 
 func TestPublish_DoesNotBlock(t *testing.T) {
-	hub := NewLiveStreamHub(nil, LiveStreamConfig{BroadcastQueueSize: 2})
+	hub := NewLiveStreamHub(nil, "test-secret", LiveStreamConfig{BroadcastQueueSize: 2})
 	// Fill the queue.
 	for i := 0; i < 2; i++ {
 		hub.Publish(LiveRequest{RequestID: "fill"})
