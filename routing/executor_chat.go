@@ -536,7 +536,13 @@ func (e *Executor) executeOpenAI(
 							if err != nil {
 								return nil, err
 							}
-							return nil, &retryableError{err: fmt.Errorf("upstream %d", resp.StatusCode)}
+							// 2026-07-03 P0 fix: preserve errKind in context-length retry path
+							return nil, &retryableError{err: &upstreampkg.Error{
+								Kind:       errKind,
+								StatusCode: resp.StatusCode,
+								Body:       append([]byte(nil), body[:n]...),
+								Message:    fmt.Sprintf("upstream %d", resp.StatusCode),
+							}}
 						case ctxLenGiveUp:
 							// Return a typed error so the outer Execute
 							// loop knows this is a context-length
@@ -567,7 +573,13 @@ func (e *Executor) executeOpenAI(
 						Message:    fmt.Sprintf("upstream %d: %s", resp.StatusCode, string(body[:min(n, 200)])),
 					}
 				}
-				return nil, &retryableError{err: fmt.Errorf("upstream %d", resp.StatusCode)}
+				// 2026-07-03 P0 fix: preserve errKind in 5xx retryable path
+				return nil, &retryableError{err: &upstreampkg.Error{
+					Kind:       errKind,
+					StatusCode: resp.StatusCode,
+					Body:       append([]byte(nil), body[:n]...),
+					Message:    fmt.Sprintf("upstream %d", resp.StatusCode),
+				}}
 			}
 
 			e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)
