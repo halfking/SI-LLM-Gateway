@@ -4,12 +4,12 @@ export type ToolId = 'zcode' | 'opencode' | 'cursor' | 'cherry_studio' | 'roocod
 export type OS = 'macos' | 'windows' | 'linux'
 export type ModelScope = 'featured' | 'all' | 'custom'
 
-export const TOOLS: { id: ToolId; name: string; icon: string; description: string }[] = [
-  { id: 'zcode', name: 'ZCode', icon: '🔮', description: '智谱 AI 编程 IDE，基于 OpenCode 配置 schema' },
-  { id: 'opencode', name: 'OpenCode', icon: '⚡', description: '终端 AI 编码 agent（opencode.ai）' },
-  { id: 'cursor', name: 'Cursor', icon: '⌨️', description: 'AI-first 代码编辑器，支持 OpenAI 兼容 API' },
-  { id: 'cherry_studio', name: 'Cherry Studio', icon: '🍒', description: '多模型桌面客户端，支持批量导入提供商' },
-  { id: 'roocode', name: 'Roo Code / VS Code', icon: '🧩', description: 'VS Code + Roo Code 扩展，配置 roo-cline' },
+export const TOOL_IDS: { id: ToolId; icon: string }[] = [
+  { id: 'zcode', icon: '🔮' },
+  { id: 'opencode', icon: '⚡' },
+  { id: 'cursor', icon: '⌨️' },
+  { id: 'cherry_studio', icon: '🍒' },
+  { id: 'roocode', icon: '🧩' },
 ]
 
 export const OS_INFO: Record<OS, { label: string; paths: Record<ToolId, string> }> = {

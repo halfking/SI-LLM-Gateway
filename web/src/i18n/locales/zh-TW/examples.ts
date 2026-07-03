@@ -5,6 +5,28 @@ export default {
   intro: '閘道相容 OpenAI API 協定。將 base_url 指向此閘道即可使用任意支援的模型；也可在側欄「對話」直接網頁聊天。',
   sectionClientConfig: '常用用戶端設定',
   sectionApiExamples: 'API 請求範例',
+  tools: {
+    zcode: {
+      name: 'ZCode',
+      description: '智譜 AI 程式設計 IDE，基於 OpenCode 設定 schema',
+    },
+    opencode: {
+      name: 'OpenCode',
+      description: '終端 AI 編碼 agent（opencode.ai）',
+    },
+    cursor: {
+      name: 'Cursor',
+      description: 'AI-first 程式碼編輯器，支援 OpenAI 相容 API',
+    },
+    cherry_studio: {
+      name: 'Cherry Studio',
+      description: '多模型桌面用戶端，支援批次匯入提供商',
+    },
+    roocode: {
+      name: 'Roo Code / VS Code',
+      description: 'VS Code + Roo Code 擴充，設定 roo-cline',
+    },
+  },
   keyHint: '範例程式碼中的 API Key 已脫敏顯示；點擊「測試」將使用目前登入金鑰。複製範例後請自行替換為真實 Key。',
   copyKey: '複製完整 Key',
   copied: '已複製!',

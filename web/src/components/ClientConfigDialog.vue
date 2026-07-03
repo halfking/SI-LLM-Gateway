@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getKeys, listModels, getFeatured, applyForKey, revealKey, type ApiKey, type ModelCanonical } from '../api'
 import {
-  TOOLS, OS_INFO,
+  TOOL_IDS, OS_INFO,
   type ToolId, type OS, type ModelScope,
   renderZCodeConfig, renderOpenCodeConfig,
   renderCherryStudioConfig, renderRooCodeSettings,
@@ -17,7 +17,8 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 const router = useRouter()
 const { t } = useI18n()
 
-const toolInfo = computed(() => TOOLS.find(t => t.id === props.tool)!)
+const toolInfo = computed(() => TOOL_IDS.find(t => t.id === props.tool)!)
+const toolName = computed(() => t(`examples.tools.${props.tool}.name`))
 
 // ── Step 1: Key selection (all tenant keys for admin) ──────────────────────
 const keys = ref<ApiKey[]>([])
@@ -292,7 +293,7 @@ function goManageFeatured() {
       <div class="drawer-header">
         <div class="dialog-title">
           <span>{{ toolInfo.icon }}</span>
-          <span>{{ t('clientConfigDialog.title', { tool: toolInfo.name }) }}</span>
+          <span>{{ t('clientConfigDialog.title', { tool: toolName }) }}</span>
         </div>
         <button class="btn btn-ghost btn-sm" @click="close">{{ t('clientConfigDialog.close') }} ✕</button>
       </div>

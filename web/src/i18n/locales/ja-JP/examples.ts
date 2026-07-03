@@ -5,6 +5,28 @@ export default {
   intro: 'ゲートウェイは OpenAI API プロトコルと互換性があります。base_url をこのゲートウェイに向けば、サポートされている任意のモデルを使用できます。サイドバーの「チャット」で直接ウェブチャットも可能です。',
   sectionClientConfig: '一般的なクライアント設定',
   sectionApiExamples: 'API リクエスト例',
+  tools: {
+    zcode: {
+      name: 'ZCode',
+      description: 'Zhipu AI プログラミング IDE、OpenCode 設定スキーマをベースに',
+    },
+    opencode: {
+      name: 'OpenCode',
+      description: 'ターミナル AI コーディングエージェント（opencode.ai）',
+    },
+    cursor: {
+      name: 'Cursor',
+      description: 'AI ファーストコードエディター、OpenAI 互換 API をサポート',
+    },
+    cherry_studio: {
+      name: 'Cherry Studio',
+      description: 'マルチモデルデスクトップクライアント、バッチプロバイダーインポートをサポート',
+    },
+    roocode: {
+      name: 'Roo Code / VS Code',
+      description: 'VS Code + Roo Code 拡張機能、roo-cline を設定',
+    },
+  },
   keyHint: 'サンプルコードの API キーはマスク表示されています。「テスト」をクリックすると現在のログインキーが使用されます。サンプルをコピーした後、ご自身で実際のキーに置き換えてください。',
   copyKey: '完全なキーをコピー',
   copied: 'コピーしました!',

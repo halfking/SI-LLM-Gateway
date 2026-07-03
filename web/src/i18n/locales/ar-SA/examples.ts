@@ -5,6 +5,28 @@ export default {
   intro: 'البوابة متوافقة مع بروتوكول OpenAI API. وجّه base_url إلى هذه البوابة لاستخدام أي نموذج مدعوم؛ يمكنك أيضًا الدردشة مباشرة على الويب في «المحادثة» بالشريط الجانبي.',
   sectionClientConfig: 'إعدادات العميل الشائعة',
   sectionApiExamples: 'أمثلة طلبات API',
+  tools: {
+    zcode: {
+      name: 'ZCode',
+      description: 'بيئة التطوير Zhipu AI، بناءً على مخطط تكوين OpenCode',
+    },
+    opencode: {
+      name: 'OpenCode',
+      description: 'وكيل ترميز الذكاء الاصطناعي للطرفية (opencode.ai)',
+    },
+    cursor: {
+      name: 'Cursor',
+      description: 'محرر أكواد يعتمد على الذكاء الاصطناعي، يدعم OpenAI API المتوافقة',
+    },
+    cherry_studio: {
+      name: 'Cherry Studio',
+      description: 'عميل سطح المكتب متعدد النماذج، يدعم استيراد الموفرين بشكل مجمّع',
+    },
+    roocode: {
+      name: 'Roo Code / VS Code',
+      description: 'VS Code + امتداد Roo Code، تكوين roo-cline',
+    },
+  },
   keyHint: 'مفتاح API في أمثلة الكود معروض بشكل مقنع؛ سيستخدم النقر على «اختبار» مفتاح تسجيل الدخول الحالي. بعد النسخ، يرجى استبداله بمفتاح حقيقي.',
   copyKey: 'نسخ المفتاح الكامل',
   copied: 'تم النسخ!',
