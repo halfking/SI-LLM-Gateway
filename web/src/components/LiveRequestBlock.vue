@@ -281,12 +281,14 @@ function hexToRgba(hex: string, alpha: number): string {
   letter-spacing: 0.3px;
 }
 
-/* Line 2: model-family code. The dominant signal. */
+/* Line 2: model-family code. Tail-first so version numbers
+ * (e.g. "4O-MINI", "3.5-SONNET") carry more identifying weight
+ * than the vendor prefix. The dominant signal on the tile. */
 .live-block__vendor {
   font-size: 11px;
   font-weight: 700;
   line-height: 1.1;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   color: var(--text, #e6edf3);
   max-width: 100%;
   white-space: nowrap;
@@ -295,22 +297,23 @@ function hexToRgba(hex: string, alpha: number): string {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-/* Line 3: provider code. Smaller + muted so the model line
- * stays the dominant signal. */
+/* Line 3: provider code. 2026-07-03: shows the FULL catalog_code
+ * (e.g. "anthropic" / "azure-openai") instead of a 3-letter abbrev.
+ * Long names get ellipsis at the tile edge. No text-transform:
+ * the operator reads lowercase catalog codes most naturally. */
 .live-block__provider {
   font-size: 8px;
   line-height: 1.1;
   font-weight: 600;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.2px;
   color: var(--muted, #8b949e);
-  text-transform: uppercase;
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   /* Slight tint so it doesn't blend into the family-coloured bg
    * when the family is the same colour as the muted text. */
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 /* Line 4: latency. */

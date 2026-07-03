@@ -58,69 +58,113 @@ export function modelGlyph(model: string | undefined | null): string {
  * like "anthropic", "openai", "azure-openai") or, if missing, a
  * human-readable display name from a future source.
  */
+/**
+ * Reduce a provider code to a label shown on the third line of the
+ * tile. 2026-07-03 revision: show the FULL catalog_code instead
+ * of a 3-letter abbreviation. Operators scan the swim lane looking
+ * for "anthropic" / "azure-openai" / "openrouter" — the full name
+ * carries more identifying weight than the abbreviation.
+ *
+ * Length policy: the CSS layer applies text-overflow: ellipsis,
+ * so very long provider names (e.g. "custom-provider-east-2")
+ * just get cut at the tile boundary. We do NOT truncate in code
+ * because the user explicitly asked for "完整 ... 超长的用...表示".
+ */
 export function providerShortLabel(provider: string | undefined | null): string {
   if (!provider) return '???'
-  const p = provider.toLowerCase().trim()
+  const p = provider.trim()
   if (!p) return '???'
-
-  // Top-vendor overrides. Order matters — "azure-openai" must NOT
-  // match the generic "openai" branch first.
-  if (p === 'openai' || p.startsWith('openai-')) return 'OPEN'
-  if (p === 'anthropic' || p.startsWith('anthropic-')) return 'ANTH'
-  if (p === 'azure' || p.startsWith('azure-') || p.includes('azure-openai')) return 'AZR'
-  if (p === 'google' || p.startsWith('google-') || p.startsWith('vertex')) return 'GGL'
-  if (p === 'bedrock' || p.startsWith('bedrock-')) return 'BDR'
-  if (p === 'cohere' || p.startsWith('cohere-')) return 'COH'
-  if (p === 'mistral' || p.startsWith('mistral-')) return 'MST'
-  if (p === 'minimax' || p.startsWith('minimax-')) return 'MIX'
-  if (p === 'qwen' || p.startsWith('qwen-')) return 'QWN'
-  if (p === 'deepseek' || p.startsWith('deepseek-')) return 'DSK'
-  if (p === 'zhipu' || p.startsWith('zhipu-') || p === 'glm' || p.startsWith('glm-')) return 'GLM'
-
-  // Generic 3-letter uppercase: take the first 3 alphanumerics of
-  // the raw provider code. Strips dashes / dots / spaces.
-  const stripped = p.replace(/[^a-z0-9]/gi, '')
-  if (stripped.length >= 3) return stripped.slice(0, 3).toUpperCase()
-  if (stripped.length > 0) return stripped.toUpperCase().padEnd(3, '?')
-  return '???'
+  // Show the full lowercase code. CSS handles ellipsis on overflow.
+  return p.toLowerCase()
 }
 
 /**
- * Top-vendor family code shown on the second line of every tile.
+ * Reduce a model name to a SHORT label shown on the second line of
+ * the tile. 2026-07-03 revision: tail-first — version numbers carry
+ * more identifying weight than vendor prefixes, so a name like
+ * "gpt-4o-mini" becomes "4o-mini" rather than "GPT". A bare model
+ * name with no version (e.g. "foo-bar") falls back to the last 7
+ * alphanumeric chars so we still have *something* on screen.
  *
- * The list is deliberately short. On 71 the production swim lane
- * is ~95% MiniMax + Claude + GPT + Qwen; everything else (Mistral,
- * Llama, Phi, Gemma, Moonshot, Doubao, Ernie…) gets `???` and a
- * gray background so the operator's eye learns to ignore it.
- *
- * Mapping rules (priority order — first match wins):
- *   - GPT / o1 / o3 / o4  → "GPT"     (OpenAI, blue)
- *   - Claude-*            → "CLD"     (Anthropic, purple)
- *   - Qwen* / Qwen2*      → "QWN"     (Alibaba, orange)
- *   - GLM-*               → "GLM"     (Zhipu, orange)
- *   - Deepseek-*          → "DSK"     (Deepseek, orange)
- *   - MiniMax* / minimax* → "MIX"     (Top usage on 71, gray)
- *
- * Everything else returns "???" — the tile shows a gray tile with
- * a question-mark, the full model name still appears in the hover
- * tooltip so debugging is not lost.
+ * Failure / unknown models get "???".
  */
 export function modelShortLabel(model: string | undefined | null): string {
   if (!model) return '???'
   const m = model.toLowerCase().trim()
   if (!m) return '???'
 
-  if (m.startsWith('gpt-') || m.startsWith('o1-') || m.startsWith('o3-') || m.startsWith('o4-')) return 'GPT'
-  if (m.startsWith('claude-')) return 'CLD'
-  if (m.startsWith('qwen')) return 'QWN'
-  if (m.startsWith('glm-')) return 'GLM'
-  if (m.startsWith('deepseek-')) return 'DSK'
+  // Tail-first rules — each captures the last "version" segment.
+  // Order matters: the first match wins.
+  // - gpt / o1 / o3 / o4: take everything AFTER the prefix.
+  //   gpt-4o-mini → "4O-MINI", o1-preview → "PREVIEW"
+  // - claude-*: "claude-3.5-sonnet" → "3.5-SONNET"
+  // - minimax: short brand label "MIX"
+  // - others: tail-first 7 chars so the version still shows
+  if (m.startsWith('gpt-')) return stripPrefix(model, 'gpt-')
+  if (m.startsWith('o1-')) return stripPrefix(model, 'o1-')
+  if (m.startsWith('o3-')) return stripPrefix(model, 'o3-')
+  if (m.startsWith('o4-')) return stripPrefix(model, 'o4-')
+  if (m.startsWith('claude-')) return stripPrefix(model, 'claude-')
+// Qwen family. Two cases:
+  //   - qwen-<version>        → "qwen-max"            → "MAX"
+  //   - qwen<digit>...         → "qwen2-72b-instruct"   → "2-72B-INSTRUCT"
+  //                            "qwen2.5-7b"            → "2.5-7B"
+  // The digit branch must come first because "qwen-max" should match
+  // the "qwen-" branch, not the regex. The regex strips only
+  // "qwen" (NOT the digit), so the suffix starts with the version
+  // number that the user explicitly asked to keep.
+  if (/^qwen\d/.test(m)) return stripPrefix(model, /^qwen/)
+  if (m.startsWith('qwen-')) return stripPrefix(model, 'qwen-')
+  if (m.startsWith('glm-')) return stripPrefix(model, 'glm-')
+  if (m.startsWith('deepseek-')) return stripPrefix(model, 'deepseek-')
+  if (m.startsWith('moonshot-')) return stripPrefix(model, 'moonshot-')
+  if (m.startsWith('doubao-')) return stripPrefix(model, 'doubao-')
+  if (m.startsWith('ernie-')) return stripPrefix(model, 'ernie-')
+  if (m.startsWith('llama-')) return stripPrefix(model, 'llama-')
+  if (m.startsWith('mistral-') || m.startsWith('mixtral-')) return stripPrefix(model, /^[a-z]+-/)
+  if (m.startsWith('phi-')) return stripPrefix(model, 'phi-')
+  if (m.startsWith('gemma-')) return stripPrefix(model, 'gemma-')
   if (m.startsWith('minimax')) return 'MIX'
 
-  // Everything else is intentionally demoted to ??? so the swim
-  // lane's visual hierarchy stays clean. The full model name is
-  // still surfaced in the hover tooltip.
-  return '???'
+  // No recognised prefix: take the LAST 7 chars of the raw name
+  // (keeping the separator so "foo-bar-123" → "AR-123" rather than
+  // collapsing to "OBAR123"). The CSS layer adds ellipsis if even
+  // this overflows.
+  if (m.length <= 7) return (m || '???').toUpperCase()
+  return m.slice(-7).toUpperCase()
+}
+
+/**
+ * Strip a known prefix from a model name and return the remainder
+ * uppercased. The CSS layer adds ellipsis if even the remainder
+ * overflows the tile. Leading separator characters are kept
+ * (so "qwen2-72b" → "2-72b" preserves the version number).
+ */
+function stripPrefix(model: string, prefix: string | RegExp): string {
+  const m = model.trim()
+  let suffix: string
+  if (typeof prefix === 'string') {
+    if (!m.toLowerCase().startsWith(prefix)) return m.toUpperCase()
+    suffix = m.slice(prefix.length)
+  } else {
+    const re = new RegExp('^' + prefix.source, 'i')
+    const matched = m.match(re)
+    if (!matched) return m.toUpperCase()
+    suffix = m.slice(matched[0].length)
+  }
+  // Only collapse leading separators IF the remainder would be a
+  // bare letter sequence ("qwen-max" → "MAX", not "-MAX"). When the
+  // remainder starts with a digit or has its own separator already,
+  // keep the separator so the version number stays readable
+  // ("qwen2-72b" → "2-72B", "gpt-3.5" → "3.5").
+  const trimmed = suffix.replace(/^[-._ ]+/, (m) => {
+    const next = (suffix.replace(/^[-._ ]+/, ''))[0] || ''
+    // If next char is a letter, drop the leading separator
+    // (we want a clean identifier). If next char is a digit, KEEP
+    // the separator so the version number stays intact.
+    return /[a-zA-Z]/.test(next) ? '' : m
+  })
+  return (trimmed || '???').replace(/[ _]/g, '-').toUpperCase()
 }
 
 /**
