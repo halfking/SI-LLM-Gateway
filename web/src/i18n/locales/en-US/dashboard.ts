@@ -107,6 +107,7 @@ export default {
     countAria: '{buffer} requests in buffer, {visible} visible',
     groupByVendor: 'By vendor',
     groupByProvider: 'By provider',
+    groupByModel: 'By model',
     other: 'Other',
     legend: {
       title: 'Legend',

@@ -105,6 +105,7 @@ export default {
     idleLabel: 'Inactif {duration}',
     countTooltip: '{buffer} en mémoire / {visible} visibles',
     countAria: '{buffer} requêtes en mémoire, {visible} visibles',
+        groupByModel: 'By model',
     legend: {
       title: 'Légende',
       model: 'Famille de modèle',

@@ -102,6 +102,10 @@ export default {
     idleLabel: '閒置 {duration}',
     countTooltip: '緩衝區 {buffer} / 螢幕可見 {visible}',
     countAria: '緩衝區 {buffer} 個請求，螢幕可見 {visible}',
+    groupByVendor: '按原廠',
+    groupByProvider: '按供應商',
+    groupByModel: '按模型',
+    other: '其他',
     legend: {
       title: '圖例',
       model: '模型族',

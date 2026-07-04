@@ -102,6 +102,7 @@ export default {
     idleLabel: 'アイドル {duration}',
     countTooltip: 'バッファ内 {buffer} / 表示中 {visible}',
     countAria: 'バッファ内に {buffer} 件、表示中 {visible} 件',
+        groupByModel: 'By model',
     legend: {
       title: '凡例',
       model: 'モデルファミリー',

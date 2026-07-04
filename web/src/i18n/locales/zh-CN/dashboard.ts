@@ -104,6 +104,7 @@ export default {
     countAria: '缓冲区内 {buffer} 个请求，屏上可见 {visible}',
     groupByVendor: '按原厂',
     groupByProvider: '按供应商',
+    groupByModel: '按模型',
     other: '其他',
     legend: {
       title: '图例',

@@ -105,6 +105,7 @@ export default {
     idleLabel: 'Leerlauf {duration}',
     countTooltip: '{buffer} im Puffer / {visible} sichtbar',
     countAria: '{buffer} Anfragen im Puffer, {visible} sichtbar',
+        groupByModel: 'By model',
     legend: {
       title: 'Legende',
       model: 'Modellfamilie',

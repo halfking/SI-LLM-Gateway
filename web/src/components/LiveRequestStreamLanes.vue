@@ -2,17 +2,18 @@
 /**
  * LiveRequestStreamLanes — 泳道式实时请求流
  *
- * 支持两种分组模式：
- * 1. 按模型原厂分组（Top 4 热门原厂 + 其他）— 动态计算
- * 2. 按供应商分组（Top 4 热门供应商 + 其他）— 按用量排序
+ * 支持三种分组模式：
+ * 1. 按模型原厂分组（动态计算 Top N）
+ * 2. 按供应商分组（动态计算 Top N）
+ * 3. 按模型分组（动态计算 Top N）
  *
- * 2026-07-04 revision: 移除"国内/domestic"分类，改为按模型原厂
- * (vendor/manufacturer) 进行分组。面向国际市场，不强调地域。
+ * 2026-07-05 revision: 新增按模型分组，实现去重更新动画，定时泳道排序
  */
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLiveStream, type LiveRequest } from '../composables/useLiveStream'
 import LiveRequestBlock from './LiveRequestBlock.vue'
+import LiveStreamLegend from './LiveStreamLegend.vue'
 
 const emit = defineEmits<{
   openDetail: [requestId: string]
@@ -21,8 +22,45 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { requests, connection, paused, togglePause } = useLiveStream()
 
-type GroupMode = 'vendor' | 'provider'
+type GroupMode = 'vendor' | 'provider' | 'model'
 const groupMode = ref<GroupMode>('vendor')
+
+// 累计统计（从开始显示到现在）
+const cumulativeStats = ref({
+  vendor: new Map<string, number>(),
+  provider: new Map<string, number>(),
+  model: new Map<string, number>(),
+})
+
+// WebSocket 连接地址（仅管理员可见）
+const wsUrl = computed(() => {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${proto}//${location.host}/api/admin/live-stream`
+})
+
+const showWsUrl = ref(false)
+
+// 监听新请求，累计统计
+watch(requests, (newReqs, oldReqs) => {
+  const oldIds = new Set(oldReqs.filter(r => r.request_id).map(r => r.request_id!))
+  const newItems = newReqs.filter(r => r.type === 'request' && r.request_id && !oldIds.has(r.request_id))
+  
+  for (const req of newItems) {
+    // 累计原厂统计
+    const vendor = identifyVendor(req.model)
+    cumulativeStats.value.vendor.set(vendor, (cumulativeStats.value.vendor.get(vendor) || 0) + 1)
+    
+    // 累计供应商统计
+    if (req.provider_code) {
+      cumulativeStats.value.provider.set(req.provider_code, (cumulativeStats.value.provider.get(req.provider_code) || 0) + 1)
+    }
+    
+    // 累计模型统计
+    if (req.model) {
+      cumulativeStats.value.model.set(req.model, (cumulativeStats.value.model.get(req.model) || 0) + 1)
+    }
+  }
+}, { deep: true })
 
 // 模型名 → 原厂（vendor/manufacturer）
 // 不强调地域，只按模型的实际研发公司分类
@@ -64,58 +102,99 @@ function identifyVendor(model: string | undefined): string {
   return OTHER_VENDOR
 }
 
-// 计算原厂统计，按用量降序排列，取 Top 4
+// 使用累计统计（而不是当前缓存）来决定 Top N
 const vendorStats = computed(() => {
-  const stats = new Map<string, number>()
-  for (const req of requests.value) {
-    if (req.type !== 'request') continue
-    const vendor = identifyVendor(req.model)
-    stats.set(vendor, (stats.get(vendor) || 0) + 1)
-  }
-  return Array.from(stats.entries())
+  return Array.from(cumulativeStats.value.vendor.entries())
     .sort((a, b) => b[1] - a[1])
 })
 
-// 计算供应商统计，按用量降序排列，取 Top 4
 const providerStats = computed(() => {
-  const stats = new Map<string, number>()
-  for (const req of requests.value) {
-    if (req.type === 'request' && req.provider_code) {
-      stats.set(req.provider_code, (stats.get(req.provider_code) || 0) + 1)
-    }
-  }
-  return Array.from(stats.entries())
+  return Array.from(cumulativeStats.value.provider.entries())
     .sort((a, b) => b[1] - a[1])
+})
+
+const modelStats = computed(() => {
+  return Array.from(cumulativeStats.value.model.entries())
+    .sort((a, b) => b[1] - a[1])
+})
+
+// 当前缓存中的请求总数（不含 idle_marker）
+const bufferSize = computed(() => requests.value.filter(r => r.type === 'request').length)
+
+// 当前窗口中实际显示的请求数（每泳道最多30，所有泳道合计）
+const visibleCount = computed(() => {
+  let total = 0
+  for (const lane of lanes.value) {
+    const items = laneRequests.value.get(lane.key) || []
+    total += Math.min(items.length, MAX_PER_LANE)
+  }
+  return total
 })
 
 // 颜色池（用于 Top 4 之外的供应商）
 const VENDOR_COLORS = ['#10a37f', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e', '#84cc16']
 
-// 动态泳道配置：Top 4 热门原厂/供应商 + Other
+// 动态泳道配置：Top 6 热门原厂/供应商/模型 + Other
+const TOP_N = 6
 const lanes = computed(() => {
   if (groupMode.value === 'vendor') {
-    const topVendors = vendorStats.value.slice(0, 4).map(([vendor]) => vendor)
+    const topVendors = vendorStats.value.slice(0, TOP_N).map(([vendor]) => vendor)
     return [
       ...topVendors.map((vendor, idx) => {
         const preset = VENDOR_PATTERNS.find((v) => v.vendor === vendor)
+        const count = cumulativeStats.value.vendor.get(vendor) || 0
         return {
           key: vendor,
           label: vendor,
           color: preset?.color || VENDOR_COLORS[idx] || '#6b7280',
+          count,
         }
       }),
-      { key: OTHER_VENDOR, label: t('dashboard.liveStream.other'), color: '#6b7280' },
+      { 
+        key: OTHER_VENDOR, 
+        label: t('dashboard.liveStream.other'), 
+        color: '#6b7280',
+        count: Array.from(cumulativeStats.value.vendor.entries())
+          .filter(([v]) => !topVendors.includes(v))
+          .reduce((sum, [, cnt]) => sum + cnt, 0),
+      },
     ]
-  } else {
-    // 供应商模式：按用量排序的 Top 4 + Other
-    const topProviders = providerStats.value.slice(0, 4).map(([code]) => code)
+  } else if (groupMode.value === 'provider') {
+    const topProviders = providerStats.value.slice(0, TOP_N).map(([code]) => code)
     return [
       ...topProviders.map((code, idx) => ({
         key: code,
         label: code,
         color: VENDOR_COLORS[idx] || '#6b7280',
+        count: cumulativeStats.value.provider.get(code) || 0,
       })),
-      { key: OTHER_VENDOR, label: t('dashboard.liveStream.other'), color: '#6b7280' },
+      { 
+        key: OTHER_VENDOR, 
+        label: t('dashboard.liveStream.other'), 
+        color: '#6b7280',
+        count: Array.from(cumulativeStats.value.provider.entries())
+          .filter(([p]) => !topProviders.includes(p))
+          .reduce((sum, [, cnt]) => sum + cnt, 0),
+      },
+    ]
+  } else {
+    // 按模型分组
+    const topModels = modelStats.value.slice(0, TOP_N).map(([model]) => model)
+    return [
+      ...topModels.map((model, idx) => ({
+        key: model,
+        label: model,
+        color: VENDOR_COLORS[idx] || '#6b7280',
+        count: cumulativeStats.value.model.get(model) || 0,
+      })),
+      { 
+        key: OTHER_VENDOR, 
+        label: t('dashboard.liveStream.other'), 
+        color: '#6b7280',
+        count: Array.from(cumulativeStats.value.model.entries())
+          .filter(([m]) => !topModels.includes(m))
+          .reduce((sum, [, cnt]) => sum + cnt, 0),
+      },
     ]
   }
 })
@@ -126,17 +205,21 @@ function getLaneKey(req: LiveRequest): string {
 
   if (groupMode.value === 'vendor') {
     const vendor = identifyVendor(req.model)
-    // 只在 Top 4 中的原厂单独显示，其余归入 Other
-    const topVendors = vendorStats.value.slice(0, 4).map(([v]) => v)
+    const topVendors = vendorStats.value.slice(0, TOP_N).map(([v]) => v)
     return topVendors.includes(vendor) ? vendor : OTHER_VENDOR
-  } else {
+  } else if (groupMode.value === 'provider') {
     if (!req.provider_code) return OTHER_VENDOR
-    const topProviders = providerStats.value.slice(0, 4).map(([c]) => c)
+    const topProviders = providerStats.value.slice(0, TOP_N).map(([c]) => c)
     return topProviders.includes(req.provider_code) ? req.provider_code : OTHER_VENDOR
+  } else {
+    // 按模型分组
+    if (!req.model) return OTHER_VENDOR
+    const topModels = modelStats.value.slice(0, TOP_N).map(([m]) => m)
+    return topModels.includes(req.model) ? req.model : OTHER_VENDOR
   }
 }
 
-// 按泳道分组请求
+// 按泳道分组请求，支持去重和自动移动到末尾
 const laneRequests = computed(() => {
   const grouped = new Map<string, LiveRequest[]>()
 
@@ -145,15 +228,40 @@ const laneRequests = computed(() => {
     grouped.set(lane.key, [])
   }
 
-  // 分配请求到泳道
-  for (const req of requests.value) {
+  // 分配请求到泳道（去重逻辑：同一 request_id 只保留最后一次出现）
+  const seenIds = new Map<string, { laneKey: string; index: number }>()
+  
+  for (let i = 0; i < requests.value.length; i++) {
+    const req = requests.value[i]
     const laneKey = getLaneKey(req)
-    const lane = grouped.get(laneKey)
-    if (lane) {
-      lane.push(req)
+    
+    if (req.type === 'request' && req.request_id) {
+      // 检查是否已经在某个泳道中
+      const existing = seenIds.get(req.request_id)
+      if (existing) {
+        // 从原泳道中移除旧记录
+        const oldLane = grouped.get(existing.laneKey)
+        if (oldLane) {
+          oldLane.splice(existing.index, 1)
+          // 更新后续索引
+          for (const [id, info] of seenIds.entries()) {
+            if (info.laneKey === existing.laneKey && info.index > existing.index) {
+              info.index--
+            }
+          }
+        }
+      }
+      
+      // 添加到新泳道末尾
+      const lane = grouped.get(laneKey)
+      if (lane) {
+        seenIds.set(req.request_id, { laneKey, index: lane.length })
+        lane.push(req)
+      }
     } else {
-      const otherLane = grouped.get(OTHER_VENDOR)
-      if (otherLane) otherLane.push(req)
+      // idle_marker 直接添加
+      const lane = grouped.get(laneKey)
+      if (lane) lane.push(req)
     }
   }
 
@@ -161,7 +269,40 @@ const laneRequests = computed(() => {
 })
 
 // 每个泳道最多显示的请求数
-const MAX_PER_LANE = 20
+const MAX_PER_LANE = 30
+
+// 定时排序泳道（每5秒按累计请求数重新排序，避免UI闪烁）
+const sortedLanes = ref(lanes.value)
+let sortTimer: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  // 初始化排序
+  sortedLanes.value = [...lanes.value].sort((a, b) => b.count - a.count)
+  
+  // 每5秒重新排序一次
+  sortTimer = setInterval(() => {
+    const current = lanes.value
+    const sorted = [...current].sort((a, b) => b.count - a.count)
+    
+    // 只有顺序真正改变时才更新（减少不必要的重渲染）
+    const orderChanged = sorted.some((lane, idx) => lane.key !== sortedLanes.value[idx]?.key)
+    if (orderChanged) {
+      sortedLanes.value = sorted
+    }
+  }, 5000)
+})
+
+onBeforeUnmount(() => {
+  if (sortTimer) {
+    clearInterval(sortTimer)
+    sortTimer = null
+  }
+})
+
+// 当分组模式切换时，立即重新排序
+watch(groupMode, () => {
+  sortedLanes.value = [...lanes.value].sort((a, b) => b.count - a.count)
+})
 
 const connectionLabel = computed(() => {
   if (connection.value === 'open') return t('dashboard.liveStream.connected')
@@ -178,16 +319,50 @@ function onSelect(requestId: string) {
     <div class="live-stream-lanes__header">
       <h3 class="live-stream-lanes__title">{{ t('dashboard.liveStream.title') }}</h3>
       <div class="live-stream-lanes__controls">
-        <span
+        <!-- 分组模式切换 -->
+        <div class="live-stream-lanes__group-toggle">
+          <button
+            type="button"
+            class="live-stream-lanes__group-btn"
+            :class="{ 'live-stream-lanes__group-btn--active': groupMode === 'vendor' }"
+            @click="groupMode = 'vendor'"
+          >
+            {{ t('dashboard.liveStream.groupByVendor') }}
+          </button>
+          <button
+            type="button"
+            class="live-stream-lanes__group-btn"
+            :class="{ 'live-stream-lanes__group-btn--active': groupMode === 'provider' }"
+            @click="groupMode = 'provider'"
+          >
+            {{ t('dashboard.liveStream.groupByProvider') }}
+          </button>
+          <button
+            type="button"
+            class="live-stream-lanes__group-btn"
+            :class="{ 'live-stream-lanes__group-btn--active': groupMode === 'model' }"
+            @click="groupMode = 'model'"
+          >
+            {{ t('dashboard.liveStream.groupByModel') }}
+          </button>
+        </div>
+
+        <!-- 连接状态 -->
+        <button
+          type="button"
           class="live-stream-lanes__status"
           :class="{
             'live-stream-lanes__status--ok': connection === 'open',
             'live-stream-lanes__status--warn': connection !== 'open',
           }"
+          @click="showWsUrl = !showWsUrl"
+          :title="showWsUrl ? wsUrl : '点击查看连接地址'"
         >
           <span class="live-stream-lanes__dot" aria-hidden="true" />
           {{ connectionLabel }}
-        </span>
+        </button>
+
+        <!-- 暂停/继续按钮 -->
         <button
           type="button"
           class="live-stream-lanes__btn"
@@ -195,24 +370,37 @@ function onSelect(requestId: string) {
         >
           {{ paused ? t('dashboard.liveStream.resume') : t('dashboard.liveStream.pause') }}
         </button>
-        <select v-model="groupMode" class="live-stream-lanes__select">
-          <option value="vendor">{{ t('dashboard.liveStream.groupByVendor') }}</option>
-          <option value="provider">{{ t('dashboard.liveStream.groupByProvider') }}</option>
-        </select>
+
+        <!-- 缓存/窗口统计 -->
+        <span
+          class="live-stream-lanes__count"
+          :title="`缓存: ${bufferSize} 个请求 / 窗口: ${visibleCount} 个请求`"
+        >
+          <span class="live-stream-lanes__count-num">{{ bufferSize }}</span>
+          <span class="live-stream-lanes__count-sep">/</span>
+          <span class="live-stream-lanes__count-num">{{ visibleCount }}</span>
+        </span>
       </div>
+    </div>
+
+    <!-- WebSocket 连接地址提示 -->
+    <div v-if="showWsUrl" class="live-stream-lanes__ws-url">
+      <code>{{ wsUrl }}</code>
     </div>
 
     <!-- 泳道容器 -->
     <div class="live-stream-lanes__container">
       <div
-        v-for="lane in lanes"
+        v-for="lane in sortedLanes"
         :key="lane.key"
         class="live-stream-lane"
       >
         <!-- 泳道标签 -->
         <div class="live-stream-lane__label" :style="{ borderLeftColor: lane.color }">
-          <span class="live-stream-lane__name">{{ lane.label }}</span>
-          <span class="live-stream-lane__count">{{ laneRequests.get(lane.key)?.length || 0 }}</span>
+          <div class="live-stream-lane__name-wrapper">
+            <span class="live-stream-lane__name" :title="lane.label">{{ lane.label }}</span>
+          </div>
+          <span class="live-stream-lane__count">({{ lane.count }})</span>
         </div>
 
         <!-- 泳道轨道 -->
@@ -234,6 +422,9 @@ function onSelect(requestId: string) {
         </div>
       </div>
     </div>
+
+    <!-- 图例 -->
+    <LiveStreamLegend />
   </div>
 </template>
 
@@ -251,10 +442,10 @@ function onSelect(requestId: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: nowrap;        /* 强制不折行 */
+  flex-wrap: nowrap;
   gap: 10px;
   margin-bottom: 12px;
-  min-width: 0;             /* 允许子元素 shrink 到 0 */
+  min-width: 0;
 }
 
 .live-stream-lanes__title {
@@ -262,7 +453,7 @@ function onSelect(requestId: string) {
   font-weight: 600;
   margin: 0;
   color: var(--text, #e6edf3);
-  flex-shrink: 0;           /* 标题不被压缩 */
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
@@ -271,20 +462,68 @@ function onSelect(requestId: string) {
   align-items: center;
   gap: 8px;
   flex: 1 1 auto;
-  min-width: 0;             /* 允许子元素 shrink 到 0 */
-  flex-wrap: nowrap;        /* 强制不折行 */
+  min-width: 0;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   overflow: hidden;
 }
 
+/* 分组模式切换按钮组 */
+.live-stream-lanes__group-toggle {
+  display: flex;
+  gap: 4px;
+  border: 1px solid var(--border, #30363d);
+  border-radius: 4px;
+  background: var(--bg, #0f1117);
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.live-stream-lanes__group-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--muted, #8b949e);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.live-stream-lanes__group-btn:hover {
+  background: var(--bg-subtle, #161b22);
+  color: var(--text, #e6edf3);
+}
+
+.live-stream-lanes__group-btn--active {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* 连接状态按钮 */
 .live-stream-lanes__status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border, #30363d);
+  background: var(--bg, #0f1117);
   color: var(--muted, #8b949e);
-  flex-shrink: 0;           /* 状态不被压缩 */
+  cursor: pointer;
+  flex-shrink: 0;
   white-space: nowrap;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.live-stream-lanes__status:hover {
+  background: var(--bg-subtle, #161b22);
+  border-color: var(--accent, #6366f1);
 }
 
 .live-stream-lanes__dot {
@@ -319,8 +558,10 @@ function onSelect(requestId: string) {
   color: var(--text, #e6edf3);
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;           /* 按钮不被压缩 */
+  flex-shrink: 0;
   min-width: 64px;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
 }
 
 .live-stream-lanes__btn:hover {
@@ -328,21 +569,48 @@ function onSelect(requestId: string) {
   border-color: var(--accent, #6366f1);
 }
 
-.live-stream-lanes__select {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--border, #30363d);
-  background: var(--bg, #0f1117);
-  color: var(--text, #e6edf3);
-  cursor: pointer;
-  flex-shrink: 0;           /* 下拉框不被压缩 */
+/* 缓存/窗口统计 */
+.live-stream-lanes__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   white-space: nowrap;
-  min-width: 140px;         /* 给"按原厂/按供应商"一个最小显示宽度 */
+  flex-shrink: 0;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, 'Cascadia Code', monospace;
+  color: var(--muted, #8b949e);
+  padding: 4px 10px;
+  border: 1px solid var(--border, #30363d);
+  border-radius: 4px;
+  background: var(--bg, #0f1117);
+  font-variant-numeric: tabular-nums;
+  min-width: 78px;
+  justify-content: center;
 }
 
-.live-stream-lanes__select option {
-  background: var(--card, #1c2128);
+.live-stream-lanes__count-num {
+  color: var(--text, #e6edf3);
+  font-weight: 600;
+}
+
+.live-stream-lanes__count-sep {
+  color: var(--border, #30363d);
+}
+
+/* WebSocket 连接地址 */
+.live-stream-lanes__ws-url {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: var(--bg-subtle, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--muted, #8b949e);
+  overflow-x: auto;
+}
+
+.live-stream-lanes__ws-url code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, 'Cascadia Code', monospace;
   color: var(--text, #e6edf3);
 }
 
@@ -358,49 +626,58 @@ function onSelect(requestId: string) {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 64px;
-  flex-wrap: nowrap;        /* 泳道不折行 */
+  min-height: 68px;
+  flex-wrap: nowrap;
   min-width: 0;
 }
 
-/* 泳道标签 — 固定宽度，避免被挤压 */
+/* 泳道标签 — 固定宽度，支持折行显示 */
 .live-stream-lane__label {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 2px;
-  width: 120px;             /* 固定宽度 */
-  min-width: 120px;
-  max-width: 120px;
-  flex-shrink: 0;           /* 标签不被压缩 */
-  padding-left: 8px;
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  flex-shrink: 0;
+  padding: 4px 0 4px 8px;
   border-left: 3px solid var(--accent, #6366f1);
-  overflow: hidden;         /* 隐藏溢出内容 */
+  overflow: hidden;
+}
+
+.live-stream-lane__name-wrapper {
+  width: 100%;
+  overflow: hidden;
 }
 
 .live-stream-lane__name {
   font-size: 13px;
   font-weight: 600;
   color: var(--text, #e6edf3);
-  white-space: nowrap;
+  word-break: break-word;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;  /* 过长时省略号 */
   max-width: 100%;
-  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
 }
 
 .live-stream-lane__count {
   font-size: 11px;
   color: var(--muted, #8b949e);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, 'Cascadia Code', monospace;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 泳道轨道 */
 .live-stream-lane__track {
   position: relative;
   flex: 1;
-  height: 64px;
+  height: 68px;
   overflow: hidden;
   background: var(--bg-subtle, #161b22);
   border: 1px solid var(--border, #30363d);

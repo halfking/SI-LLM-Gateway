@@ -102,6 +102,7 @@ export default {
     idleLabel: 'خامل {duration}',
     countTooltip: '{buffer} في المخزن / {visible} مرئية على الشاشة',
     countAria: '{buffer} طلب في المخزن، {visible} مرئية',
+        groupByModel: 'By model',
     legend: {
       title: 'مفتاح الرموز',
       model: 'عائلة النموذج',
