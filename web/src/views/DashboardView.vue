@@ -145,10 +145,6 @@ async function load() {
     models.value  = m
     overview.value = o
     hotKeys.value = h
-    // Re-baseline the live-stream delta tracker against the freshly
-    // fetched summary so the next push starts from a clean slate.
-    seenLiveRequestIds.clear()
-    resetLiveStream()
     void loadCompressionStats()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('dashboard.loadError')
