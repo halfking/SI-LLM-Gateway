@@ -207,6 +207,12 @@ function scheduleBatchUpdate() {
 }
 
 watch(requests, (newReqs, oldReqs) => {
+  // 🔥 只有当组件实际挂载后才处理新请求
+  if (!initialStatsLoaded.value) {
+    console.log('[LiveStreamLanes] skipping watch: initialStats not loaded yet')
+    return
+  }
+
   console.log('[LiveStreamLanes] requests watch triggered:', {
     oldCount: oldReqs.length,
     newCount: newReqs.length,
@@ -485,11 +491,26 @@ function scheduleSort() {
 }
 
 onMounted(async () => {
+  console.log('[LiveStreamLanes] onMounted called')
+  
   // 加载初始统计数据
   await loadInitialStats()
   
+  console.log('[LiveStreamLanes] after loadInitialStats, lanes:', lanes.value.map(l => ({ key: l.key, count: l.count })))
+  
   // 🔥 初始化泳道队列
   initializeLaneQueues()
+  
+  console.log('[LiveStreamLanes] after initializeLaneQueues, queues:', Array.from(laneQueues.value.keys()))
+  
+  // 🔥 将 useLiveStream 缓冲区中已有的请求推入泳道
+  const existingRequests = requests.value.filter(r => r.type === 'request')
+  console.log('[LiveStreamLanes] found', existingRequests.length, 'existing requests in buffer')
+  
+  if (existingRequests.length > 0) {
+    pendingRequests.push(...existingRequests)
+    processPendingRequests()
+  }
   
   // 初始化排序
   sortedLanes.value = [...lanes.value].sort((a, b) => {
