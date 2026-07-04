@@ -206,7 +206,10 @@ function scheduleBatchUpdate() {
   }
 }
 
-watch(requests, (newReqs, oldReqs) => {
+// 🔥 追踪已处理的请求 ID，避免重复处理
+const processedRequestIds = new Set<string>()
+
+watch(requests, (newReqs) => {
   // 🔥 只有当组件实际挂载后才处理新请求
   if (!initialStatsLoaded.value) {
     console.log('[LiveStreamLanes] skipping watch: initialStats not loaded yet')
@@ -214,15 +217,21 @@ watch(requests, (newReqs, oldReqs) => {
   }
 
   console.log('[LiveStreamLanes] requests watch triggered:', {
-    oldCount: oldReqs.length,
-    newCount: newReqs.length,
+    bufferSize: newReqs.length,
+    processedCount: processedRequestIds.size,
     initialStatsLoaded: initialStatsLoaded.value,
     laneQueueKeys: Array.from(laneQueues.value.keys()),
   })
 
-  const oldIds = new Set(oldReqs.filter(r => r.request_id).map(r => r.request_id!))
-  const newItems = newReqs.filter(r => r.type === 'request' && r.request_id && !oldIds.has(r.request_id))
+  // 🔥 找出尚未处理的新请求
+  const newItems = newReqs.filter(r => 
+    r.type === 'request' && 
+    r.request_id && 
+    !processedRequestIds.has(r.request_id)
+  )
 
+  console.log('[LiveStreamLanes] unprocessed items:', newItems.length, 'of', newReqs.length)
+  
   if (newItems.length === 0) {
     console.log('[LiveStreamLanes] no new items detected')
     return
@@ -234,10 +243,18 @@ watch(requests, (newReqs, oldReqs) => {
     provider: r.provider_code,
   })))
 
+  // 🔥 标记为已处理
+  for (const item of newItems) {
+    if (item.request_id) {
+      processedRequestIds.add(item.request_id)
+    }
+  }
+
   // 加入待处理队列
   pendingRequests.push(...newItems)
+  console.log('[LiveStreamLanes] pendingRequests queue size:', pendingRequests.length)
   scheduleBatchUpdate()
-}, { deep: false }) // 🔥 改为浅层监听，减少开销
+})
 
 // 模型名 → 原厂（vendor/manufacturer）
 // 不强调地域，只按模型的实际研发公司分类
@@ -508,6 +525,12 @@ onMounted(async () => {
   console.log('[LiveStreamLanes] found', existingRequests.length, 'existing requests in buffer')
   
   if (existingRequests.length > 0) {
+    // 🔥 标记缓冲区中的已有请求为已处理
+    for (const req of existingRequests) {
+      if (req.request_id) {
+        processedRequestIds.add(req.request_id)
+      }
+    }
     pendingRequests.push(...existingRequests)
     processPendingRequests()
   }
@@ -543,21 +566,28 @@ onBeforeUnmount(() => {
 watch(groupMode, () => {
   console.log('[LiveStreamLanes] group mode changed to:', groupMode.value)
   
-  // 收集所有现有请求
-  const allRequests: LiveRequest[] = []
-  for (const queue of laneQueues.value.values()) {
-    allRequests.push(...queue)
-  }
+  // 🔥 清空泳道队列，避免残留数据
+  laneQueues.value.clear()
   
-  // 重新初始化泳道队列
+  // 重新初始化泳道队列（创建空队列）
   initializeLaneQueues()
   
-  // 重新分配所有请求到新泳道
-  for (const req of allRequests) {
-    if (req.type === 'request') {
-      const laneKey = getLaneKey(req)
-      upsertRequest(laneKey, req)
-    }
+  console.log('[LiveStreamLanes] cleared and reinitialized lanes:', Array.from(laneQueues.value.keys()))
+  
+  // 🔥 从 requests buffer 中重新处理所有已标记为已处理的请求
+  // 这样可以确保切换维度后，泳道数据与当前维度一致
+  const allBufferedRequests = requests.value.filter(r => 
+    r.type === 'request' && 
+    r.request_id && 
+    processedRequestIds.has(r.request_id)
+  )
+  
+  console.log('[LiveStreamLanes] re-processing', allBufferedRequests.length, 'buffered requests for new group mode')
+  
+  // 重新分配到新泳道
+  for (const req of allBufferedRequests) {
+    const laneKey = getLaneKey(req)
+    upsertRequest(laneKey, req)
   }
   
   // 触发响应式更新
