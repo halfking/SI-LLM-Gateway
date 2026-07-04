@@ -64,9 +64,9 @@ export default {
   advantagesTitle: 'Ventajas diferenciales',
   advantagesSubtitle: 'Lo que los proveedores globales no pueden ofrecer',
   advantages: {
-    local: {
-      title: 'Localización en China',
-      description: 'Interfaz completamente en chino, prioridad de modelos nacionales, Alipay / WeChat Pay, plantillas compatibles con MLPS',
+    openSource: {
+      title: 'Núcleo Abierto',
+      description: 'Código base Open Core · Licencia compatible con Apache 2.0 · Construido por desarrolladores globales · Transparente y auditable',
     },
     private: {
       title: 'Despliegue privado',
@@ -81,31 +81,31 @@ export default {
       description: 'Go nativo, imagen ligera de 40 MB, P99 < 500 ms con 200 concurrentes, retransmisión estable de SSE en streaming',
     },
   },
-  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Despliegue privado · Localización en China',
+  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Despliegue privado · Núcleo Abierto',
   ariaPoints: 'Puntos destacados',
   roadmap: {
     title: 'Hoja de ruta de evolución del producto',
     subtitle: 'Del plano de datos LLM a la pasarela de agentes empresariales, en construcción continua',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'API Hub Asset Center + hosting de herramientas MCP',
       description:
         'Registro unificado de endpoints LLM, servicios MCP y agentes. Autoservicio de descubrimiento y reutilización para desarrolladores.',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
+      phase: 'Step 2',
       title: 'Escudo de seguridad GA + integración SIEM + SpecBoost',
       description:
         'Bloqueo de inyección de prompt, enmascaramiento de datos sensibles, enriquecimiento inteligente de la descripción de la API para mejorar la precisión del Function Calling.',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'Registro de agentes + pasarela de protocolo A2A',
       description:
         'Delegación y orquestación de tareas entre agentes, entrada unificada de OpenClaw y agentes de negocio.',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
+      phase: 'Step 4',
       title: 'Soluciones sectoriales GA',
       description:
         'Plantillas sectoriales para atención al cliente, RR. HH., ventas y logística: soluciones de agentes listas para usar.',

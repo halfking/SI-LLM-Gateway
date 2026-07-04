@@ -60,9 +60,9 @@ export default {
   advantagesTitle: 'Differentiated Advantages',
   advantagesSubtitle: 'What global vendors cannot offer',
   advantages: {
-    local: {
-      title: 'China Localization',
-      description: 'Full Chinese UI, open-source model priority, Alipay / WeChat Pay, MLPS-compliant templates',
+    openSource: {
+      title: 'Core Open Source',
+      description: 'Open Core codebase · Apache 2.0-friendly license · Built by global developers · Transparent & auditable',
     },
     private: {
       title: 'Private Deployment',
@@ -77,7 +77,7 @@ export default {
       description: 'Native Go, 40MB lightweight image, 200 concurrent P99 < 500ms, stable SSE streaming relay',
     },
   },
-  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Private deployment · China localization',
+  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Private deployment · Core Open Source',
   ariaPoints: 'Highlight points',
   roadmap: {
     title: 'Product Evolution Roadmap',

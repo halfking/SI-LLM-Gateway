@@ -54,33 +54,36 @@ export default {
   advantagesTitle: 'المزايا التفاضلية',
   advantagesSubtitle: 'قدرات لا يستطيع البائعون الأجانب تقديمها',
   advantages: {
-    local: { title: 'التوطين الصيني', description: 'واجهة كاملة باللغة الصينية، أولوية للنماذج المحلية، تكامل دفع Alipay/WeChat، قوالب امتثال Classified Protection' },
+    openSource: {
+      title: 'نواة مفتوحة',
+      description: 'قاعدة كود Open Core · ترخيص متوافق مع Apache 2.0 · مساهمون من جميع أنحاء العالم · شفافية قابلة للتدقيق',
+    },
     private: { title: 'النشر الخاص', description: 'نشر خاص بالكامل، لا تغادر البيانات المؤسسة، k3s + Docker، صفر اعتماديات خارجية' },
     antiBan: { title: 'نظام مكافحة الحظر', description: 'تناوب 50+ UA + تجمع بصمات utls TLS + 11 ملف تعريف متصفح + تناوب تلقائي كل 5 دقائق' },
     perf: { title: 'طبقة بيانات عالية الأداء بـ Go', description: 'تنفيذ أصلي بـ Go، صورة خفيفة 40MB، P99 للتزامن 200 أقل من 500ms، ترحيل SSE مستقر' },
   },
-  footer: 'بوابة Kaixuan LLM · [GATEWAY_DOMAIN] · نشر خاص · توطين صيني',
+  footer: 'بوابة Kaixuan LLM · [GATEWAY_DOMAIN] · نشر خاص · نواة مفتوحة',
   ariaPoints: 'النقاط الأساسية',
   roadmap: {
     title: 'خارطة طريق تطور المنتج',
     subtitle: 'من طبقة بيانات LLM إلى بوابة وكلاء المؤسسة، بناء مستمر',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'مركز أصول API Hub + استضافة أدوات MCP',
       description: 'تسجيل موحد لنقاط نهاية LLM وخدمات MCP والوكلاء، اكتشاف وإعادة استخدام ذاتي للمطورين.',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
+      phase: 'Step 2',
       title: 'درع الأمان GA + تكامل SIEM + SpecBoost',
       description: 'اعتراض حقن Prompt، إزالة البيانات الحساسة، إثراء ذكي لوصف API لتحسين دقة Function Calling.',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'مركز تسجيل الوكلاء + بوابة بروتوكول A2A',
       description: 'تفويض المهام بين الوكلاء الأذكياء والتنسيق، تكامل موحد مع OpenClaw ووكلاء الأعمال.',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
+      phase: 'Step 4',
       title: 'حلول الصناعة GA',
       description: 'قوالب صناعة خدمة العملاء والموارد البشرية والمبيعات والخدمات اللوجستية، حلول وكلاء جاهزة للاستخدام.',
     },

@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MemoraStatusButton from '../components/MemoraStatusButton.vue'
 import LiveRequestStream from '../components/LiveRequestStream.vue'
+import LiveRequestStreamLanes from '../components/LiveRequestStreamLanes.vue'
 import RequestLogDrawer from '../components/RequestLogDrawer.vue'
 import TenantDashboardView from './TenantDashboardView.vue'
 import {
@@ -186,7 +187,7 @@ const tenantLabel = computed(() => {
   }
 })
 
-const showTenantDashboard = computed(() => !isDefaultTenant())
+const showTenantDashboard = computed(() => true) // Always show new dashboard (2026-07-05)
 
 const proxyWarning = computed(() => {
   const p = health.value?.proxy
@@ -411,7 +412,7 @@ function scheduleProbeFailuresPoll() {
       <RouterLink to="/routing-v2?tab=resolve&row=model">{{ t('nav.item.routingOverview') }}</RouterLink>
     </div>
 
-    <LiveRequestStream @open-detail="openRequestDetail" />
+    <LiveRequestStreamLanes @open-detail="openRequestDetail" />
 
     <div class="stat-grid" v-if="summary && overview">
       <div class="stat-card">

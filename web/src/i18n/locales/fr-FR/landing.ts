@@ -69,9 +69,9 @@ export default {
   advantagesTitle: 'Avantages différenciants',
   advantagesSubtitle: 'Ce que les fournisseurs mondiaux ne peuvent pas offrir',
   advantages: {
-    local: {
-      title: 'Localisation en Chine',
-      description: 'Interface entièrement en chinois, priorité aux modèles nationaux, Alipay / WeChat Pay, modèles conformes MLPS',
+    openSource: {
+      title: 'Open Core',
+      description: 'Base de code Open Core · Licence compatible Apache 2.0 · Contributions mondiales · Transparent et auditable',
     },
     private: {
       title: 'Déploiement privé',
@@ -86,31 +86,31 @@ export default {
       description: 'Go natif, image légère de 40 Mo, 200 simultanés P99 < 500 ms, relais de streaming SSE stable',
     },
   },
-  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Déploiement privé · Localisation en Chine',
+  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Déploiement privé · Open Core',
   ariaPoints: 'Points forts',
   roadmap: {
     title: 'Feuille de route produit',
     subtitle: 'Du plan de données LLM à la passerelle Agent entreprise — construit en continu',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'Centre de ressources API Hub + hébergement d\'outils MCP',
       description:
         'Enregistrement unifié des points d\'accès LLM, des services MCP et des agents. Découverte et réutilisation en libre-service pour les développeurs.',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
+      phase: 'Step 2',
       title: 'Bouclier de sécurité GA + intégration SIEM + SpecBoost',
       description:
         'Blocage des injections de prompt, masquage des données sensibles, enrichissement intelligent des descriptions API pour améliorer la précision du Function Calling.',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'Registre d\'agents + passerelle protocole A2A',
       description:
         'Délégation et orchestration de tâches inter-agents, point d\'entrée unifié pour OpenClaw et les agents métier.',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
+      phase: 'Step 4',
       title: 'Solutions sectorielles GA',
       description:
         'Modèles sectoriels pour le service client, les RH, les ventes et la logistique — solutions d\'agents prêtes à l\'emploi.',

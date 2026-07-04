@@ -54,33 +54,36 @@ export default {
   advantagesTitle: '差別化された優位性',
   advantagesSubtitle: '海外ベンダーが提供できない能力',
   advantages: {
-    local: { title: '中国ローカライズ', description: '完全な中国語インターフェース、国内モデル優先、Alipay/WeChat Pay 統合、等保コンプライアンステンプレート' },
+    openSource: {
+      title: 'オープンコア',
+      description: 'Open Core オープンソースコア · Apache 2.0 フレンドリーライセンス · グローバル開発者協業 · 透明性と監査性',
+    },
     private: { title: 'プライベートデプロイ', description: '完全なプライベートデプロイでデータは企業外に出ません。k3s + Docker 両対応で外部依存ゼロ' },
     antiBan: { title: '垢バン対策', description: '50+ UA ローテーション + utls TLS 指紋プール + 11種類のブラウザプロファイル + 5分ごとの自動切替' },
     perf: { title: 'Go 高性能データプレーン', description: 'ネイティブ Go 実装、40MB 軽量イメージ、200 並行で P99 < 500ms、SSE ストリーミングを安定中継' },
   },
-  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · プライベートデプロイ · 中国ローカライズ',
+  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · プライベートデプロイ · オープンコア',
   ariaPoints: '主な特徴',
   roadmap: {
     title: '製品ロードマップ',
     subtitle: 'LLM データプレーンからエンタープライズ Agent ゲートウェイへ',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'API Hub アセットセンター + MCP ツールホスティング',
       description: 'LLM エンドポイント、MCP サービス、Agent を統一登録し、開発者がセルフサービスで利用可能に。',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
+      phase: 'Step 2',
       title: 'セーフティシールド GA + SIEM 連携 + SpecBoost',
       description: 'プロンプトインジェクション防御、機微データの脱敏化、API 説明の自動拡充による Function Calling 精度向上。',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'Agent 登録センター + A2A プロトコルゲートウェイ',
       description: 'エージェント間のタスク委譲とオーケストレーション。OpenClaw と業務 Agent を統一接続。',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
+      phase: 'Step 4',
       title: '業界ソリューション GA',
       description: 'カスタマーサポート、人事、セールス、物流の4業界テンプレート。すぐに使えるエージェントソリューション。',
     },

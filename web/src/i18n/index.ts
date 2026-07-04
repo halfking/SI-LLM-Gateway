@@ -60,6 +60,34 @@ export const i18n = createI18n({
   fallbackWarn: false,
 })
 
+// Eagerly preload the initial locale's lazy chunk (if any) so the first
+// paint of the public landing page shows the user's language instead of
+// silently falling back to en-US. The dynamic import is async but the
+// chunk is typically fetched within the same network round-trip as the
+// initial bundle; this only blocks if the lazy chunk has not yet been
+// fetched when the LandingView template evaluates `t('landing.advantages…')`.
+//
+// Without this, users whose browser language is e.g. ja-JP / zh-TW would
+// see English copy on first visit, even though we have full translations
+// ready in the lazy chunk. Reported in the 2026-07-05 landing-page audit.
+const __initialLocale = detectInitialLocale()
+if (!loaded.has(__initialLocale) && LAZY_LOADERS[__initialLocale]) {
+  // Fire-and-forget; the messages will be merged before the user's first
+  // t() call lands in the next tick. If the import is in flight when the
+  // template evaluates, vue-i18n falls back to en-US (FALLBACK_LOCALE),
+  // and a subsequent re-render (after `loaded` flips) will pick up the
+  // translated strings.
+  LAZY_LOADERS[__initialLocale]()
+    .then((mod) => {
+      i18n.global.setLocaleMessage(__initialLocale, mod.default as never)
+      loaded.add(__initialLocale)
+    })
+    .catch((err) => {
+      // Swallow: the fallback chain (FALLBACK_LOCALE=en-US) still works.
+      console.warn(`[i18n] failed to preload ${__initialLocale}:`, err)
+    })
+}
+
 /** Apply <html lang> and <html dir> for the given locale (no-op in non-browser). */
 export function applyDocumentLocale(code: string): void {
   if (typeof document === 'undefined') return

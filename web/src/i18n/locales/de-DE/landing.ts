@@ -69,9 +69,9 @@ export default {
   advantagesTitle: 'Differenzierte Vorteile',
   advantagesSubtitle: 'Was globale Anbieter nicht bieten können',
   advantages: {
-    local: {
-      title: 'China-Lokalisierung',
-      description: 'Vollständige chinesische Benutzeroberfläche, Priorität für inländische Modelle, Alipay / WeChat Pay, MLPS-konforme Vorlagen',
+    openSource: {
+      title: 'Open Core',
+      description: 'Open-Core-Codebasis · Apache-2.0-freundliche Lizenz · Mitwirkende weltweit · Transparent & auditierbar',
     },
     private: {
       title: 'Private Bereitstellung',
@@ -86,31 +86,31 @@ export default {
       description: 'Natives Go, 40 MB leichtgewichtiges Image, 200 gleichzeitig P99 < 500 ms, stabiles SSE-Streaming-Relais',
     },
   },
-  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Private Bereitstellung · China-Lokalisierung',
+  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Private Bereitstellung · Open Core',
   ariaPoints: 'Highlights',
   roadmap: {
     title: 'Produktentwicklungs-Roadmap',
     subtitle: 'Von der LLM-Datenebene zum Enterprise-Agent-Gateway — kontinuierlich aufgebaut',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'API-Hub-Asset-Center + MCP-Tool-Hosting',
       description:
         'Einheitliche Registrierung von LLM-Endpunkten, MCP-Diensten und Agenten. Self-Service-Entdeckung und -Wiederverwendung für Entwickler.',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
+      phase: 'Step 2',
       title: 'Sicherheits-Schild GA + SIEM-Integration + SpecBoost',
       description:
         'Prompt-Injection-Blockierung, Maskierung sensibler Daten, intelligente API-Beschreibungs-Anreicherung zur Verbesserung der Function-Calling-Genauigkeit.',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'Agent-Registry + A2A-Protokoll-Gateway',
       description:
         'Mandantenübergreifende Aufgabendelegation und -Orchestrierung, einheitlicher Einstieg für OpenClaw und Geschäfts-Agenten.',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
+      phase: 'Step 4',
       title: 'Branchenlösungen GA',
       description:
         'Kundenservice-, HR-, Vertriebs- und Logistik-Branchenvorlagen — sofort einsatzbereite Agent-Lösungen.',

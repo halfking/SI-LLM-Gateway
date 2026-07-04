@@ -54,33 +54,36 @@ export default {
   advantagesTitle: '差異化優勢',
   advantagesSubtitle: '海外廠商給不了的能力',
   advantages: {
-    local: { title: '中國本地化', description: '全中文介面、國產模型優先、支付寶/微信支付接入、等保合規模板' },
+    openSource: {
+      title: '核心開源',
+      description: 'Open Core 開源核心 · Apache 2.0 友善授權 · 全球開發者共建 · 透明可審計',
+    },
     private: { title: '私有化部署', description: '完全私有部署，資料不出企業，k3s + Docker 雙形態，零外部依賴' },
     antiBan: { title: '抗封號體系', description: '50+ UA 輪換 + utls TLS 指紋池 + 11 瀏覽器 profile + 5 分鐘自動輪換' },
     perf: { title: 'Go 高效能資料面', description: '原生 Go 實作，40MB 輕量映像，200 並行 P99 < 500ms，SSE 串流穩定中繼' },
   },
-  footer: '開軒 LLM Gateway · [GATEWAY_DOMAIN] · 私有部署 · 中國本地化',
+  footer: '開軒 LLM Gateway · [GATEWAY_DOMAIN] · 私有部署 · 核心開源',
   ariaPoints: '核心亮點',
   roadmap: {
     title: '產品演進路線',
     subtitle: '從 LLM 資料面到企業 Agent 閘道，持續建置',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'API Hub 資產中心 + MCP 工具託管',
       description: '統一登記 LLM 端點、MCP 服務與 Agent，開發者自助發現與複用。',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
+      phase: 'Step 2',
       title: '安全護盾 GA + SIEM 對接 + SpecBoost',
       description: '提示詞注入攔截、敏感資料脫敏、API 描述智慧豐富提升 Function Calling 準確率。',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'Agent 註冊中心 + A2A 協定閘道',
       description: '跨智慧體任務委派與編排，OpenClaw 與業務 Agent 統一接入。',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
+      phase: 'Step 4',
       title: '行業方案 GA',
       description: '客服、人資、銷售、物流四大行業範本，開箱即用的智慧體方案。',
     },

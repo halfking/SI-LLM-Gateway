@@ -58,12 +58,15 @@ export default {
   advantagesTitle: '差异化优势',
   advantagesSubtitle: '海外厂商给不了的能力',
   advantages: {
-    local: { title: '中国本地化', description: '全中文界面、开源模型优先、支付宝/微信支付接入、等保合规模板' },
+    openSource: {
+      title: '核心开源',
+      description: 'Open Core 开源核心 · Apache 2.0 友好许可 · 全球开发者共建 · 透明可审计',
+    },
     private: { title: '私有化部署', description: '完全私有部署，数据不出企业，k3s + Docker 双形态，零外部依赖' },
     antiBan: { title: '抗封号体系', description: '50+ UA 轮换 + utls TLS 指纹池 + 11 浏览器 profile + 5 分钟自动轮换' },
     perf: { title: 'Go 高性能数据面', description: '原生 Go 实现，40MB 轻量镜像，200 并发 P99 < 500ms，SSE 流式稳定中继' },
   },
-  footer: '开轩 LLM Gateway · [GATEWAY_DOMAIN] · 私有部署 · 中国本地化',
+  footer: '开轩 LLM Gateway · [GATEWAY_DOMAIN] · 私有部署 · 核心开源',
   ariaPoints: '核心亮点',
   roadmap: {
     title: '产品演进路线',
