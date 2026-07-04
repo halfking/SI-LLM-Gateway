@@ -185,12 +185,12 @@ func TestIRConverter_Q3_OpenAI_To_Anthropic(t *testing.T) {
 // Anthropic client → irAdapter.ParseAnthropic → IR → irAdapter.SerializeOpenAI → OpenAI upstream.
 func TestIRConverter_Q2_Anthropic_To_OpenAI(t *testing.T) {
 	tests := []struct {
-		name         string
+		name          string
 		anthropicBody string
-		wantModel    string
-		wantSystem   string
-		wantMsgCount int
-		wantTools    bool
+		wantModel     string
+		wantSystem    string
+		wantMsgCount  int
+		wantTools     bool
 	}{
 		{
 			name: "basic message",
@@ -329,10 +329,10 @@ func TestIRConverter_FinalizeOpenAIUpstreamBody_IRPath(t *testing.T) {
 		RawModel:     "gpt-4o",
 	}
 	params := &ExecParams{
-		R:             req,
-		BodyBytes:     []byte(anthropicBody),
-		ClientModel:   "claude-3-5-sonnet",
-		OutboundModel: "gpt-4o",
+		R:              req,
+		BodyBytes:      []byte(anthropicBody),
+		ClientModel:    "claude-3-5-sonnet",
+		OutboundModel:  "gpt-4o",
 		ClientProtocol: "anthropic-messages",
 	}
 
@@ -385,10 +385,10 @@ func TestIRConverter_PrepareAnthropicRequestBody_IRPath(t *testing.T) {
 		RawModel:     "claude-3-5-sonnet",
 	}
 	params := &ExecParams{
-		R:             req,
-		BodyBytes:     []byte(openAIBody),
-		ClientModel:   "gpt-4o",
-		OutboundModel: "claude-3-5-sonnet",
+		R:              req,
+		BodyBytes:      []byte(openAIBody),
+		ClientModel:    "gpt-4o",
+		OutboundModel:  "claude-3-5-sonnet",
 		ClientProtocol: "openai-completions",
 	}
 
@@ -457,7 +457,7 @@ func TestIRConverter_RoundTrip_OpenAI_Anthropic_OpenAI(t *testing.T) {
 		"messages": [
 			{"role": "system", "content": "you are a helpful assistant"},
 			{"role": "user", "content": "what's the weather in tokyo?"},
-			{"role": "assistant", "content": "I'll check that for you"},
+			{"role": "assistant", "content": "", "tool_calls": [{"id": "call_123", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\":\"tokyo\"}"}}]},
 			{"role": "tool", "tool_call_id": "call_123", "content": "sunny, 25C"},
 			{"role": "assistant", "content": "It's sunny and 25C in Tokyo!"}
 		],
