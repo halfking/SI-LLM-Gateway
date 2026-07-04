@@ -40,6 +40,27 @@ const wsUrl = computed(() => {
 
 const showWsUrl = ref(false)
 
+// 选中的分组项和状态项（用于高亮显示）
+const selectedGroups = ref<Set<string>>(new Set())
+const selectedStatuses = ref<Set<string>>(new Set())
+
+// 处理图例项选中/反选
+function handleLegendToggle(type: 'group' | 'status', key: string) {
+  if (type === 'group') {
+    if (selectedGroups.value.has(key)) {
+      selectedGroups.value.delete(key)
+    } else {
+      selectedGroups.value.add(key)
+    }
+  } else {
+    if (selectedStatuses.value.has(key)) {
+      selectedStatuses.value.delete(key)
+    } else {
+      selectedStatuses.value.add(key)
+    }
+  }
+}
+
 // 监听新请求，累计统计
 watch(requests, (newReqs, oldReqs) => {
   const oldIds = new Set(oldReqs.filter(r => r.request_id).map(r => r.request_id!))
@@ -135,7 +156,7 @@ const visibleCount = computed(() => {
 const VENDOR_COLORS = ['#10a37f', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e', '#84cc16']
 
 // 动态泳道配置：Top 6 热门原厂/供应商/模型 + Other
-const TOP_N = 6
+const TOP_N = 5  // 改为 Top 5，符合需求
 const lanes = computed(() => {
   if (groupMode.value === 'vendor') {
     const topVendors = vendorStats.value.slice(0, TOP_N).map(([vendor]) => vendor)
@@ -198,6 +219,58 @@ const lanes = computed(() => {
     ]
   }
 })
+
+// 图例数据：根据分组模式动态生成
+const legendItems = computed(() => {
+  return lanes.value.map(lane => ({
+    key: lane.key,
+    label: lane.label,
+    color: lane.color,
+  }))
+})
+
+// 判断某个请求是否应该高亮显示
+function shouldHighlight(req: LiveRequest): boolean {
+  // 如果没有选中任何图例项，则不高亮
+  if (selectedGroups.value.size === 0 && selectedStatuses.value.size === 0) {
+    return false
+  }
+  
+  // 检查分组维度是否匹配
+  let groupMatch = selectedGroups.value.size === 0
+  if (selectedGroups.value.size > 0) {
+    const laneKey = getLaneKey(req)
+    groupMatch = selectedGroups.value.has(laneKey)
+  }
+  
+  // 检查状态维度是否匹配
+  let statusMatch = selectedStatuses.value.size === 0
+  if (selectedStatuses.value.size > 0 && req.type === 'request') {
+    const status = req.status || 'in_progress'
+    if (status === 'success') {
+      statusMatch = selectedStatuses.value.has('success')
+    } else if (status === 'in_progress') {
+      statusMatch = selectedStatuses.value.has('in_progress')
+    } else if (status === 'failure') {
+      // 根据 error_kind 判断具体的失败类型
+      const k = (req.error_kind || '').toLowerCase()
+      if (/(timeout|timedout|cancel|disconnect)/.test(k)) {
+        statusMatch = selectedStatuses.value.has('failure_timeout')
+      } else if (/(5xx|server|upstream|provider|overloaded|backend)/.test(k)) {
+        statusMatch = selectedStatuses.value.has('failure_5xx')
+      } else if (/(4xx|auth|unauthor|forbidden|quota|rate|billing|payment)/.test(k)) {
+        statusMatch = selectedStatuses.value.has('failure_4xx')
+      } else if (/(not_found|model_not|route|no_route|resolve|policy)/.test(k)) {
+        statusMatch = selectedStatuses.value.has('failure_not_found')
+      } else {
+        statusMatch = selectedStatuses.value.has('failure_other')
+      }
+    }
+  }
+  
+  // 同时满足分组和状态的匹配才高亮
+  return groupMatch && statusMatch
+}
 
 // 将请求分配到对应泳道
 function getLaneKey(req: LiveRequest): string {
@@ -413,6 +486,13 @@ function onSelect(requestId: string) {
       <code>{{ wsUrl }}</code>
     </div>
 
+    <!-- 图例：放在标题栏下一行 -->
+    <LiveStreamLegend 
+      :group-mode="groupMode"
+      :group-items="legendItems"
+      @toggle-selection="handleLegendToggle"
+    />
+
     <!-- 泳道容器 -->
     <div class="live-stream-lanes__container">
       <div
@@ -436,6 +516,7 @@ function onSelect(requestId: string) {
               :key="req.request_id ?? `idle-${lane.key}-${idx}-${req.ts}`"
               :request="req"
               :group-mode="groupMode"
+              :highlight="shouldHighlight(req)"
               @select="onSelect"
             />
           </TransitionGroup>
@@ -448,9 +529,6 @@ function onSelect(requestId: string) {
         </div>
       </div>
     </div>
-
-    <!-- 图例 -->
-    <LiveStreamLegend />
   </div>
 </template>
 

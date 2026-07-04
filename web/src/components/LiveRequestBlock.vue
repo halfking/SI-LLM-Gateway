@@ -38,6 +38,8 @@ const props = defineProps<{
   request: LiveRequest
   /** 分组模式：vendor=原厂, provider=供应商, model=模型 */
   groupMode?: 'vendor' | 'provider' | 'model'
+  /** 是否高亮显示（当图例被选中时） */
+  highlight?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -305,6 +307,7 @@ function hexToRgba(hex: string, alpha: number): string {
       'live-block--clickable': !!request.request_id,
       'live-block--in-progress': isPulsing,
       'live-block--failure': request.status === 'failure',
+      'live-block--highlight': highlight,
     }"
     role="button"
     tabindex="0"
@@ -389,6 +392,19 @@ function hexToRgba(hex: string, alpha: number): string {
 /* Failure: an extra slight scale-up hint + a subtle red glow. */
 .live-block--failure {
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4) inset;
+}
+
+/* Highlight: 图例选中时的高亮效果 */
+.live-block--highlight {
+  transform: scale(1.1);
+  z-index: 10;
+  box-shadow: 0 0 12px 2px rgba(99, 102, 241, 0.6);
+  animation: live-block-highlight-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes live-block-highlight-pulse {
+  0%, 100% { box-shadow: 0 0 12px 2px rgba(99, 102, 241, 0.6); }
+  50%      { box-shadow: 0 0 18px 4px rgba(99, 102, 241, 0.8); }
 }
 
 /* Line 1: time HH:MM (居中对齐). */

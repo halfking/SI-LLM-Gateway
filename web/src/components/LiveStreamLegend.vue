@@ -1,141 +1,230 @@
 <script setup lang="ts">
-// LiveStreamLegend — colour key for the swim lane.
-//
-// Two rows of swatches: model family + status. Reused palette from
-// composables/liveStreamColors so the legend and the tiles stay
-// visually identical without hard-coding hex strings in two places.
-//
-// 2026-07-04: Updated to support dynamic provider list from top providers API
-// instead of hardcoded openai/anthropic/domestic/oss/other categories.
-import { ref, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import {
-  MODEL_COLORS,
-  STATUS_COLORS,
-  MODEL_FAMILY_LABELS,
-  STATUS_LABELS,
-  loadTopProviders,
-} from '../composables/liveStreamColors'
+/**
+ * LiveStreamLegend — 动态图例，支持选中/反选高亮
+ *
+ * 2026-07-05 重构：
+ * - 左侧：根据分组模式显示Top5（原厂/供应商/模型）+ 其它
+ * - 右侧：详细状态（成功/进行中/失败细分）
+ * - 支持点击选中/反选，高亮对应tile
+ */
+import { computed, ref } from 'vue'
 
-const { t } = useI18n()
+type GroupMode = 'vendor' | 'provider' | 'model'
 
-// Track if providers are loaded
-const providersLoaded = ref(false)
+interface LegendItem {
+  key: string
+  label: string
+  color: string
+}
 
-// Computed property for model entries that updates when MODEL_COLORS changes
-const modelEntries = computed(() => {
-  const keys = Object.keys(MODEL_COLORS).filter(k => k !== 'other')
-  const entries = keys.map((key) => ({
-    key,
-    color: MODEL_COLORS[key],
-    label: MODEL_FAMILY_LABELS[key] || key,
-  }))
-  
-  // Add "other" at the end
-  entries.push({
-    key: 'other',
-    color: MODEL_COLORS.other,
-    label: MODEL_FAMILY_LABELS.other || 'Other',
-  })
-  
-  return entries
+const props = defineProps<{
+  /** 分组模式 */
+  groupMode: GroupMode
+  /** 分组维度的统计数据（Top5 + Other） */
+  groupItems: LegendItem[]
+}>()
+
+const emit = defineEmits<{
+  /** 图例项被选中/反选 */
+  toggleSelection: [type: 'group' | 'status', key: string]
+}>()
+
+// 选中的分组项（原厂/供应商/模型）
+const selectedGroups = ref<Set<string>>(new Set())
+
+// 选中的状态项
+const selectedStatuses = ref<Set<string>>(new Set())
+
+// 详细状态图例（细化错误类型）
+const statusLegend = [
+  { key: 'success', label: '成功', color: 'rgba(34, 197, 94, 0.85)', borderWidth: '2px' },
+  { key: 'in_progress', label: '进行中', color: 'rgba(245, 158, 11, 0.95)', borderWidth: '2px' },
+  { key: 'failure_timeout', label: '超时', color: 'rgba(239, 68, 68, 0.95)', borderWidth: '3px' },
+  { key: 'failure_5xx', label: '服务端错误', color: 'rgba(220, 38, 38, 0.95)', borderWidth: '3px' },
+  { key: 'failure_4xx', label: '客户端错误', color: 'rgba(239, 68, 68, 0.85)', borderWidth: '3px' },
+  { key: 'failure_not_found', label: '未找到', color: 'rgba(239, 68, 68, 0.75)', borderWidth: '3px' },
+  { key: 'failure_other', label: '其它失败', color: 'rgba(239, 68, 68, 0.65)', borderWidth: '3px' },
+]
+
+// 分组标题
+const groupTitle = computed(() => {
+  if (props.groupMode === 'vendor') return '原厂'
+  if (props.groupMode === 'provider') return '供应商'
+  return '模型'
 })
 
-const statusEntries = (['success', 'inProgress', 'failure'] as const).map((key) => ({
-  key,
-  color: STATUS_COLORS[key === 'inProgress' ? 'in_progress' : key],
-  label: t(`dashboard.liveStream.legend.${key}`, STATUS_LABELS[key === 'inProgress' ? 'in_progress' : key]),
-}))
+// 切换分组项选中状态
+function toggleGroup(key: string) {
+  if (selectedGroups.value.has(key)) {
+    selectedGroups.value.delete(key)
+  } else {
+    selectedGroups.value.add(key)
+  }
+  emit('toggleSelection', 'group', key)
+}
 
-// Load top providers on mount
-onMounted(async () => {
-  await loadTopProviders(6, 7) // Top 6 providers from last 7 days
-  providersLoaded.value = true
-})
+// 切换状态项选中状态
+function toggleStatus(key: string) {
+  if (selectedStatuses.value.has(key)) {
+    selectedStatuses.value.delete(key)
+  } else {
+    selectedStatuses.value.add(key)
+  }
+  emit('toggleSelection', 'status', key)
+}
 </script>
 
 <template>
   <div class="live-legend">
-    <div class="live-legend__row">
-      <span class="live-legend__heading">{{ t('dashboard.liveStream.legend.model') }}</span>
-      <span
-        v-for="m in modelEntries"
-        :key="m.key"
-        class="live-legend__item"
-      >
-        <span
-          class="live-legend__swatch"
-          :style="{ background: m.color }"
-          aria-hidden="true"
-        />
-        <span class="live-legend__label">{{ m.label }}</span>
-      </span>
+    <!-- 左侧：分组维度图例（原厂/供应商/模型） -->
+    <div class="live-legend__section live-legend__section--left">
+      <span class="live-legend__heading">{{ groupTitle }}</span>
+      <div class="live-legend__items">
+        <button
+          v-for="item in groupItems"
+          :key="item.key"
+          type="button"
+          class="live-legend__item"
+          :class="{ 'live-legend__item--selected': selectedGroups.has(item.key) }"
+          @click="toggleGroup(item.key)"
+        >
+          <span
+            class="live-legend__swatch live-legend__swatch--bg"
+            :style="{ background: item.color }"
+            aria-hidden="true"
+          />
+          <span class="live-legend__label">{{ item.label }}</span>
+        </button>
+      </div>
     </div>
-    <div class="live-legend__row">
-      <span class="live-legend__heading">{{ t('dashboard.liveStream.legend.status') }}</span>
-      <span
-        v-for="s in statusEntries"
-        :key="s.key"
-        class="live-legend__item"
-      >
-        <span
-          class="live-legend__swatch"
-          :style="{ background: s.color }"
-          aria-hidden="true"
-        />
-        <span class="live-legend__label">{{ s.label }}</span>
-      </span>
+
+    <!-- 右侧：状态图例 -->
+    <div class="live-legend__section live-legend__section--right">
+      <span class="live-legend__heading">状态</span>
+      <div class="live-legend__items">
+        <button
+          v-for="item in statusLegend"
+          :key="item.key"
+          type="button"
+          class="live-legend__item"
+          :class="{ 'live-legend__item--selected': selectedStatuses.has(item.key) }"
+          @click="toggleStatus(item.key)"
+        >
+          <span
+            class="live-legend__swatch live-legend__swatch--border"
+            :style="{ borderColor: item.color, borderWidth: item.borderWidth }"
+            aria-hidden="true"
+          />
+          <span class="live-legend__label">{{ item.label }}</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* 2026-07-03 dark-mode audit: pull every fallback to the project's
- * --muted / --text / --border tokens so the legend blends with the
- * surrounding dashboard chrome instead of rendering as a bright bar.
- */
+/* 2026-07-05 图例重构：左右分布，支持点击选中/反选 */
 .live-legend {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  font-size: 12px;
+  justify-content: space-between;
+  gap: 24px;
+  font-size: 11px;
   color: var(--muted, #8b949e);
-  padding: 8px 4px 2px;
-  margin-top: 4px;
-  border-top: 1px solid var(--border, #30363d);
+  padding: 10px 8px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border, #30363d);
+  border-radius: 6px;
+  background: var(--bg-subtle, #161b22);
 }
 
-.live-legend__row {
+.live-legend__section {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 12px;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.live-legend__section--left {
+  justify-content: flex-start;
+}
+
+.live-legend__section--right {
+  justify-content: flex-end;
 }
 
 .live-legend__heading {
   font-weight: 600;
   color: var(--text, #e6edf3);
-  margin-inline-end: 4px;
+  font-size: 12px;
+  flex-shrink: 0;
+  min-width: 40px;
+}
+
+.live-legend__items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .live-legend__item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.live-legend__item:hover {
+  background: var(--bg, #0f1117);
+  border-color: var(--border, #30363d);
+}
+
+/* 选中状态：明显的边框和背景 */
+.live-legend__item--selected {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+}
+
+.live-legend__item--selected .live-legend__label {
+  color: #fff;
+  font-weight: 600;
 }
 
 .live-legend__swatch {
   display: inline-block;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 3px;
-  /* Subtle 1px inner highlight keeps the swatch from looking like
-   * a hole punched in the dark card. */
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+/* 背景色色块 */
+.live-legend__swatch--bg {
+  opacity: 0.5;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* 边框色块 */
+.live-legend__swatch--border {
+  background: transparent;
+  border-style: solid;
+  box-shadow: inset 0 0 0 1px rgba(139, 148, 158, 0.2);
 }
 
 .live-legend__label {
   line-height: 1;
   color: var(--muted, #8b949e);
+  font-size: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
 }
 </style>
