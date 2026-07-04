@@ -128,7 +128,7 @@ function initializeLaneQueues() {
 function upsertRequest(laneKey: string, req: LiveRequest) {
   const queue = laneQueues.value.get(laneKey)
   if (!queue) {
-    console.warn(`[LiveStreamLanes] lane ${laneKey} not found`)
+    console.warn(`[LiveStreamLanes] lane ${laneKey} not found, available lanes:`, Array.from(laneQueues.value.keys()))
     return
   }
 
@@ -152,6 +152,7 @@ function upsertRequest(laneKey: string, req: LiveRequest) {
 
   // 推到队尾
   queue.push(req)
+  console.log(`[LiveStreamLanes] pushed request ${requestId} to lane ${laneKey}, queue size: ${queue.length}`)
 
   // 限制队列长度
   if (queue.length > MAX_PER_LANE) {
