@@ -54,7 +54,7 @@ func (h *Handler) handleTopProviders(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT 
 			COALESCE(p.catalog_code, '') AS provider_code,
-			COALESCE(p.name, p.catalog_code, 'Unknown') AS provider_name,
+			COALESCE(p.display_name, p.catalog_code, 'Unknown') AS provider_name,
 			COUNT(*) AS request_count
 		FROM request_logs rl
 		LEFT JOIN providers p ON rl.provider_id = p.id
@@ -62,7 +62,7 @@ func (h *Handler) handleTopProviders(w http.ResponseWriter, r *http.Request) {
 			AND p.catalog_code IS NOT NULL
 			AND p.catalog_code != ''
 			AND p.enabled = TRUE
-		GROUP BY p.catalog_code, p.name
+		GROUP BY p.catalog_code, p.display_name
 		ORDER BY request_count DESC
 		LIMIT $2
 	`
