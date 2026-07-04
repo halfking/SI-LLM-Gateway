@@ -255,7 +255,7 @@ watch(requests, (newReqs) => {
   pendingRequests.push(...newItems)
   console.log('[LiveStreamLanes] pendingRequests queue size:', pendingRequests.length)
   scheduleBatchUpdate()
-})
+}, { deep: true }) // 🔥 必须监听深层变化，因为 requests.value.push() 修改的是数组内容
 
 // 模型名 → 原厂（vendor/manufacturer）
 // 不强调地域，只按模型的实际研发公司分类
