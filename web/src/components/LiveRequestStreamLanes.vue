@@ -26,6 +26,9 @@ const { requests, connection, paused, togglePause } = useLiveStream()
 type GroupMode = 'vendor' | 'provider' | 'model'
 const groupMode = ref<GroupMode>('vendor')
 
+// 初始统计加载状态
+const initialStatsLoaded = ref(false)
+
 // 累计统计（从开始显示到现在）
 const cumulativeStats = ref({
   vendor: new Map<string, number>(),
@@ -54,6 +57,9 @@ async function loadInitialStats() {
       cumulativeStats.value.model.set(model, count)
     }
     
+    initialStatsLoaded.value = true  // 标记加载完成
+    console.log('[LiveStreamLanes] initial stats loaded, vendor count:', cumulativeStats.value.vendor.size)
+    
     console.log('[LiveStreamLanes] initialized cumulative stats:', {
       vendorCount: cumulativeStats.value.vendor.size,
       providerCount: cumulativeStats.value.provider.size,
@@ -61,6 +67,8 @@ async function loadInitialStats() {
     })
   } catch (error) {
     console.error('[LiveStreamLanes] failed to load initial stats:', error)
+    // 加载失败也标记为已完成，避免永远卡在加载状态
+    initialStatsLoaded.value = true
   }
 }
 
@@ -84,50 +92,132 @@ function handleLegendToggle(type: 'group' | 'status', key: string) {
     } else {
       selectedGroups.value.add(key)
     }
+    // 触发响应式更新
+    selectedGroups.value = new Set(selectedGroups.value)
   } else {
     if (selectedStatuses.value.has(key)) {
       selectedStatuses.value.delete(key)
     } else {
       selectedStatuses.value.add(key)
     }
+    // 触发响应式更新
+    selectedStatuses.value = new Set(selectedStatuses.value)
   }
 }
 
-// 监听新请求，累计统计（调试：添加日志）
-watch(requests, (newReqs, oldReqs) => {
-  console.log('[LiveStreamLanes] requests changed:', {
-    oldCount: oldReqs.length,
-    newCount: newReqs.length,
-    newReqs: newReqs.slice(-3), // 最后3个
-  })
-  
-  const oldIds = new Set(oldReqs.filter(r => r.request_id).map(r => r.request_id!))
-  const newItems = newReqs.filter(r => r.type === 'request' && r.request_id && !oldIds.has(r.request_id))
-  
-  console.log('[LiveStreamLanes] new items:', newItems.length)
-  
-  for (const req of newItems) {
+// 每个泳道的请求队列（独立管理，避免每次重新计算）
+// 使用 shallowRef 避免深度响应式开销
+const laneQueues = ref<Map<string, LiveRequest[]>>(new Map())
+
+// 请求ID索引：快速查找请求在哪个泳道
+const requestLaneIndex = new Map<string, string>()
+
+// 初始化泳道队列
+function initializeLaneQueues() {
+  const queues = new Map<string, LiveRequest[]>()
+  for (const lane of lanes.value) {
+    queues.set(lane.key, [])
+  }
+  laneQueues.value = queues
+  // 清空索引
+  requestLaneIndex.clear()
+  console.log('[LiveStreamLanes] initialized lane queues:', Array.from(queues.keys()))
+}
+
+// 去重更新：如果请求已存在，移除旧位置，推到队尾
+function upsertRequest(laneKey: string, req: LiveRequest) {
+  const queue = laneQueues.value.get(laneKey)
+  if (!queue) {
+    console.warn(`[LiveStreamLanes] lane ${laneKey} not found`)
+    return
+  }
+
+  const requestId = req.request_id
+  if (!requestId) {
+    // idle_marker 等非请求类型，直接追加
+    queue.push(req)
+    if (queue.length > MAX_PER_LANE) {
+      queue.shift()
+    }
+    return
+  }
+
+  // 检查是否已存在（去重更新）
+  const existingIdx = queue.findIndex(r => r.request_id === requestId)
+  if (existingIdx >= 0) {
+    // 移除旧位置
+    queue.splice(existingIdx, 1)
+    console.log(`[LiveStreamLanes] removed duplicate ${requestId} from position ${existingIdx}`)
+  }
+
+  // 推到队尾
+  queue.push(req)
+
+  // 限制队列长度
+  if (queue.length > MAX_PER_LANE) {
+    const removed = queue.shift()
+    if (removed?.request_id) {
+      requestLaneIndex.delete(removed.request_id)
+    }
+  }
+
+  // 更新索引
+  requestLaneIndex.set(requestId, laneKey)
+}
+
+// 监听新请求，直接推入对应泳道（使用 RAF 批量处理）
+let pendingRequests: LiveRequest[] = []
+let rafHandle: number | null = null
+
+function processPendingRequests() {
+  rafHandle = null
+  const batch = pendingRequests.splice(0)
+  if (batch.length === 0) return
+
+  console.log('[LiveStreamLanes] processing batch:', batch.length)
+
+  for (const req of batch) {
     // 累计原厂统计
     const vendor = identifyVendor(req.model)
     cumulativeStats.value.vendor.set(vendor, (cumulativeStats.value.vendor.get(vendor) || 0) + 1)
-    
+
     // 累计供应商统计
     if (req.provider_code) {
       cumulativeStats.value.provider.set(req.provider_code, (cumulativeStats.value.provider.get(req.provider_code) || 0) + 1)
     }
-    
+
     // 累计模型统计
     if (req.model) {
       cumulativeStats.value.model.set(req.model, (cumulativeStats.value.model.get(req.model) || 0) + 1)
     }
+
+    // 推入对应泳道（带去重）
+    const laneKey = getLaneKey(req)
+    upsertRequest(laneKey, req)
   }
-  
-  console.log('[LiveStreamLanes] cumulative stats:', {
-    vendorCount: cumulativeStats.value.vendor.size,
-    providerCount: cumulativeStats.value.provider.size,
-    modelCount: cumulativeStats.value.model.size,
-  })
-}, { deep: true })
+
+  // 触发响应式更新（浅层拷贝）
+  laneQueues.value = new Map(laneQueues.value)
+}
+
+function scheduleBatchUpdate() {
+  if (rafHandle === null) {
+    rafHandle = requestAnimationFrame(processPendingRequests)
+  }
+}
+
+watch(requests, (newReqs, oldReqs) => {
+  const oldIds = new Set(oldReqs.filter(r => r.request_id).map(r => r.request_id!))
+  const newItems = newReqs.filter(r => r.type === 'request' && r.request_id && !oldIds.has(r.request_id))
+
+  if (newItems.length === 0) return
+
+  console.log('[LiveStreamLanes] detected', newItems.length, 'new requests')
+
+  // 加入待处理队列
+  pendingRequests.push(...newItems)
+  scheduleBatchUpdate()
+}, { deep: false }) // 🔥 改为浅层监听，减少开销
 
 // 模型名 → 原厂（vendor/manufacturer）
 // 不强调地域，只按模型的实际研发公司分类
@@ -318,14 +408,18 @@ function shouldHighlight(req: LiveRequest): boolean {
   return groupMatch && statusMatch
 }
 
+// 固定的知名原厂列表（避免依赖累计统计导致初始化问题）
+const KNOWN_VENDORS = ['OpenAI', 'Anthropic', 'Google', 'Meta', 'xAI', 'Mistral', 'Cohere', 'DeepSeek']
+
 // 将请求分配到对应泳道
 function getLaneKey(req: LiveRequest): string {
   if (req.type === 'idle_marker') return OTHER_VENDOR
 
   if (groupMode.value === 'vendor') {
     const vendor = identifyVendor(req.model)
-    const topVendors = vendorStats.value.slice(0, TOP_N).map(([v]) => v)
-    return topVendors.includes(vendor) ? vendor : OTHER_VENDOR
+    // 🔥 修复：使用固定的知名原厂列表，不依赖 vendorStats
+    // 这样即使在 loadInitialStats 完成前，新请求也能正确分配到对应泳道
+    return KNOWN_VENDORS.includes(vendor) ? vendor : OTHER_VENDOR
   } else if (groupMode.value === 'provider') {
     if (!req.provider_code) return OTHER_VENDOR
     const topProviders = providerStats.value.slice(0, TOP_N).map(([c]) => c)
@@ -338,55 +432,11 @@ function getLaneKey(req: LiveRequest): string {
   }
 }
 
-// 按泳道分组请求，支持去重和自动移动到末尾
-// 优化版：使用 Map 提升性能，从 O(n²) 降至 O(n)
+// 🔥 新方案：直接从泳道队列获取请求，不再计算
+// 使用 computed 包裹，确保响应式更新
 const laneRequests = computed(() => {
-  console.log('[laneRequests] computing, requests.length:', requests.value.length)
-  console.log('[laneRequests] lanes:', lanes.value.map(l => l.key))
-  
-  const grouped = new Map<string, LiveRequest[]>()
-
-  // 初始化所有泳道
-  for (const lane of lanes.value) {
-    grouped.set(lane.key, [])
-  }
-
-  // 优化的去重逻辑：使用 Map 跟踪每个 request_id 的最新版本
-  const latestRequestMap = new Map<string, LiveRequest>()
-  const idleMarkers: LiveRequest[] = []
-  
-  // 第一遍：找到每个 request_id 的最新版本
-  for (const req of requests.value) {
-    if (req.type === 'request' && req.request_id) {
-      // 同一个 request_id 只保留最后一次出现（自动去重）
-      latestRequestMap.set(req.request_id, req)
-    } else if (req.type === 'idle_marker') {
-      idleMarkers.push(req)
-    }
-  }
-  
-  console.log('[laneRequests] latestRequestMap size:', latestRequestMap.size)
-  
-  // 第二遍：将最新版本的请求分配到对应泳道
-  for (const req of latestRequestMap.values()) {
-    const laneKey = getLaneKey(req)
-    const lane = grouped.get(laneKey)
-    if (lane) {
-      lane.push(req)
-    }
-  }
-  
-  // idle_marker 分配到 Other 泳道
-  for (const req of idleMarkers) {
-    const lane = grouped.get(OTHER_VENDOR)
-    if (lane) lane.push(req)
-  }
-
-  console.log('[laneRequests] result:', 
-    Array.from(grouped.entries()).map(([k, v]) => `${k}: ${v.length}`).join(', ')
-  )
-
-  return grouped
+  // 返回当前泳道队列的快照
+  return laneQueues.value
 })
 
 // 每个泳道最多显示的请求数
@@ -424,6 +474,9 @@ onMounted(async () => {
   // 加载初始统计数据
   await loadInitialStats()
   
+  // 🔥 初始化泳道队列
+  initializeLaneQueues()
+  
   // 初始化排序
   sortedLanes.value = [...lanes.value].sort((a, b) => {
     if (b.count !== a.count) return b.count - a.count
@@ -445,10 +498,37 @@ onBeforeUnmount(() => {
     cancelAnimationFrame(rafId)
     rafId = null
   }
+  if (rafHandle !== null) {
+    cancelAnimationFrame(rafHandle)
+    rafHandle = null
+  }
 })
 
-// 当分组模式切换时，立即重新排序
+// 当分组模式切换时，需要重新分配所有请求到新泳道
 watch(groupMode, () => {
+  console.log('[LiveStreamLanes] group mode changed to:', groupMode.value)
+  
+  // 收集所有现有请求
+  const allRequests: LiveRequest[] = []
+  for (const queue of laneQueues.value.values()) {
+    allRequests.push(...queue)
+  }
+  
+  // 重新初始化泳道队列
+  initializeLaneQueues()
+  
+  // 重新分配所有请求到新泳道
+  for (const req of allRequests) {
+    if (req.type === 'request') {
+      const laneKey = getLaneKey(req)
+      upsertRequest(laneKey, req)
+    }
+  }
+  
+  // 触发响应式更新
+  laneQueues.value = new Map(laneQueues.value)
+  
+  // 立即重新排序
   sortedLanes.value = [...lanes.value].sort((a, b) => {
     if (b.count !== a.count) return b.count - a.count
     return a.key.localeCompare(b.key)
@@ -552,7 +632,10 @@ function onSelect(requestId: string) {
     />
 
     <!-- 泳道容器 -->
-    <div class="live-stream-lanes__container">
+    <div v-if="!initialStatsLoaded" class="live-stream-lanes__loading">
+      <span class="live-stream-lanes__loading-text">{{ t('dashboard.liveStream.loadingStats') }}</span>
+    </div>
+    <div v-else class="live-stream-lanes__container">
       <div
         v-for="lane in sortedLanes"
         :key="lane.key"
@@ -868,25 +951,53 @@ function onSelect(requestId: string) {
   pointer-events: none;
 }
 
-/* 泳道滑入动画 */
+// 泳道轨道滑入动画：新请求从右侧滑入
 .lane-slide-enter-active {
   transition:
-    transform 0.4s cubic-bezier(0.18, 1.25, 0.32, 1.0),
-    opacity 0.3s ease;
+    transform 0.45s cubic-bezier(0.18, 1.25, 0.32, 1.0),
+    opacity 0.35s ease;
 }
 
 .lane-slide-enter-from {
   opacity: 0;
-  transform: translateX(30px);
+  transform: translateX(40px);
+}
+
+// 移动到队尾动画（去重更新时）
+.lane-slide-move {
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .lane-slide-leave-active {
-  transition: transform 0.25s ease, opacity 0.25s ease;
+  transition: transform 0.3s ease, opacity 0.3s ease;
   position: absolute;
 }
 
 .lane-slide-leave-to {
   opacity: 0;
-  transform: translateX(-15px);
+  transform: translateX(-20px);
+}
+
+/* 加载状态 */
+.live-stream-lanes__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--muted, #8b949e);
+}
+
+.live-stream-lanes__loading-text {
+  font-size: 14px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 </style>

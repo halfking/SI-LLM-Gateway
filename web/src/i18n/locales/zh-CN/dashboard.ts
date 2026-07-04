@@ -106,6 +106,7 @@ export default {
     groupByProvider: '按供应商',
     groupByModel: '按模型',
     other: '其他',
+    loadingStats: '加载统计数据中…',
     legend: {
       title: '图例',
       model: '供应商',

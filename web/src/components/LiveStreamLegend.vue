@@ -53,23 +53,27 @@ const groupTitle = computed(() => {
   return '模型'
 })
 
-// 切换分组项选中状态
+// 切换分组项选中状态（反转操作）
 function toggleGroup(key: string) {
   if (selectedGroups.value.has(key)) {
     selectedGroups.value.delete(key)
   } else {
     selectedGroups.value.add(key)
   }
+  // 触发响应式更新
+  selectedGroups.value = new Set(selectedGroups.value)
   emit('toggleSelection', 'group', key)
 }
 
-// 切换状态项选中状态
+// 切换状态项选中状态（反转操作）
 function toggleStatus(key: string) {
   if (selectedStatuses.value.has(key)) {
     selectedStatuses.value.delete(key)
   } else {
     selectedStatuses.value.add(key)
   }
+  // 触发响应式更新
+  selectedStatuses.value = new Set(selectedStatuses.value)
   emit('toggleSelection', 'status', key)
 }
 </script>
@@ -189,15 +193,26 @@ function toggleStatus(key: string) {
   border-color: var(--border, #30363d);
 }
 
-/* 选中状态：明显的边框和背景 */
+/* 选中状态：醒目的边框和背景，带脉冲动画 */
 .live-legend__item--selected {
-  background: var(--accent, #6366f1);
+  background: rgba(99, 102, 241, 0.15);
   border-color: var(--accent, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  animation: legend-pulse 2s ease-in-out infinite;
+}
+
+@keyframes legend-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5);
+  }
 }
 
 .live-legend__item--selected .live-legend__label {
-  color: #fff;
-  font-weight: 600;
+  color: var(--accent, #6366f1);
+  font-weight: 700;
 }
 
 .live-legend__swatch {

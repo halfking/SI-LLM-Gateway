@@ -109,6 +109,7 @@ export default {
     groupByProvider: 'By provider',
     groupByModel: 'By model',
     other: 'Other',
+    loadingStats: 'Loading statistics…',
     legend: {
       title: 'Legend',
       model: 'Provider',
