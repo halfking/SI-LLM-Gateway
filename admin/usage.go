@@ -1449,14 +1449,14 @@ func identifyVendorFromModel(model string) string {
 // matches 辅助函数：检查模型名是否包含任一关键词
 func matches(model string, keywords ...string) bool {
 	for _, kw := range keywords {
-		if contains(model, kw) {
+		if containsSubstring(model, kw) {
 			return true
 		}
 	}
 	return false
 }
 
-func contains(s, substr string) bool {
+func containsSubstring(s, substr string) bool {
 	// 简单的子串匹配（大小写不敏感）
 	sLower := ""
 	subLower := ""
