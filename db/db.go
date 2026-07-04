@@ -321,13 +321,11 @@ func (d *DB) ensureRequestLogSchema(ctx context.Context) error {
 	-- Idempotent: WHERE request_status IS NULL OR request_status = ''
 	-- matches nothing once the first run completes.
 	--
-	-- 2026-07-03 FIX: Wrap UPDATE in DO block to handle Citus columnar
-	-- table limitation (UPDATE with CTID scan not supported). If the
-	-- UPDATE fails (e.g., on columnar request_logs), the schema init
-	-- continues instead of disabling the entire database connection.
+	-- 2026-07-04: UPDATE request_logs_default (heap) only, not columnar
+	-- partitions. Wrapped in DO block to handle any remaining edge cases.
 	DO $$
 	BEGIN
-	    UPDATE request_logs rl
+	    UPDATE request_logs_default rl
 	    SET request_status = CASE
 	        WHEN rl.success THEN 'success'
 	        WHEN rl.error_kind IS NOT NULL AND rl.error_kind <> '' THEN 'failure'

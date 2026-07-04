@@ -1,6 +1,10 @@
 #!/bin/bash
 # archive-request-logs.sh
 # 归档指定时间段的 request_logs 数据到压缩文件
+#
+# 2026-07-04: SELECT/COPY 仍然走父表（聚合所有分区，符合规范）；
+# 但 DELETE 阶段只清 *_default（heap）。如果想彻底清理列存分区的数据，
+# 请用 DROP PARTITION request_logs_YYYY_MM，而不是 DELETE 列存表。
 
 set -euo pipefail
 
@@ -206,7 +210,7 @@ if [[ "$DELETE_AFTER" == true ]]; then
         DELETE_START=$(date +%s)
         
         PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c \
-            "DELETE FROM request_logs WHERE ts >= '$FROM_DATE'::date AND ts < '$TO_DATE'::date + INTERVAL '1 day';"
+            "DELETE FROM request_logs_default WHERE ts >= '$FROM_DATE'::date AND ts < '$TO_DATE'::date + INTERVAL '1 day';"
         
         DELETE_END=$(date +%s)
         DELETE_DURATION=$((DELETE_END - DELETE_START))

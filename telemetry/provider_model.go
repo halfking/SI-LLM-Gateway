@@ -206,8 +206,9 @@ func PersistProviderModel(
 	if exec == nil || value == "" {
 		return nil
 	}
+	// 2026-07-04: Only UPDATE request_logs_default (heap), not columnar partitions
 	_, err := exec.Exec(ctx,
-		`UPDATE request_logs
+		`UPDATE request_logs_default
 		 SET provider_model = $2
 		 WHERE request_id = $1
 		   AND ts = (

@@ -120,8 +120,9 @@ func HandleResetCredentialSuccessRate(db *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// Delete failed requests older than 10 minutes to allow immediate recovery
+		// 2026-07-04: Only operate on request_logs_default (heap), not columnar partitions
 		result, err := db.Exec(r.Context(), `
-		DELETE FROM request_logs
+		DELETE FROM request_logs_default
 		WHERE credential_id = $1
 		  AND lower(COALESCE(outbound_model, client_model)) = lower($2)
 		  AND success = false

@@ -68,69 +68,69 @@ func TestRequestLogInsertParamCount(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	upstream := "stop"
 	entry := &RequestLogEntry{
-		Op:                RequestLogInsert,
-		RequestID:         "telemetry-paramcount-" + now.Format("20060102T150405.000"),
-		TenantID:          "default",
-		ApplicationID:     intPtr(1),
-		APIKeyID:          intPtr(1),
-		EndUserID:         strPtr("end-user"),
-		ClientModel:       strPtr("gpt-4o"),
-		OutboundModel:     strPtr("gpt-4o-2024-08-06"),
-		CredentialID:      intPtr(1),
-		ProviderID:        intPtr(1),
-		CanonicalID:       intPtr(1),
-		ClientProfile:     strPtr("smart"),
-		RequestMode:       strPtr("chat"),
-		PromptTokens:      intPtr(10),
-		CompletionTokens:  intPtr(20),
-		CacheReadTokens:   intPtr(0),
-		CacheWriteTokens:  intPtr(0),
-		CostUSD:           floatPtr(0.001),
-		CostDisplay:       floatPtr(0.007),
-		CostCurrency:      strPtr("CNY"),
-		LatencyMs:         intPtr(1234),
-		Success:           true,
-		RequestStatus:     strPtr(RequestStatusSuccess),
-		ErrorKind:         nil,
-		UsageSource:       strPtr("llm"),
-		IdentityHash:      strPtr("hash-test"),
-		ResponseChecksum:  strPtr("cs-test"),
-		TransformRuleID:   strPtr("tr-test"),
-		EgressProtocol:    strPtr("openai"),
-		FailureStage:      nil,
-		FailureDetailCode: nil,
-		RequestPreview:    strPtr("hello"),
-		TransformSummary:  strPtr("noop"),
-		ResponsePreview:   strPtr("world"),
-		RequestBody:       strPtr(`{"messages":[]}`),
-		ResponseBody:      strPtr(`{"choices":[{"message":{"content":"world"}}]}`),
-		StreamFirstChunkMs: intPtr(50),
-		StreamChunkCount:   intPtr(5),
-		StreamDoneReceived: func() *bool { b := true; return &b }(),
-		StreamInterrupted:  func() *bool { b := false; return &b }(),
-		GwSessionID:         strPtr("gw_test_session"),
-		GwTaskID:            strPtr("gw_test_task"),
-		APIKeyPrefix:        strPtr("sk-test-****"),
-		APIKeyOwnerUser:     strPtr("test-owner"),
-		ApplicationCode:     strPtr("test-app"),
-		IsAutoRequest:       func() *bool { b := false; return &b }(),
-		TaskType:            strPtr("chat"),
-		AutoProfile:         strPtr("smart"),
-		AutoDecision:        strPtr(`{"top":[]}`),
-		AutoConfidence:      floatPtr(0.95),
-		WorkType:            strPtr("general_chat"),
-		CreditsCharged:      func() *int64 { v := int64(100); return &v }(),
-		ParentRequestID:     nil,
-		CompressionReason:   nil,
-		CompressionStrategy: nil,
-		CompressionMeta:     nil,
-		OutboundBody:        nil,
-		OutboundMsgCount:    nil,
-		OutboundTokenEst:    nil,
-		OutboundMsgHashes:   nil,
-		QualityFlags:        []string{},
-		QualityFixActions:   nil,
-		QualityScore:        nil,
+		Op:                   RequestLogInsert,
+		RequestID:            "telemetry-paramcount-" + now.Format("20060102T150405.000"),
+		TenantID:             "default",
+		ApplicationID:        intPtr(1),
+		APIKeyID:             intPtr(1),
+		EndUserID:            strPtr("end-user"),
+		ClientModel:          strPtr("gpt-4o"),
+		OutboundModel:        strPtr("gpt-4o-2024-08-06"),
+		CredentialID:         intPtr(1),
+		ProviderID:           intPtr(1),
+		CanonicalID:          intPtr(1),
+		ClientProfile:        strPtr("smart"),
+		RequestMode:          strPtr("chat"),
+		PromptTokens:         intPtr(10),
+		CompletionTokens:     intPtr(20),
+		CacheReadTokens:      intPtr(0),
+		CacheWriteTokens:     intPtr(0),
+		CostUSD:              floatPtr(0.001),
+		CostDisplay:          floatPtr(0.007),
+		CostCurrency:         strPtr("CNY"),
+		LatencyMs:            intPtr(1234),
+		Success:              true,
+		RequestStatus:        strPtr(RequestStatusSuccess),
+		ErrorKind:            nil,
+		UsageSource:          strPtr("llm"),
+		IdentityHash:         strPtr("hash-test"),
+		ResponseChecksum:     strPtr("cs-test"),
+		TransformRuleID:      strPtr("tr-test"),
+		EgressProtocol:       strPtr("openai"),
+		FailureStage:         nil,
+		FailureDetailCode:    nil,
+		RequestPreview:       strPtr("hello"),
+		TransformSummary:     strPtr("noop"),
+		ResponsePreview:      strPtr("world"),
+		RequestBody:          strPtr(`{"messages":[]}`),
+		ResponseBody:         strPtr(`{"choices":[{"message":{"content":"world"}}]}`),
+		StreamFirstChunkMs:   intPtr(50),
+		StreamChunkCount:     intPtr(5),
+		StreamDoneReceived:   func() *bool { b := true; return &b }(),
+		StreamInterrupted:    func() *bool { b := false; return &b }(),
+		GwSessionID:          strPtr("gw_test_session"),
+		GwTaskID:             strPtr("gw_test_task"),
+		APIKeyPrefix:         strPtr("sk-test-****"),
+		APIKeyOwnerUser:      strPtr("test-owner"),
+		ApplicationCode:      strPtr("test-app"),
+		IsAutoRequest:        func() *bool { b := false; return &b }(),
+		TaskType:             strPtr("chat"),
+		AutoProfile:          strPtr("smart"),
+		AutoDecision:         strPtr(`{"top":[]}`),
+		AutoConfidence:       floatPtr(0.95),
+		WorkType:             strPtr("general_chat"),
+		CreditsCharged:       func() *int64 { v := int64(100); return &v }(),
+		ParentRequestID:      nil,
+		CompressionReason:    nil,
+		CompressionStrategy:  nil,
+		CompressionMeta:      nil,
+		OutboundBody:         nil,
+		OutboundMsgCount:     nil,
+		OutboundTokenEst:     nil,
+		OutboundMsgHashes:    nil,
+		QualityFlags:         []string{},
+		QualityFixActions:    nil,
+		QualityScore:         nil,
 		UpstreamFinishReason: &upstream,
 	}
 
@@ -164,7 +164,8 @@ func TestRequestLogInsertParamCount(t *testing.T) {
 
 	// Cleanup — best-effort, ignore errors (the row is keyed by
 	// a timestamped request_id that no real request would use).
-	_, _ = pool.Exec(ctx, `DELETE FROM request_logs WHERE request_id = $1`, entry.RequestID)
+	// 2026-07-04: DELETE goes to request_logs_default (heap), not the parent.
+	_, _ = pool.Exec(ctx, `DELETE FROM request_logs_default WHERE request_id = $1`, entry.RequestID)
 
 	// Verify the new column write + also a sanity check that
 	// quality_flags and quality_fix_actions are written as
@@ -173,9 +174,9 @@ func TestRequestLogInsertParamCount(t *testing.T) {
 	// so the helpers must coerce nil → []string{} / "{}" — see
 	// qualityFlagsArg/qualityActionsArg).
 	var (
-		gotFlags    []string
-		gotActions  []byte
-		gotSuccess  bool
+		gotFlags   []string
+		gotActions []byte
+		gotSuccess bool
 	)
 	err = pool.QueryRow(ctx, `
 		SELECT quality_flags, quality_fix_actions::text, success
@@ -259,7 +260,8 @@ func TestRequestLogUniqueRequestID(t *testing.T) {
 
 	// Cleanup guard.
 	defer func() {
-		_, _ = pool.Exec(ctx, `DELETE FROM request_logs WHERE request_id = $1`, requestID)
+		// 2026-07-04: only operate on the heap default partition.
+		_, _ = pool.Exec(ctx, `DELETE FROM request_logs_default WHERE request_id = $1`, requestID)
 	}()
 
 	intPtr := func(v int) *int { return &v }
@@ -310,17 +312,17 @@ func TestRequestLogUniqueRequestID(t *testing.T) {
 	// Step 3: nvidia nim success (mimics emitTelemetry happy path).
 	emptyKind := ""
 	success := &RequestLogEntry{
-		Op:             RequestLogUpdate,
-		RequestID:      requestID,
-		TenantID:       "default",
-		ClientModel:    strPtr("glm-5.1"),
-		OutboundModel:  strPtr("glm-5"),
-		CredentialID:   intPtr(18),
-		ProviderID:     intPtr(18),
-		Success:        true,
-		RequestStatus:  strPtr(RequestStatusSuccess),
-		ErrorKind:      &emptyKind, // explicit clear
-		PromptTokens:   intPtr(100),
+		Op:               RequestLogUpdate,
+		RequestID:        requestID,
+		TenantID:         "default",
+		ClientModel:      strPtr("glm-5.1"),
+		OutboundModel:    strPtr("glm-5"),
+		CredentialID:     intPtr(18),
+		ProviderID:       intPtr(18),
+		Success:          true,
+		RequestStatus:    strPtr(RequestStatusSuccess),
+		ErrorKind:        &emptyKind, // explicit clear
+		PromptTokens:     intPtr(100),
 		CompletionTokens: intPtr(50),
 	}
 	if err := cl.persistRequestLog(success); err != nil {
@@ -337,10 +339,10 @@ func TestRequestLogUniqueRequestID(t *testing.T) {
 		TenantID:      "default",
 		ClientModel:   strPtr("glm-5.1"),
 		OutboundModel: strPtr("glm-5"),
-		CredentialID:   intPtr(18),
-		ProviderID:     intPtr(18),
-		Success:        true,
-		RequestStatus:  strPtr(RequestStatusSuccess),
+		CredentialID:  intPtr(18),
+		ProviderID:    intPtr(18),
+		Success:       true,
+		RequestStatus: strPtr(RequestStatusSuccess),
 	}
 	if err := cl.persistRequestLog(fallback); err != nil {
 		t.Fatalf("fallback INSERT (would have created dup row pre-fix): %v", err)
@@ -362,10 +364,10 @@ func TestRequestLogUniqueRequestID(t *testing.T) {
 
 	// ASSERT 2: final state shows nvidia nim (provider 18) success.
 	var (
-		gotSuccess   bool
-		gotProvider  *int
+		gotSuccess       bool
+		gotProvider      *int
 		gotRequestStatus *string
-		gotErrorKind *string
+		gotErrorKind     *string
 	)
 	if err := pool.QueryRow(ctx, `
 		SELECT success, provider_id, request_status, error_kind
@@ -388,7 +390,7 @@ func TestRequestLogUniqueRequestID(t *testing.T) {
 
 	// ASSERT 3: token counts survived.
 	var (
-		gotPrompt *int
+		gotPrompt     *int
 		gotCompletion *int
 	)
 	if err := pool.QueryRow(ctx, `
@@ -447,7 +449,8 @@ func TestRequestLogFallbackUpsert(t *testing.T) {
 
 	requestID := "test-fallback-upsert-" + time.Now().UTC().Format("20060102T150405.000000")
 	defer func() {
-		_, _ = pool.Exec(ctx, `DELETE FROM request_logs WHERE request_id = $1`, requestID)
+		// 2026-07-04: only operate on the heap default partition.
+		_, _ = pool.Exec(ctx, `DELETE FROM request_logs_default WHERE request_id = $1`, requestID)
 	}()
 
 	intPtr := func(v int) *int { return &v }
@@ -461,16 +464,16 @@ func TestRequestLogFallbackUpsert(t *testing.T) {
 	// fix, all 3 collapse to a single row.
 	for i := 1; i <= 3; i++ {
 		entry := &RequestLogEntry{
-			Op:             RequestLogUpdate,
-			RequestID:      requestID,
-			TenantID:       "default",
-			ClientModel:    strPtr("gpt-4o"),
-			OutboundModel:  strPtr("gpt-4o"),
-			CredentialID:   intPtr(i),
-			ProviderID:     intPtr(i),
-			Success:        i == 3, // last call wins
-			RequestStatus:  strPtr(RequestStatusSuccess),
-			PromptTokens:   intPtr(10 * i),
+			Op:               RequestLogUpdate,
+			RequestID:        requestID,
+			TenantID:         "default",
+			ClientModel:      strPtr("gpt-4o"),
+			OutboundModel:    strPtr("gpt-4o"),
+			CredentialID:     intPtr(i),
+			ProviderID:       intPtr(i),
+			Success:          i == 3, // last call wins
+			RequestStatus:    strPtr(RequestStatusSuccess),
+			PromptTokens:     intPtr(10 * i),
 			CompletionTokens: intPtr(5 * i),
 		}
 		_ = intPtr
@@ -493,8 +496,8 @@ func TestRequestLogFallbackUpsert(t *testing.T) {
 
 	// ASSERT: last value wins (cred 3, provider 3, prompt=30, completion=15).
 	var (
-		gotProvider *int
-		gotPrompt *int
+		gotProvider   *int
+		gotPrompt     *int
 		gotCompletion *int
 	)
 	if err := pool.QueryRow(ctx, `

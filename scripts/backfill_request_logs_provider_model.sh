@@ -23,6 +23,12 @@
 # Idempotent: only updates rows where provider_model IS NULL.
 # Restartable: the cursor is "id > last_id_seen", so a killed run can
 # resume from the next batch.
+#
+# 2026-07-04: 严格遵守 *_default 写入规则。本脚本的 UPDATE / JOIN 现在
+# 只走 request_logs_default（heap）。SELECT 仍然走父表以便聚合检查。
+# 这意味着：本脚本只补 *_default 里的 provider_model，不会回填已经
+# 迁移到列存分区里的历史数据。这是有意为之——历史数据走迁移工具的
+# 二次补数，不要在应用层动列存表。
 
 set -euo pipefail
 
@@ -51,9 +57,11 @@ DECLARE
   iter            int := 0;
 BEGIN
   LOOP
+    -- 2026-07-04: SELECT on *_default (only heap rows; columnar partitions
+    -- are intentionally excluded from the cursor's id-space).
     WITH next_batch AS (
       SELECT id
-      FROM request_logs
+      FROM request_logs_default
       WHERE provider_model IS NULL
         AND id > last_id
       ORDER BY id ASC
@@ -67,7 +75,8 @@ BEGIN
                NULLIF(TRIM(mo.raw_model_name), '')
              ) AS provider_model
       FROM next_batch nb
-      JOIN request_logs r ON r.id = nb.id
+      -- 2026-07-04: JOIN on *_default so the result set is consistent.
+      JOIN request_logs_default r ON r.id = nb.id
       LEFT JOIN models_canonical mc ON mc.id = r.canonical_id
       LEFT JOIN LATERAL (
         SELECT mo.outbound_model_name, mo.raw_model_name
@@ -96,7 +105,8 @@ BEGIN
         LIMIT 1
       ) mo ON TRUE
     )
-    UPDATE request_logs r
+    -- 2026-07-04: UPDATE only *_default (heap), never the parent.
+    UPDATE request_logs_default r
     SET provider_model = c.provider_model
     FROM computed c
     WHERE r.id = c.id;

@@ -543,8 +543,13 @@ func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
 	//nolint:errcheck // deferred rollback, best-effort
 	defer tx.Rollback(ctx)
 
+	// 2026-07-04: INSERT into *_default (heap) ONLY, never into the parent
+	// table. Even though PG would route by ts into request_logs_default if
+	// the current month columnar partition is detached, we deliberately do
+	// NOT rely on partition routing: writes must be deterministic regardless
+	// of whether any monthly columnar partition is ATTACHed at runtime.
 	_, err = tx.Exec(ctx, `
-		INSERT INTO usage_ledger (
+		INSERT INTO usage_ledger_default (
 			request_id, ts, tenant_id, application_id, api_key_id,
 			end_user_id, credential_id, provider_id, canonical_id,
 			raw_model_name, prompt_tokens, completion_tokens,
@@ -581,8 +586,10 @@ func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
 	if err != nil {
 		return err
 	}
+	// 2026-07-04: INSERT into request_logs_default (heap) ONLY, never into
+	// the parent table. See usage_ledger_default comment above for rationale.
 	_, err = tx.Exec(ctx, `
-		INSERT INTO request_logs (
+		INSERT INTO request_logs_default (
 			request_id, ts, tenant_id, application_id, api_key_id,
 			end_user_id, client_model, outbound_model,
 			credential_id, provider_id, canonical_id,
@@ -708,13 +715,13 @@ func (c *Client) insertRequestLog(entry *RequestLogEntry) error {
 		quality_score = EXCLUDED.quality_score,
 		upstream_finish_reason = EXCLUDED.upstream_finish_reason,
 		tool_calls = EXCLUDED.tool_calls,
-		-- 2026-06-26: client-supplied X-Request-Id (debug only; preserve
+-- 2026-06-26: client-supplied X-Request-Id (debug only; preserve
 		-- the value across INSERT/UPDATE on the same (request_id, ts)).
-		client_request_id = COALESCE(EXCLUDED.client_request_id, request_logs.client_request_id),
+		client_request_id = COALESCE(EXCLUDED.client_request_id, request_logs_default.client_request_id),
 		-- 2026-07-01: attachment tracking.
-		has_attachments = COALESCE(EXCLUDED.has_attachments, request_logs.has_attachments),
-		attachment_count = COALESCE(EXCLUDED.attachment_count, request_logs.attachment_count)
-`,
+		has_attachments = COALESCE(EXCLUDED.has_attachments, request_logs_default.has_attachments),
+		attachment_count = COALESCE(EXCLUDED.attachment_count, request_logs_default.attachment_count)
+	`,
 		entry.RequestID,
 		nonEmpty(entry.TenantID, "default"),
 		entry.ApplicationID,
@@ -1177,8 +1184,10 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 	// updateRequestLog without a normalised status field.
 	normalizeRequestStatus(entry)
 
+	// 2026-07-04: INSERT into request_logs_default (heap) ONLY, never the
+	// parent. See insertRequestLog comment for rationale.
 	_, err := c.dbPool.Exec(ctx, `
-		INSERT INTO request_logs (
+		INSERT INTO request_logs_default (
 			request_id, ts, tenant_id,
 			client_model, outbound_model,
 			credential_id, provider_id, canonical_id,
@@ -1236,49 +1245,49 @@ func (c *Client) upsertRequestLogFallback(entry *RequestLogEntry) error {
 		-- 2026-06-27 REVERT: ON CONFLICT back to (request_id, ts) for partitioned table compatibility
 		ON CONFLICT (request_id, ts) DO UPDATE SET
 			success = CASE
-				WHEN request_logs.request_status = 'in_progress' THEN EXCLUDED.success
-				ELSE request_logs.success
+				WHEN request_logs_default.request_status = 'in_progress' THEN EXCLUDED.success
+				ELSE request_logs_default.success
 			END,
 			request_status = CASE
-				WHEN request_logs.request_status = 'in_progress' THEN EXCLUDED.request_status
-				ELSE request_logs.request_status
+				WHEN request_logs_default.request_status = 'in_progress' THEN EXCLUDED.request_status
+				ELSE request_logs_default.request_status
 			END,
 			error_kind = CASE
-				WHEN request_logs.request_status = 'in_progress'
+				WHEN request_logs_default.request_status = 'in_progress'
 				     AND EXCLUDED.success = TRUE THEN NULL
-				WHEN request_logs.request_status = 'in_progress' THEN EXCLUDED.error_kind
-				ELSE request_logs.error_kind
+				WHEN request_logs_default.request_status = 'in_progress' THEN EXCLUDED.error_kind
+				ELSE request_logs_default.error_kind
 			END,
 			latency_ms = CASE
-				WHEN request_logs.request_status = 'in_progress' THEN EXCLUDED.latency_ms
-				ELSE request_logs.latency_ms
+				WHEN request_logs_default.request_status = 'in_progress' THEN EXCLUDED.latency_ms
+				ELSE request_logs_default.latency_ms
 			END,
-			prompt_tokens = COALESCE(request_logs.prompt_tokens, EXCLUDED.prompt_tokens),
-			completion_tokens = COALESCE(request_logs.completion_tokens, EXCLUDED.completion_tokens),
-			cache_read_tokens = COALESCE(request_logs.cache_read_tokens, EXCLUDED.cache_read_tokens),
-			cache_write_tokens = COALESCE(request_logs.cache_write_tokens, EXCLUDED.cache_write_tokens),
-			total_tokens = COALESCE(request_logs.total_tokens, EXCLUDED.total_tokens),
-			cost_usd = COALESCE(request_logs.cost_usd, EXCLUDED.cost_usd),
-			cost_display = COALESCE(request_logs.cost_display, EXCLUDED.cost_display),
-			cost_currency = COALESCE(request_logs.cost_currency, EXCLUDED.cost_currency),
-			usage_source = COALESCE(NULLIF(request_logs.usage_source, ''), EXCLUDED.usage_source),
-			stream_first_chunk_ms = COALESCE(request_logs.stream_first_chunk_ms, EXCLUDED.stream_first_chunk_ms),
-			stream_chunk_count = COALESCE(request_logs.stream_chunk_count, EXCLUDED.stream_chunk_count),
-			stream_done_received = COALESCE(request_logs.stream_done_received, EXCLUDED.stream_done_received),
-			stream_interrupted = COALESCE(request_logs.stream_interrupted, EXCLUDED.stream_interrupted),
-			upstream_finish_reason = COALESCE(NULLIF(request_logs.upstream_finish_reason, ''), EXCLUDED.upstream_finish_reason),
-			failure_stage = COALESCE(NULLIF(request_logs.failure_stage, ''), EXCLUDED.failure_stage),
-			failure_detail_code = COALESCE(NULLIF(request_logs.failure_detail_code, ''), EXCLUDED.failure_detail_code),
-			response_preview = COALESCE(NULLIF(request_logs.response_preview, ''), EXCLUDED.response_preview),
-			response_body = COALESCE(request_logs.response_body, EXCLUDED.response_body),
-			identity_hash = COALESCE(NULLIF(request_logs.identity_hash, ''), EXCLUDED.identity_hash),
+			prompt_tokens = COALESCE(request_logs_default.prompt_tokens, EXCLUDED.prompt_tokens),
+			completion_tokens = COALESCE(request_logs_default.completion_tokens, EXCLUDED.completion_tokens),
+			cache_read_tokens = COALESCE(request_logs_default.cache_read_tokens, EXCLUDED.cache_read_tokens),
+			cache_write_tokens = COALESCE(request_logs_default.cache_write_tokens, EXCLUDED.cache_write_tokens),
+			total_tokens = COALESCE(request_logs_default.total_tokens, EXCLUDED.total_tokens),
+			cost_usd = COALESCE(request_logs_default.cost_usd, EXCLUDED.cost_usd),
+			cost_display = COALESCE(request_logs_default.cost_display, EXCLUDED.cost_display),
+			cost_currency = COALESCE(request_logs_default.cost_currency, EXCLUDED.cost_currency),
+			usage_source = COALESCE(NULLIF(request_logs_default.usage_source, ''), EXCLUDED.usage_source),
+			stream_first_chunk_ms = COALESCE(request_logs_default.stream_first_chunk_ms, EXCLUDED.stream_first_chunk_ms),
+			stream_chunk_count = COALESCE(request_logs_default.stream_chunk_count, EXCLUDED.stream_chunk_count),
+			stream_done_received = COALESCE(request_logs_default.stream_done_received, EXCLUDED.stream_done_received),
+			stream_interrupted = COALESCE(request_logs_default.stream_interrupted, EXCLUDED.stream_interrupted),
+			upstream_finish_reason = COALESCE(NULLIF(request_logs_default.upstream_finish_reason, ''), EXCLUDED.upstream_finish_reason),
+			failure_stage = COALESCE(NULLIF(request_logs_default.failure_stage, ''), EXCLUDED.failure_stage),
+			failure_detail_code = COALESCE(NULLIF(request_logs_default.failure_detail_code, ''), EXCLUDED.failure_detail_code),
+			response_preview = COALESCE(NULLIF(request_logs_default.response_preview, ''), EXCLUDED.response_preview),
+			response_body = COALESCE(request_logs_default.response_body, EXCLUDED.response_body),
+			identity_hash = COALESCE(NULLIF(request_logs_default.identity_hash, ''), EXCLUDED.identity_hash),
 			-- 2026-07-02: attachment tracking. The original INSERT from
 			-- recordInitialRequestLog already populated these via
 			-- applyAttachmentFields; preserve them by COALESCE'ing on
 			-- the existing row, NOT on EXCLUDED, so a late fallback
 			-- that arrives with NIL doesn't blank the original value.
-			has_attachments  = COALESCE(request_logs.has_attachments,  EXCLUDED.has_attachments),
-			attachment_count = COALESCE(request_logs.attachment_count, EXCLUDED.attachment_count)
+			has_attachments  = COALESCE(request_logs_default.has_attachments,  EXCLUDED.has_attachments),
+			attachment_count = COALESCE(request_logs_default.attachment_count, EXCLUDED.attachment_count)
 		-- NOTE: do NOT update client_model, request_body, gw_session_id, gw_task_id,
 		-- api_key_*, application_code, is_auto_request, task_type, auto_*,
 		-- work_type, credits_charged, request_preview, transform_summary,

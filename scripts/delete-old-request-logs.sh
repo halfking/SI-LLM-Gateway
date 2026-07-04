@@ -1,6 +1,11 @@
 #!/bin/bash
 # delete-old-request-logs.sh
 # 删除过期的 request_logs 数据
+#
+# 2026-07-04: 严格遵循 *_default 表写入规则。DELETE 只操作
+# request_logs_default（heap），不会扫描列存分区。
+# 想要清空列存分区的历史数据，请改用 DROP PARTITION request_logs_YYYY_MM，
+# 或在数据迁移工具里处理（不要用 DELETE 直接打列存表）。
 
 set -euo pipefail
 
@@ -147,9 +152,9 @@ while true; do
     
     DELETED=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -A -c \
         "WITH deleted AS (
-            DELETE FROM request_logs 
+            DELETE FROM request_logs_default
             WHERE id IN (
-                SELECT id FROM request_logs 
+                SELECT id FROM request_logs_default
                 WHERE ts < '$DELETE_BEFORE'::date
                 LIMIT $BATCH_SIZE
             )

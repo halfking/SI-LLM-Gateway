@@ -11,7 +11,7 @@ API_KEY="test-api-key-12345"
 
 # 清空数据
 PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
-DELETE FROM request_logs WHERE ts > now() - interval '5 minutes';
+DELETE FROM request_logs_default WHERE ts > now() - interval '5 minutes';
 DELETE FROM request_wal WHERE created_at > now() - interval '5 minutes';
 " > /dev/null 2>&1
 

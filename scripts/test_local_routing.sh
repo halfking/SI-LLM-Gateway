@@ -22,7 +22,7 @@ echo ""
 # 清理之前的测试数据
 echo "🧹 清理之前的测试数据..."
 PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
-DELETE FROM request_logs WHERE ts > now() - interval '5 minutes';
+DELETE FROM request_logs_default WHERE ts > now() - interval '5 minutes';
 DELETE FROM request_wal WHERE created_at > now() - interval '5 minutes';
 DELETE FROM candidate_failure_logs WHERE ts > now() - interval '5 minutes';
 " > /dev/null 2>&1

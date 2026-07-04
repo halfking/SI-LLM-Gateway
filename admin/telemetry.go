@@ -80,13 +80,13 @@ type requestLogInput struct {
 	// 2026-06-19 T-NEW-7: split the semantic overload of failure_detail_code.
 	// New column is the SOLE home for the upstream finish_reason.
 	UpstreamFinishReason *string `json:"upstream_finish_reason,omitempty"`
-	TransformRuleID    *string  `json:"transform_rule_id,omitempty"`
-	EgressProtocol     *string  `json:"egress_protocol,omitempty"`
-	RequestPreview     *string  `json:"request_preview,omitempty"`
-	TransformSummary   *string  `json:"transform_summary,omitempty"`
-	ResponsePreview    *string  `json:"response_preview,omitempty"`
-	RequestBody        *string  `json:"request_body,omitempty"`
-	ResponseBody       *string  `json:"response_body,omitempty"`
+	TransformRuleID      *string `json:"transform_rule_id,omitempty"`
+	EgressProtocol       *string `json:"egress_protocol,omitempty"`
+	RequestPreview       *string `json:"request_preview,omitempty"`
+	TransformSummary     *string `json:"transform_summary,omitempty"`
+	ResponsePreview      *string `json:"response_preview,omitempty"`
+	RequestBody          *string `json:"request_body,omitempty"`
+	ResponseBody         *string `json:"response_body,omitempty"`
 }
 
 type batchEntry struct {
@@ -220,8 +220,13 @@ func (t *telemetryIngester) persistRequestLog(ctx context.Context, e *requestLog
 	//nolint:errcheck // deferred rollback, best-effort
 	defer tx.Rollback(ctx)
 
+	// 2026-07-04: INSERT into *_default (heap) ONLY, never into the parent
+	// table. Even though PG would route by ts into request_logs_default
+	// when monthly columnar partitions are detached, we deliberately do
+	// NOT rely on partition routing: writes must be deterministic regardless
+	// of whether any monthly columnar partition is ATTACHed at runtime.
 	_, err = tx.Exec(ctx, `
-		INSERT INTO usage_ledger (
+		INSERT INTO usage_ledger_default (
 			request_id, ts, tenant_id, application_id, api_key_id,
 			end_user_id, credential_id, provider_id, canonical_id,
 			raw_model_name, prompt_tokens, completion_tokens,
@@ -246,8 +251,9 @@ func (t *telemetryIngester) persistRequestLog(ctx context.Context, e *requestLog
 		return
 	}
 
+	// 2026-07-04: INSERT into request_logs_default (heap) ONLY. See above.
 	_, err = tx.Exec(ctx, `
-		INSERT INTO request_logs (
+		INSERT INTO request_logs_default (
 			request_id, ts, tenant_id, application_id, api_key_id,
 			end_user_id, client_model, outbound_model,
 			credential_id, provider_id, canonical_id,
@@ -452,10 +458,10 @@ func (h *Handler) handleTelemetryBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":              "ok",
-		"decision_log_count":  decCount,
-		"request_log_count":   reqCount,
-		"errors":              errCount,
+		"status":             "ok",
+		"decision_log_count": decCount,
+		"request_log_count":  reqCount,
+		"errors":             errCount,
 	})
 }
 

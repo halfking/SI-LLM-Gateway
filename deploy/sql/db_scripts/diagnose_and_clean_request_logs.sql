@@ -114,25 +114,28 @@ ORDER BY rl.request_id, rl.ts;
 -- 7. 清理重复记录（保留最早的记录）
 -- 警告：这会真正删除数据！请先在测试环境验证！
 -- 取消注释下面的 BEGIN/COMMIT 来执行
+-- 2026-07-04: 严格遵循 *_default 规则。下方 DELETE 已改为 request_logs_default。
+-- 如果怀疑列存分区里也有重复行，请改用针对分区的去重策略，不要在
+-- 应用层直接 DELETE 列存表。
 /*
 BEGIN;
 
 WITH duplicates AS (
-    SELECT 
+    SELECT
         request_id,
         MIN(ts) as earliest_ts
-    FROM request_logs
+    FROM request_logs_default
     WHERE ts > now() - interval '7 days'
     GROUP BY request_id
     HAVING COUNT(*) > 1
 )
-DELETE FROM request_logs rl
+DELETE FROM request_logs_default rl
 USING duplicates d
 WHERE rl.request_id = d.request_id
   AND rl.ts > d.earliest_ts;
 
 -- 检查删除结果
-SELECT COUNT(*) as deleted_rows FROM request_logs WHERE false;
+SELECT COUNT(*) as deleted_rows FROM request_logs_default WHERE false;
 
 COMMIT;
 */
@@ -141,10 +144,10 @@ COMMIT;
 -- 这个版本更安全，可以多次运行直到没有重复记录
 /*
 WITH duplicates AS (
-    SELECT 
+    SELECT
         request_id,
         MIN(ts) as earliest_ts
-    FROM request_logs
+    FROM request_logs_default
     WHERE ts > now() - interval '7 days'
     GROUP BY request_id
     HAVING COUNT(*) > 1
@@ -152,12 +155,12 @@ WITH duplicates AS (
 ),
 to_delete AS (
     SELECT rl.id
-    FROM request_logs rl
+    FROM request_logs_default rl
     INNER JOIN duplicates d ON rl.request_id = d.request_id
     WHERE rl.ts > d.earliest_ts
     LIMIT 1000  -- 一次最多删除1000行
 )
-DELETE FROM request_logs
+DELETE FROM request_logs_default
 WHERE id IN (SELECT id FROM to_delete);
 */
 
