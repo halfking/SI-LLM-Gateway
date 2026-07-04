@@ -36,6 +36,8 @@ import {
 
 const props = defineProps<{
   request: LiveRequest
+  /** 分组模式：vendor=原厂, provider=供应商, model=模型 */
+  groupMode?: 'vendor' | 'provider' | 'model'
 }>()
 
 const emit = defineEmits<{
@@ -52,7 +54,7 @@ const idleLabel = computed(() => {
   const start = Date.parse(props.request.ts)
   if (Number.isNaN(start)) return '—'
   const minutes = Math.max(1, Math.round((Date.now() - start) / 60_000))
-  return `Idle ${minutes}m`
+  return `空闲 ${minutes}m`
 })
 
 // Line 1: HH:MM start time (locale-aware).
@@ -73,6 +75,82 @@ const vendorLabel = computed(() => modelShortLabel(props.request.model))
 // Line 3: provider code. Smaller font + lower contrast — secondary
 // signal, but critical when an incident is on a specific vendor.
 const providerLabel = computed(() => providerShortLabel(props.request.provider_code))
+
+// 获取模型家族名称（用于供应商模式第3行）
+function getModelFamily(model: string | undefined): string {
+  if (!model) return '???'
+  const m = model.toLowerCase()
+  if (m.startsWith('gpt-') || m.startsWith('o1-') || m.startsWith('o3-') || m.startsWith('o4-')) return 'OpenAI'
+  if (m.startsWith('claude-')) return 'Anthropic'
+  if (m.startsWith('gemini') || m.startsWith('palm')) return 'Google'
+  if (m.startsWith('llama')) return 'Meta'
+  if (m.startsWith('qwen')) return 'Alibaba'
+  if (m.startsWith('deepseek')) return 'DeepSeek'
+  if (m.startsWith('glm')) return 'Zhipu'
+  if (m.startsWith('mistral') || m.startsWith('mixtral')) return 'Mistral'
+  if (m.startsWith('grok')) return 'xAI'
+  return '其他'
+}
+
+// 获取状态文本（用于模型模式第2行）
+function getStatusText(): string {
+  const status = props.request.status
+  if (status === 'success') return '成功'
+  if (status === 'in_progress') return '进行中'
+  if (status === 'failure') {
+    const k = (props.request.error_kind || '').toLowerCase()
+    if (/(timeout|timedout)/.test(k)) return '超时'
+    if (/(5xx|server|upstream)/.test(k)) return '5xx'
+    if (/(4xx|auth|quota)/.test(k)) return '认证'
+    if (/(not_found|route)/.test(k)) return '未找到'
+    return '失败'
+  }
+  return '—'
+}
+
+// 第2行动态内容：根据分组模式决定
+const line2Label = computed(() => {
+  const mode = props.groupMode || 'vendor'
+  if (mode === 'model') {
+    // 模型模式：显示状态或错误信息
+    return getStatusText()
+  }
+  // 原厂/供应商模式：显示模型名称
+  return vendorLabel.value
+})
+
+// 第3行动态内容：根据分组模式决定
+const line3Label = computed(() => {
+  const mode = props.groupMode || 'vendor'
+  if (mode === 'vendor') {
+    // 原厂模式：显示供应商名称
+    return providerLabel.value
+  } else if (mode === 'provider') {
+    // 供应商模式：显示模型家族名称
+    return getModelFamily(props.request.model)
+  } else {
+    // 模型模式：显示供应商名称
+    return providerLabel.value
+  }
+})
+
+// 第2行字体大小：根据内容长度动态调整（需求：尽可能显示完整名称）
+const line2FontSize = computed(() => {
+  const len = line2Label.value.length
+  const mode = props.groupMode || 'vendor'
+  
+  // 模型模式的状态文本较短，使用固定字体
+  if (mode === 'model') {
+    return '10px'
+  }
+  
+  // 原厂/供应商模式：根据模型名称长度动态调整
+  if (len <= 6) return '11px'
+  if (len <= 8) return '10px'
+  if (len <= 10) return '9px'
+  if (len <= 12) return '8px'
+  return '7px'
+})
 
 // Line 4: latency OR error message (for failures).
 const latencyText = computed(() => {
@@ -104,22 +182,18 @@ const line4Text = computed(() => {
 })
 
 /**
- * Dynamic width based on content length. The tile is at least 60px
- * wide (the baseline that fits "14:35" / "4O-MINI" / "anthropic" /
- * "1.2s" in a tight layout). When the model name or provider name
- * is long (e.g. "2-72B-INSTRUCT" / "azure-openai"), the tile grows
- * to ~75-80px so the full label is visible (or at least more of it
- * before the ellipsis kicks in). CSS clamps at 90px so a pathological
- * "custom-provider-east-2-replica-1" doesn't break the layout.
+ * Dynamic width based on content length. 
+ * 需求：泳道宽度80px（但tile需要适应内容）
  */
 const tileWidth = computed(() => {
-  const modelLen = vendorLabel.value.length
-  const providerLen = providerLabel.value.length
-  const maxLen = Math.max(modelLen, providerLen)
-  // Each char is ~5-6px at 11px/8px font. Base is 60px.
-  // For every char beyond 8, add 4px so longer labels get more space.
-  const extra = Math.max(0, maxLen - 8) * 4
-  return Math.min(90, 60 + extra)
+  const line2Len = line2Label.value.length
+  const line3Len = line3Label.value.length
+  const maxLen = Math.max(line2Len, line3Len)
+  // 基础宽度 80px
+  const base = 80
+  // 内容较长时适当增加宽度
+  if (maxLen > 12) return Math.min(90, base + 10)
+  return base
 })
 
 /**
@@ -247,8 +321,8 @@ function hexToRgba(hex: string, alpha: number): string {
     @keyup.space.prevent="onClick"
   >
     <span class="live-block__time">{{ timeLabel }}</span>
-    <span class="live-block__vendor">{{ vendorLabel }}</span>
-    <span class="live-block__provider">{{ providerLabel }}</span>
+    <span class="live-block__line2" :style="{ fontSize: line2FontSize }">{{ line2Label }}</span>
+    <span class="live-block__line3">{{ line3Label }}</span>
     <span 
       class="live-block__latency"
       :class="{ 'live-block__latency--error': request.status === 'failure' }"
@@ -263,19 +337,20 @@ function hexToRgba(hex: string, alpha: number): string {
 </template>
 
 <style scoped>
-/* 2026-07-03 v5 — 4-row tile (60-90px × 76px, dynamic width).
+/* 2026-07-05 v6 — 4-row tile (80px × 60px, 紧凑布局).
+ * 支持三种分组模式的动态显示
  *
- *   width  60-90px  ← dynamic: 60px baseline, grows for long labels
- *   height 76px     ← 4 rows × 14px + 4px padding (top+bottom)
- *   border 2-3px    ← thicker on failure
- *   font   8-11px   ← model is the loudest; provider is the quietest
+ *   width  80px     ← 固定宽度（需求要求）
+ *   height 60px     ← 固定高度（需求要求）
+ *   border 2px      ← 边框宽度（需求要求）
+ *   font   动态     ← 第2行根据内容长度动态调整
  */
 .live-block {
   box-sizing: border-box;
-  width: 60px; /* fallback; overridden by :style */
-  min-width: 60px;
+  width: 80px;
+  min-width: 80px;
   max-width: 90px;
-  height: 76px;
+  height: 60px;
   border-radius: 4px;
   border: 2px solid rgba(139, 148, 158, 0.4);
   color: var(--text, #e6edf3);
@@ -284,8 +359,8 @@ function hexToRgba(hex: string, alpha: number): string {
   flex-direction: column;
   align-items: center;
   justify-content: space-around;
-  padding: 3px 2px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
   position: relative;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
@@ -316,68 +391,69 @@ function hexToRgba(hex: string, alpha: number): string {
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4) inset;
 }
 
-/* Line 1: time HH:MM. */
+/* Line 1: time HH:MM (居中对齐). */
 .live-block__time {
-  font-size: 9px;
+  font-size: 8px;
   line-height: 1.1;
   color: var(--muted, #8b949e);
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, 'Cascadia Code', monospace;
+  text-align: center;
 }
 
-/* Line 2: model-family code. Tail-first so version numbers
- * (e.g. "4O-MINI", "3.5-SONNET") carry more identifying weight
- * than the vendor prefix. The dominant signal on the tile. */
-.live-block__vendor {
-  font-size: 11px;
+/* Line 2: 动态内容（模型名或状态），居中显示，字体大小动态调整 */
+.live-block__line2 {
+  font-size: 11px; /* fallback, 由 :style 覆盖 */
   font-weight: 700;
   line-height: 1.1;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   color: var(--text, #e6edf3);
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  text-align: center;
+  padding: 0 2px;
 }
 
-/* Line 3: provider code. 2026-07-03: shows the FULL catalog_code
- * (e.g. "anthropic" / "azure-openai") instead of a 3-letter abbrev.
- * Long names get ellipsis at the tile edge. No text-transform:
- * the operator reads lowercase catalog codes most naturally. */
-.live-block__provider {
-  font-size: 8px;
+/* Line 3: 动态内容（供应商或模型家族），居中显示 */
+.live-block__line3 {
+  font-size: 7px;
   line-height: 1.1;
   font-weight: 600;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
   color: var(--muted, #8b949e);
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* Slight tint so it doesn't blend into the family-coloured bg
-   * when the family is the same colour as the muted text. */
   opacity: 0.9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  text-align: center;
+  padding: 0 2px;
 }
 
-/* Line 4: latency OR error message (for failures). */
+/* Line 4: latency (xxxs 或 xxxms 两种形式). */
 .live-block__latency {
-  font-size: 9px;
+  font-size: 8px;
   line-height: 1.1;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--muted, #8b949e);
   letter-spacing: 0.2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, 'Cascadia Code', monospace;
+  text-align: center;
 }
 
-/* When status=failure, line 4 shows the error kind (e.g. "Timeout",
- * "5xx", "Auth") in a bright amber/red so the operator's eye can
- * scan the swim lane for red tiles with readable error labels. */
+/* When status=failure, line 4 shows the error kind in bright amber/red */
 .live-block__latency--error {
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 700;
   color: #fbbf24; /* amber-400 */
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
 }
 
 /* When the tile is a failure (red border), boost the error text
@@ -418,7 +494,8 @@ function hexToRgba(hex: string, alpha: number): string {
   justify-content: center;
 }
 .live-block__idle-text {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
 }
 </style>

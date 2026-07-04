@@ -220,6 +220,7 @@ function getLaneKey(req: LiveRequest): string {
 }
 
 // 按泳道分组请求，支持去重和自动移动到末尾
+// 优化版：使用 Map 提升性能，从 O(n²) 降至 O(n)
 const laneRequests = computed(() => {
   const grouped = new Map<string, LiveRequest[]>()
 
@@ -228,41 +229,33 @@ const laneRequests = computed(() => {
     grouped.set(lane.key, [])
   }
 
-  // 分配请求到泳道（去重逻辑：同一 request_id 只保留最后一次出现）
-  const seenIds = new Map<string, { laneKey: string; index: number }>()
+  // 优化的去重逻辑：使用 Map 跟踪每个 request_id 的最新版本
+  const latestRequestMap = new Map<string, LiveRequest>()
+  const idleMarkers: LiveRequest[] = []
   
-  for (let i = 0; i < requests.value.length; i++) {
-    const req = requests.value[i]
-    const laneKey = getLaneKey(req)
-    
+  // 第一遍：找到每个 request_id 的最新版本
+  for (const req of requests.value) {
     if (req.type === 'request' && req.request_id) {
-      // 检查是否已经在某个泳道中
-      const existing = seenIds.get(req.request_id)
-      if (existing) {
-        // 从原泳道中移除旧记录
-        const oldLane = grouped.get(existing.laneKey)
-        if (oldLane) {
-          oldLane.splice(existing.index, 1)
-          // 更新后续索引
-          for (const [id, info] of seenIds.entries()) {
-            if (info.laneKey === existing.laneKey && info.index > existing.index) {
-              info.index--
-            }
-          }
-        }
-      }
-      
-      // 添加到新泳道末尾
-      const lane = grouped.get(laneKey)
-      if (lane) {
-        seenIds.set(req.request_id, { laneKey, index: lane.length })
-        lane.push(req)
-      }
-    } else {
-      // idle_marker 直接添加
-      const lane = grouped.get(laneKey)
-      if (lane) lane.push(req)
+      // 同一个 request_id 只保留最后一次出现（自动去重）
+      latestRequestMap.set(req.request_id, req)
+    } else if (req.type === 'idle_marker') {
+      idleMarkers.push(req)
     }
+  }
+  
+  // 第二遍：将最新版本的请求分配到对应泳道
+  for (const req of latestRequestMap.values()) {
+    const laneKey = getLaneKey(req)
+    const lane = grouped.get(laneKey)
+    if (lane) {
+      lane.push(req)
+    }
+  }
+  
+  // idle_marker 分配到 Other 泳道
+  for (const req of idleMarkers) {
+    const lane = grouped.get(OTHER_VENDOR)
+    if (lane) lane.push(req)
   }
 
   return grouped
@@ -272,23 +265,43 @@ const laneRequests = computed(() => {
 const MAX_PER_LANE = 30
 
 // 定时排序泳道（每5秒按累计请求数重新排序，避免UI闪烁）
+// 使用 requestAnimationFrame 批量更新，减少重渲染
 const sortedLanes = ref(lanes.value)
 let sortTimer: ReturnType<typeof setInterval> | null = null
+let rafId: number | null = null
 
-onMounted(() => {
-  // 初始化排序
-  sortedLanes.value = [...lanes.value].sort((a, b) => b.count - a.count)
+// 使用 RAF 批量更新排序，避免频繁触发重渲染
+function scheduleSort() {
+  if (rafId !== null) return
   
-  // 每5秒重新排序一次
-  sortTimer = setInterval(() => {
+  rafId = requestAnimationFrame(() => {
+    rafId = null
     const current = lanes.value
-    const sorted = [...current].sort((a, b) => b.count - a.count)
+    const sorted = [...current].sort((a, b) => {
+      // 先按请求数降序
+      if (b.count !== a.count) return b.count - a.count
+      // 请求数相同时按 key 字母序（稳定排序，避免闪烁）
+      return a.key.localeCompare(b.key)
+    })
     
-    // 只有顺序真正改变时才更新（减少不必要的重渲染）
+    // 只有顺序真正改变时才更新
     const orderChanged = sorted.some((lane, idx) => lane.key !== sortedLanes.value[idx]?.key)
     if (orderChanged) {
       sortedLanes.value = sorted
     }
+  })
+}
+
+onMounted(() => {
+  // 初始化排序
+  sortedLanes.value = [...lanes.value].sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count
+    return a.key.localeCompare(b.key)
+  })
+  
+  // 每5秒重新排序一次（使用 RAF 批量更新）
+  sortTimer = setInterval(() => {
+    scheduleSort()
   }, 5000)
 })
 
@@ -297,12 +310,24 @@ onBeforeUnmount(() => {
     clearInterval(sortTimer)
     sortTimer = null
   }
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
 })
 
 // 当分组模式切换时，立即重新排序
 watch(groupMode, () => {
-  sortedLanes.value = [...lanes.value].sort((a, b) => b.count - a.count)
+  sortedLanes.value = [...lanes.value].sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count
+    return a.key.localeCompare(b.key)
+  })
 })
+
+// 当泳道定义变化时，触发排序检查（使用 RAF 避免频繁更新）
+watch(lanes, () => {
+  scheduleSort()
+}, { deep: false })
 
 const connectionLabel = computed(() => {
   if (connection.value === 'open') return t('dashboard.liveStream.connected')
@@ -410,6 +435,7 @@ function onSelect(requestId: string) {
               v-for="(req, idx) in laneRequests.get(lane.key)?.slice(-MAX_PER_LANE) || []"
               :key="req.request_id ?? `idle-${lane.key}-${idx}-${req.ts}`"
               :request="req"
+              :group-mode="groupMode"
               @select="onSelect"
             />
           </TransitionGroup>
@@ -621,29 +647,31 @@ function onSelect(requestId: string) {
   gap: 8px;
 }
 
-/* 单个泳道 */
+/* 单个泳道（高度60px，需求要求） */
 .live-stream-lane {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 68px;
+  min-height: 60px;
   flex-wrap: nowrap;
   min-width: 0;
 }
 
-/* 泳道标签 — 固定宽度，支持折行显示 */
+/* 泳道标签 — 固定宽度（约10个字符），支持折行显示，高度与泳道一致 */
 .live-stream-lane__label {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  width: 140px;
-  min-width: 140px;
-  max-width: 140px;
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
   flex-shrink: 0;
   padding: 4px 0 4px 8px;
   border-left: 3px solid var(--accent, #6366f1);
   overflow: hidden;
+  min-height: 60px;
+  justify-content: center;
 }
 
 .live-stream-lane__name-wrapper {
@@ -673,16 +701,16 @@ function onSelect(requestId: string) {
   font-variant-numeric: tabular-nums;
 }
 
-/* 泳道轨道 */
+/* 泳道轨道（高度60px，需求要求） */
 .live-stream-lane__track {
   position: relative;
   flex: 1;
-  height: 68px;
+  height: 60px;
   overflow: hidden;
   background: var(--bg-subtle, #161b22);
   border: 1px solid var(--border, #30363d);
   border-radius: 6px;
-  padding: 4px 6px;
+  padding: 2px 4px;
 }
 
 .live-stream-lane__track-inner {
