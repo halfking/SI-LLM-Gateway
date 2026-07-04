@@ -12,6 +12,7 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLiveStream, type LiveRequest } from '../composables/useLiveStream'
+import { getInitialLiveStreamStats } from '../api/usage'
 import LiveRequestBlock from './LiveRequestBlock.vue'
 import LiveStreamLegend from './LiveStreamLegend.vue'
 
@@ -31,6 +32,37 @@ const cumulativeStats = ref({
   provider: new Map<string, number>(),
   model: new Map<string, number>(),
 })
+
+// 从 API 加载初始统计数据
+async function loadInitialStats() {
+  try {
+    const data = await getInitialLiveStreamStats(7)
+    console.log('[LiveStreamLanes] loaded initial stats:', data)
+    
+    // 初始化原厂统计
+    for (const [vendor, count] of Object.entries(data.vendors)) {
+      cumulativeStats.value.vendor.set(vendor, count)
+    }
+    
+    // 初始化供应商统计
+    for (const [provider, count] of Object.entries(data.providers)) {
+      cumulativeStats.value.provider.set(provider, count)
+    }
+    
+    // 初始化模型统计
+    for (const [model, count] of Object.entries(data.models)) {
+      cumulativeStats.value.model.set(model, count)
+    }
+    
+    console.log('[LiveStreamLanes] initialized cumulative stats:', {
+      vendorCount: cumulativeStats.value.vendor.size,
+      providerCount: cumulativeStats.value.provider.size,
+      modelCount: cumulativeStats.value.model.size,
+    })
+  } catch (error) {
+    console.error('[LiveStreamLanes] failed to load initial stats:', error)
+  }
+}
 
 // WebSocket 连接地址（仅管理员可见）
 const wsUrl = computed(() => {
@@ -388,7 +420,10 @@ function scheduleSort() {
   })
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // 加载初始统计数据
+  await loadInitialStats()
+  
   // 初始化排序
   sortedLanes.value = [...lanes.value].sort((a, b) => {
     if (b.count !== a.count) return b.count - a.count

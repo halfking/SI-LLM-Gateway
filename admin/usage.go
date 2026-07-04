@@ -35,6 +35,8 @@ func (h *Handler) handleUsage(w http.ResponseWriter, r *http.Request) {
 		h.usageByTenant(w, r)
 	case remaining == "tenants":
 		h.listTenants(w, r)
+	case remaining == "live-stream-init":
+		h.usageLiveStreamInit(w, r)
 	default:
 		h.usageKeyDetail(w, r)
 	}
@@ -60,12 +62,12 @@ func (h *Handler) usageSummary(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	var summary struct {
-		TotalRequests       int     `json:"total_requests"`
-		TotalPromptTokens   int     `json:"total_prompt_tokens"`
-		TotalCompletionTok  int     `json:"total_completion_tokens"`
-		TotalCostUSD        float64 `json:"total_cost_usd"`
-		AvgLatencyMs        float64 `json:"avg_latency_ms"`
-		SuccessRate         float64 `json:"success_rate"`
+		TotalRequests      int     `json:"total_requests"`
+		TotalPromptTokens  int     `json:"total_prompt_tokens"`
+		TotalCompletionTok int     `json:"total_completion_tokens"`
+		TotalCostUSD       float64 `json:"total_cost_usd"`
+		AvgLatencyMs       float64 `json:"avg_latency_ms"`
+		SuccessRate        float64 `json:"success_rate"`
 	}
 	tid := EffectiveTenantIDAll(r) // Use All version for super_admin to see all tenants
 	whereClause := "ts >= now() - ($1 * INTERVAL '1 day')"
@@ -87,7 +89,7 @@ func (h *Handler) usageSummary(w http.ResponseWriter, r *http.Request) {
 			)                                               AS success_rate
 		FROM usage_ledger
 		WHERE `+whereClause,
-	args...)
+		args...)
 	if err := row.Scan(
 		&summary.TotalRequests,
 		&summary.TotalPromptTokens,
@@ -115,16 +117,16 @@ func (h *Handler) usageDashboard(w http.ResponseWriter, r *http.Request) {
 
 	tid := EffectiveTenantIDAll(r) // Use All version for super_admin to see all tenants
 	var overview struct {
-		TotalAPIKeys           int `json:"total_api_keys"`
-		ActiveAPIKeys          int `json:"active_api_keys"`
-		ActiveAPIKeysInWindow  int `json:"active_api_keys_in_window"`
-		TotalModels            int `json:"total_models"`
-		ActiveModelsInWindow   int `json:"active_models_in_window"`
-		TotalProviders         int `json:"total_providers"`
-		ActiveProviders        int `json:"active_providers"`
-		OfflineModels          int `json:"offline_models"`
-		OfflineCredentials     int `json:"offline_credentials"`
-		TotalCredentials       int `json:"total_credentials"`
+		TotalAPIKeys          int `json:"total_api_keys"`
+		ActiveAPIKeys         int `json:"active_api_keys"`
+		ActiveAPIKeysInWindow int `json:"active_api_keys_in_window"`
+		TotalModels           int `json:"total_models"`
+		ActiveModelsInWindow  int `json:"active_models_in_window"`
+		TotalProviders        int `json:"total_providers"`
+		ActiveProviders       int `json:"active_providers"`
+		OfflineModels         int `json:"offline_models"`
+		OfflineCredentials    int `json:"offline_credentials"`
+		TotalCredentials      int `json:"total_credentials"`
 	}
 
 	// Build dynamic query based on whether tenant filter is needed
@@ -692,23 +694,23 @@ func (h *Handler) usageKeyDetail(w http.ResponseWriter, r *http.Request) {
 	`, keyID, startTime, endTime).Scan(&gatewayRejected, &upstreamFailed, &peakRequests5m)
 
 	resp := map[string]any{
-		"key_id":               keyID,
-		"key_prefix":           keyPrefix,
-		"total_requests":       totalReqs,
-		"total_prompt_tokens":  promptTok,
+		"key_id":                  keyID,
+		"key_prefix":              keyPrefix,
+		"total_requests":          totalReqs,
+		"total_prompt_tokens":     promptTok,
 		"total_completion_tokens": compTok,
-		"total_tokens":         totalTok,
-		"total_cost_usd":       cost,
-		"avg_latency_ms":       avgLatency,
-		"success_rate":         successRate,
-		"unique_models":        uniqueModels,
-		"gateway_rejected":     gatewayRejected,
-		"upstream_failed":      upstreamFailed,
-		"peak_requests_5m":     peakRequests5m,
-		"window_start":         startTime.Format(time.RFC3339),
-		"window_end":           endTime.Format(time.RFC3339),
-		"first_request_at":     nil,
-		"last_request_at":      nil,
+		"total_tokens":            totalTok,
+		"total_cost_usd":          cost,
+		"avg_latency_ms":          avgLatency,
+		"success_rate":            successRate,
+		"unique_models":           uniqueModels,
+		"gateway_rejected":        gatewayRejected,
+		"upstream_failed":         upstreamFailed,
+		"peak_requests_5m":        peakRequests5m,
+		"window_start":            startTime.Format(time.RFC3339),
+		"window_end":              endTime.Format(time.RFC3339),
+		"first_request_at":        nil,
+		"last_request_at":         nil,
 	}
 	if firstAt != nil {
 		resp["first_request_at"] = firstAt.Format(time.RFC3339)
@@ -764,16 +766,16 @@ func (h *Handler) usageKeyModels(w http.ResponseWriter, r *http.Request, keyID i
 	defer rows.Close()
 
 	type modelUsage struct {
-		Model            string   `json:"model"`
-		RequestCount     int      `json:"request_count"`
-		PromptTokens     int      `json:"prompt_tokens"`
-		CompletionTokens int      `json:"completion_tokens"`
-		TotalTokens      int      `json:"total_tokens"`
-		CostUSD          float64  `json:"cost_usd"`
-		AvgLatencyMs     float64  `json:"avg_latency_ms"`
-		SuccessRate      float64  `json:"success_rate"`
-		FirstUsedAt      *string  `json:"first_used_at"`
-		LastUsedAt       *string  `json:"last_used_at"`
+		Model            string  `json:"model"`
+		RequestCount     int     `json:"request_count"`
+		PromptTokens     int     `json:"prompt_tokens"`
+		CompletionTokens int     `json:"completion_tokens"`
+		TotalTokens      int     `json:"total_tokens"`
+		CostUSD          float64 `json:"cost_usd"`
+		AvgLatencyMs     float64 `json:"avg_latency_ms"`
+		SuccessRate      float64 `json:"success_rate"`
+		FirstUsedAt      *string `json:"first_used_at"`
+		LastUsedAt       *string `json:"last_used_at"`
 	}
 	usage := make([]modelUsage, 0)
 	for rows.Next() {
@@ -981,12 +983,12 @@ func (h *Handler) usageKeyTraffic(w http.ResponseWriter, r *http.Request, keyID 
 	defer rows.Close()
 
 	type bucket struct {
-		Bucket           time.Time `json:"bucket"`
-		Requests         int       `json:"requests"`
-		SuccessCount     int       `json:"success_count"`
-		FailureCount     int       `json:"failure_count"`
-		GatewayRejected  int       `json:"gateway_rejected"`
-		UpstreamFailed   int       `json:"upstream_failed"`
+		Bucket          time.Time `json:"bucket"`
+		Requests        int       `json:"requests"`
+		SuccessCount    int       `json:"success_count"`
+		FailureCount    int       `json:"failure_count"`
+		GatewayRejected int       `json:"gateway_rejected"`
+		UpstreamFailed  int       `json:"upstream_failed"`
 	}
 	buckets := make([]bucket, 0)
 	peak := 0
@@ -1002,12 +1004,12 @@ func (h *Handler) usageKeyTraffic(w http.ResponseWriter, r *http.Request, keyID 
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"key_id":             keyID,
-		"bucket_minutes":     5,
-		"window_start":       startTime.Format(time.RFC3339),
-		"window_end":         endTime.Format(time.RFC3339),
-		"peak_requests_5m":   peak,
-		"buckets":            buckets,
+		"key_id":           keyID,
+		"bucket_minutes":   5,
+		"window_start":     startTime.Format(time.RFC3339),
+		"window_end":       endTime.Format(time.RFC3339),
+		"peak_requests_5m": peak,
+		"buckets":          buckets,
 	})
 }
 
@@ -1138,14 +1140,14 @@ func (h *Handler) usageByTenant(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	type tenantUsage struct {
-		TenantID         string  `json:"tenant_id"`
-		TotalRequests    int     `json:"total_requests"`
-		TotalPromptTok   int     `json:"total_prompt_tokens"`
-		TotalCompTok     int     `json:"total_completion_tokens"`
-		TotalCostUSD     float64 `json:"total_cost_usd"`
-		UniqueKeys       int     `json:"unique_keys"`
-		UniqueModels     int     `json:"unique_models"`
-		UniqueApps       int     `json:"unique_applications"`
+		TenantID       string  `json:"tenant_id"`
+		TotalRequests  int     `json:"total_requests"`
+		TotalPromptTok int     `json:"total_prompt_tokens"`
+		TotalCompTok   int     `json:"total_completion_tokens"`
+		TotalCostUSD   float64 `json:"total_cost_usd"`
+		UniqueKeys     int     `json:"unique_keys"`
+		UniqueModels   int     `json:"unique_models"`
+		UniqueApps     int     `json:"unique_applications"`
 	}
 
 	var u tenantUsage
@@ -1252,16 +1254,243 @@ func (h *Handler) listTenants(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tenants)
 }
 
+// usageLiveStreamInit 返回原厂/供应商/模型的初始汇总数据
+// 用于实时请求流的冷启动初始化，避免泳道为空
+func (h *Handler) usageLiveStreamInit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	days := queryInt(r, "days", 7)
+	if days < 1 {
+		days = 1
+	}
+	if days > 90 {
+		days = 90
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	tid := EffectiveTenantIDAll(r)
+	whereClause := "ts >= now() - ($1 * INTERVAL '1 day')"
+	args := []any{days}
+	if tid != "" {
+		whereClause += " AND tenant_id = $2"
+		args = append(args, tid)
+	}
+
+	// 汇总原厂（vendor）：从模型名提取
+	vendorMap := make(map[string]int)
+	rows, err := h.db.Query(ctx, `
+		SELECT model, COUNT(*)::int AS cnt
+		FROM usage_ledger
+		WHERE `+whereClause+`
+		GROUP BY model
+		ORDER BY cnt DESC
+		LIMIT 20
+	`, args...)
+	if err != nil {
+		slog.Error("usageLiveStreamInit: vendor query failed", "error", err)
+	} else {
+		defer rows.Close()
+		for rows.Next() {
+			var model string
+			var cnt int
+			if err := rows.Scan(&model, &cnt); err != nil {
+				continue
+			}
+			vendor := identifyVendorFromModel(model)
+			vendorMap[vendor] += cnt
+		}
+	}
+
+	// 汇总供应商（provider_code）
+	providerMap := make(map[string]int)
+	rows2, err := h.db.Query(ctx, `
+		SELECT provider_code, COUNT(*)::int AS cnt
+		FROM usage_ledger
+		WHERE `+whereClause+` AND provider_code IS NOT NULL
+		GROUP BY provider_code
+		ORDER BY cnt DESC
+		LIMIT 20
+	`, args...)
+	if err != nil {
+		slog.Error("usageLiveStreamInit: provider query failed", "error", err)
+	} else {
+		defer rows2.Close()
+		for rows2.Next() {
+			var provider string
+			var cnt int
+			if err := rows2.Scan(&provider, &cnt); err != nil {
+				continue
+			}
+			providerMap[provider] = cnt
+		}
+	}
+
+	// 汇总模型（model）
+	modelMap := make(map[string]int)
+	rows3, err := h.db.Query(ctx, `
+		SELECT model, COUNT(*)::int AS cnt
+		FROM usage_ledger
+		WHERE `+whereClause+`
+		GROUP BY model
+		ORDER BY cnt DESC
+		LIMIT 20
+	`, args...)
+	if err != nil {
+		slog.Error("usageLiveStreamInit: model query failed", "error", err)
+	} else {
+		defer rows3.Close()
+		for rows3.Next() {
+			var model string
+			var cnt int
+			if err := rows3.Scan(&model, &cnt); err != nil {
+				continue
+			}
+			modelMap[model] = cnt
+		}
+	}
+
+	result := map[string]any{
+		"vendors":   vendorMap,
+		"providers": providerMap,
+		"models":    modelMap,
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// identifyVendorFromModel 从模型名识别原厂
+// 与前端的 identifyVendor 逻辑保持一致
+func identifyVendorFromModel(model string) string {
+	m := model
+	// OpenAI
+	if matches(m, "gpt-", "o1-", "o3-", "o4-", "chatgpt") {
+		return "OpenAI"
+	}
+	// Anthropic
+	if matches(m, "claude") {
+		return "Anthropic"
+	}
+	// Google
+	if matches(m, "gemini", "palm", "bard", "gemma") {
+		return "Google"
+	}
+	// Meta
+	if matches(m, "llama", "codellama") {
+		return "Meta"
+	}
+	// Mistral
+	if matches(m, "mistral", "mixtral", "codestral") {
+		return "Mistral"
+	}
+	// Alibaba
+	if matches(m, "qwen", "qwq", "tongyi") {
+		return "Alibaba"
+	}
+	// DeepSeek
+	if matches(m, "deepseek") {
+		return "DeepSeek"
+	}
+	// xAI
+	if matches(m, "grok") {
+		return "xAI"
+	}
+	// Cohere
+	if matches(m, "command", "cohere") {
+		return "Cohere"
+	}
+	// Microsoft
+	if matches(m, "phi-", "wizardlm") {
+		return "Microsoft"
+	}
+	// NVIDIA
+	if matches(m, "nemotron", "nvidia") {
+		return "NVIDIA"
+	}
+	// 01.AI
+	if matches(m, "yi-", "yi_") {
+		return "01.AI"
+	}
+	// Baichuan
+	if matches(m, "baichuan") {
+		return "Baichuan"
+	}
+	// Zhipu
+	if matches(m, "glm", "chatglm") {
+		return "Zhipu"
+	}
+	// Moonshot
+	if matches(m, "moonshot", "kimi") {
+		return "Moonshot"
+	}
+	// ByteDance
+	if matches(m, "doubao") {
+		return "ByteDance"
+	}
+	// Baidu
+	if matches(m, "ernie", "wenxin") {
+		return "Baidu"
+	}
+	// Tencent
+	if matches(m, "hunyuan") {
+		return "Tencent"
+	}
+	// iFlytek
+	if matches(m, "spark", "iflytek") {
+		return "iFlytek"
+	}
+	return "Other"
+}
+
+// matches 辅助函数：检查模型名是否包含任一关键词
+func matches(model string, keywords ...string) bool {
+	for _, kw := range keywords {
+		if contains(model, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func contains(s, substr string) bool {
+	// 简单的子串匹配（大小写不敏感）
+	sLower := ""
+	subLower := ""
+	for _, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			sLower += string(r + 32)
+		} else {
+			sLower += string(r)
+		}
+	}
+	for _, r := range substr {
+		if r >= 'A' && r <= 'Z' {
+			subLower += string(r + 32)
+		} else {
+			subLower += string(r)
+		}
+	}
+	for i := 0; i <= len(sLower)-len(subLower); i++ {
+		if sLower[i:i+len(subLower)] == subLower {
+			return true
+		}
+	}
+	return false
+}
+
 // resolveUsageTimeRange parses the start/end and days query parameters
 // for the per-key usage endpoints and returns the (start, end) pair
 // to use in SQL.  Semantics:
 //
 //   - start + end provided  → use them as [start, end).  start is
-//                              inclusive at 00:00:00 UTC; end is
-//                              exclusive at 00:00:00 UTC of the day
-//                              AFTER end (so the end date itself is
-//                              included — matches user expectations
-//                              from a date picker).
+//     inclusive at 00:00:00 UTC; end is
+//     exclusive at 00:00:00 UTC of the day
+//     AFTER end (so the end date itself is
+//     included — matches user expectations
+//     from a date picker).
 //   - start alone           → invalid; require end too.
 //   - end alone             → invalid; require start too.
 //   - neither               → fall back to [now - defaultDays, now).

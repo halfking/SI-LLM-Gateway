@@ -137,3 +137,14 @@ export function getKeyUsageTrend(keyId: number, period: UsageTrendPeriod = 'day'
   }
   return req<TrendEntry[]>('GET', `/api/usage/${keyId}/trend?${qs.toString()}`)
 }
+
+// 获取原厂/供应商/模型的初始汇总数据（用于实时请求流的初始化）
+export interface InitialLiveStreamStats {
+  vendors: Record<string, number>
+  providers: Record<string, number>
+  models: Record<string, number>
+}
+
+export function getInitialLiveStreamStats(days = 7) {
+  return req<InitialLiveStreamStats>('GET', `/api/usage/live-stream-init?days=${days}`)
+}
