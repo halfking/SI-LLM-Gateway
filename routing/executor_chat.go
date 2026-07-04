@@ -536,7 +536,13 @@ func (e *Executor) executeOpenAI(
 							if err != nil {
 								return nil, err
 							}
-							return nil, &retryableError{err: fmt.Errorf("upstream %d", resp.StatusCode)}
+							// 2026-07-03 P0 fix: preserve errKind in context-length retry path
+							return nil, &retryableError{err: &upstreampkg.Error{
+								Kind:       errKind,
+								StatusCode: resp.StatusCode,
+								Body:       append([]byte(nil), body[:n]...),
+								Message:    fmt.Sprintf("upstream %d", resp.StatusCode),
+							}}
 						case ctxLenGiveUp:
 							// Return a typed error so the outer Execute
 							// loop knows this is a context-length
@@ -556,9 +562,24 @@ func (e *Executor) executeOpenAI(
 					// Do not write 4xx to ResponseWriter here — Execute() may
 					// fail over to the next credential. Writing first would
 					// prepend e.g. "404 page not found" before a later 200 body.
-					return nil, fmt.Errorf("upstream %d: %s", resp.StatusCode, string(body[:min(n, 200)]))
+					// 2026-07-03 P0 fix: return *upstreampkg.Error to preserve
+					// errKind (e.g. tool_call_id_mismatch) instead of degrading
+					// to transient via fmt.Errorf. Previously 99.7% of transient
+					// errors were misclassified client bugs (tool_call_id_mismatch).
+					return nil, &upstreampkg.Error{
+						Kind:       errKind,
+						StatusCode: resp.StatusCode,
+						Body:       append([]byte(nil), body[:n]...),
+						Message:    fmt.Sprintf("upstream %d: %s", resp.StatusCode, string(body[:min(n, 200)])),
+					}
 				}
-				return nil, &retryableError{err: fmt.Errorf("upstream %d", resp.StatusCode)}
+				// 2026-07-03 P0 fix: preserve errKind in 5xx retryable path
+				return nil, &retryableError{err: &upstreampkg.Error{
+					Kind:       errKind,
+					StatusCode: resp.StatusCode,
+					Body:       append([]byte(nil), body[:n]...),
+					Message:    fmt.Sprintf("upstream %d", resp.StatusCode),
+				}}
 			}
 
 			e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)

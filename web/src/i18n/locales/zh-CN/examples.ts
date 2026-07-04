@@ -4,6 +4,28 @@ export default {
   intro: '网关兼容 OpenAI API 协议。将 base_url 指向此网关即可使用任意支持的模型；也可在侧栏「对话」直接网页聊天。',
   sectionClientConfig: '常用客户端配置',
   sectionApiExamples: 'API 请求示例',
+  tools: {
+    zcode: {
+      name: 'ZCode',
+      description: '智谱 AI 编程 IDE，基于 OpenCode 配置 schema',
+    },
+    opencode: {
+      name: 'OpenCode',
+      description: '终端 AI 编码 agent（opencode.ai）',
+    },
+    cursor: {
+      name: 'Cursor',
+      description: 'AI-first 代码编辑器，支持 OpenAI 兼容 API',
+    },
+    cherry_studio: {
+      name: 'Cherry Studio',
+      description: '多模型桌面客户端，支持批量导入提供商',
+    },
+    roocode: {
+      name: 'Roo Code / VS Code',
+      description: 'VS Code + Roo Code 扩展，配置 roo-cline',
+    },
+  },
   keyHint: '示例代码中的 API Key 已脱敏显示；点击「测试」将使用当前登录密钥。复制示例后请自行替换为真实 Key。',
   copyKey: '复制完整 Key',
   copied: '已复制!',

@@ -6,10 +6,12 @@
 // Keys use camelCase nested objects so vue-i18n's `t()` interpolation and
 // `t('landing.features.X.title', { ... })` substitution both work.
 export default {
-  kicker: 'Passerelle IA & Agent pour entreprise',
-  title: 'Passerelle IA & Agent Kaixuan pour entreprise',
-  subtitle:
-    'La passerelle unifiée, du proxy LLM à l\'orchestration d\'agents. Un point d\'entrée pour chaque LLM — routage intelligent, boucliers de sécurité, réduction des coûts par cache, audit de bout en bout. Chaque appel IA est observable, contrôlable et facturable.',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'Passerelle cœur d\'organisation AI-Native',
+  subtitle: [
+    'Faites de l\'IA une capacité native de votre organisation.',
+    'Open core + renforcement entreprise + gouvernance Vibe Coding + monétisation des sessions.',
+  ],
   featuresTitle: 'Capacités clés',
   featuresSubtitle: 'Couvre toute la chaîne, de l\'accès à l\'exploitation',
   heroPoints: [

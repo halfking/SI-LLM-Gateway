@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { TOOLS, type ToolId } from '../composables/useClientConfig'
+import { TOOL_IDS, type ToolId } from '../composables/useClientConfig'
 import ClientConfigDialog from './ClientConfigDialog.vue'
 
 const emit = defineEmits<{ (e: 'openDialog', tool: ToolId): void }>()
@@ -19,12 +19,12 @@ function openDialog(tool: ToolId) {
 
 <template>
   <div class="tool-grid">
-    <div v-for="tool in TOOLS" :key="tool.id" class="tool-card">
+    <div v-for="tool in TOOL_IDS" :key="tool.id" class="tool-card">
       <div class="tool-card-header">
         <span class="tool-icon">{{ tool.icon }}</span>
         <div class="tool-title">
-          <span class="tool-name">{{ tool.name }}</span>
-          <span class="tool-desc">{{ tool.description }}</span>
+          <span class="tool-name">{{ t(`examples.tools.${tool.id}.name`) }}</span>
+          <span class="tool-desc">{{ t(`examples.tools.${tool.id}.description`) }}</span>
         </div>
       </div>
       <div class="tool-card-actions">

@@ -99,7 +99,10 @@ func (h *Handler) checkProvider(w http.ResponseWriter, r *http.Request, provider
 
 		decrypted, decErr := h.decryptCredStr(string(ciphertext))
 		if decErr != nil {
-			healthStatus = "error"
+			// 2026-07-03: use "unreachable" instead of "error" to comply with
+			// chk_credentials_health_status CHECK constraint (unknown/healthy/warning/unreachable).
+			// Decrypt failure means the credential is effectively inaccessible.
+			healthStatus = "unreachable"
 			errMsg = "decrypt failed"
 			results = append(results, credResult{CredentialID: credID, Label: label, Status: healthStatus, Error: errMsg})
 			continue

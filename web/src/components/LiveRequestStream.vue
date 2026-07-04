@@ -14,8 +14,9 @@
 // tail tile gets the entrance animation.
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useLiveStream, type LiveStatus } from '../composables/useLiveStream'
+import { useLiveStream } from '../composables/useLiveStream'
 import { useElementSize } from '../composables/useElementSize'
+import { statusCategory, type StatusCategory } from '../composables/liveStreamDisplay'
 import LiveRequestBlock from './LiveRequestBlock.vue'
 import LiveStreamLegend from './LiveStreamLegend.vue'
 
@@ -27,13 +28,21 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { requests, connection, paused, togglePause } = useLiveStream()
 
-const statusFilter = ref<'all' | LiveStatus>('all')
+type StatusFilter = 'all' | 'success' | 'in_progress' | StatusCategory
+const statusFilter = ref<StatusFilter>('all')
 
 const filteredRequests = computed(() => {
   if (statusFilter.value === 'all') return requests.value
   return requests.value.filter((r) => {
     if (r.type === 'idle_marker') return true
-    return r.status === statusFilter.value
+    // 'success' / 'in_progress' match the raw status directly. The
+    // failure_* buckets come from statusCategory(), which inspects
+    // both `status` and `error_kind` to decide which of the 5
+    // coarse failure families the request belongs to.
+    if (statusFilter.value === 'success' || statusFilter.value === 'in_progress') {
+      return r.status === statusFilter.value
+    }
+    return statusCategory(r.status, r.error_kind ?? null) === statusFilter.value
   })
 })
 
@@ -42,7 +51,11 @@ const filteredRequests = computed(() => {
 // Tile pitch = 52px wide + 4px gap. Reserve ~120px on the right so
 // the entrance animation has room to overshoot without escaping the
 // track. The idle marker is wider (110px) and counted separately.
-const TILE_WIDTH = 52
+// Tile pitch = 60px wide + 4px gap. Reserve ~24px on the right so
+// the entrance animation has room to overshoot without escaping
+// the track. The idle marker is wider (110px) and counted
+// separately.
+const TILE_WIDTH = 60
 const TILE_GAP = 4
 const TILE_PITCH = TILE_WIDTH + TILE_GAP
 const IDLE_WIDTH = 110
@@ -115,10 +128,22 @@ function onSelect(requestId: string) {
           <option value="all">{{ t('dashboard.liveStream.filterAll') }}</option>
           <option value="success">{{ t('dashboard.liveStream.filterSuccess') }}</option>
           <option value="in_progress">{{ t('dashboard.liveStream.filterInProgress') }}</option>
-          <option value="failure">{{ t('dashboard.liveStream.filterFailure') }}</option>
+          <optgroup :label="t('dashboard.liveStream.filterGroupFailures')">
+            <option value="failure_5xx">{{ t('dashboard.liveStream.filterFailure5xx') }}</option>
+            <option value="failure_4xx">{{ t('dashboard.liveStream.filterFailure4xx') }}</option>
+            <option value="failure_timeout">{{ t('dashboard.liveStream.filterFailureTimeout') }}</option>
+            <option value="failure_not_found">{{ t('dashboard.liveStream.filterFailureNotFound') }}</option>
+            <option value="failure_other">{{ t('dashboard.liveStream.filterFailureOther') }}</option>
+          </optgroup>
         </select>
-        <span class="live-stream__count" :title="`${realTileCount} total / ${visibleTileCount} visible`">
-          {{ realTileCount }} / {{ visibleTileCount }}
+        <span
+          class="live-stream__count"
+          :title="t('dashboard.liveStream.countTooltip', { buffer: realTileCount, visible: visibleTileCount })"
+          :aria-label="t('dashboard.liveStream.countAria', { buffer: realTileCount, visible: visibleTileCount })"
+        >
+          <span class="live-stream__count-num">{{ realTileCount }}</span>
+          <span class="live-stream__count-sep">/</span>
+          <span class="live-stream__count-num">{{ visibleTileCount }}</span>
         </span>
       </div>
     </div>
@@ -153,7 +178,13 @@ function onSelect(requestId: string) {
  *   - track is overflow:hidden (no horizontal scrollbar)
  *   - tile pitch is computed at runtime via useElementSize
  *   - 4px tile gap, 6px top/bottom padding, 80px track height
- *     leaves enough room for hover-scale + pulse glow */
+ *     leaves enough room for hover-scale + pulse glow
+ *
+ * 2026-07-03 v6: header row NEVER wraps. The status / pause button /
+ * filter / count are sized so a 1280px dashboard fits all of them
+ * on one line; on a narrower viewport the flex children shrink
+ * proportionally (text becomes ellipsised, NOT wrapped).
+ */
 .live-stream {
   border: 1px solid var(--border, #30363d);
   border-radius: var(--radius, 8px);
@@ -165,10 +196,16 @@ function onSelect(requestId: string) {
 .live-stream__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 12px;
+  /* flex-wrap: nowrap is the single most important rule for this
+   * header — the user explicitly asked for "no wrapping" so the
+   * status/button/select/count always sit on one row. When the
+   * viewport is too narrow, each child shrinks via flex-shrink
+   * + min-width: 0 below. */
+  flex-wrap: nowrap;
+  gap: 10px;
   margin-bottom: 10px;
+  /* Push everything into a single row no matter what. */
+  min-width: 0;
 }
 
 .live-stream__title {
@@ -176,12 +213,25 @@ function onSelect(requestId: string) {
   font-weight: 600;
   margin: 0;
   color: var(--text, #e6edf3);
+  /* The title is the only "always-fits" piece. flex-shrink: 0
+   * means the title never gives up its space to the controls. */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .live-stream__controls {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Controls take the remaining space. min-width: 0 lets flex
+   * actually shrink the children below their intrinsic width. */
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+  /* All children must NOT wrap; long labels become ellipsised
+   * via the .live-stream__select override below. */
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .live-stream__status {
@@ -190,12 +240,15 @@ function onSelect(requestId: string) {
   gap: 6px;
   font-size: 12px;
   color: var(--muted, #8b949e);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .live-stream__dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--muted, #8b949e);
+  flex-shrink: 0;
 }
 .live-stream__status--ok .live-stream__dot {
   background: var(--success, #3fb950);
@@ -210,7 +263,33 @@ function onSelect(requestId: string) {
   50%      { opacity: 0.4; }
 }
 
-.live-stream__btn,
+/* Pause/resume button. Fixed width so the row layout is stable
+ * across locales (zh-CN 的 "继续" / en-US 的 "Resume" are 2 vs 6
+ * chars but both fit in the same column). */
+.live-stream__btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border, #30363d);
+  background: var(--bg, #0f1117);
+  color: var(--text, #e6edf3);
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-width: 64px;
+}
+.live-stream__btn:hover {
+  background: var(--bg-subtle, #161b22);
+  border-color: var(--accent, #6366f1);
+}
+
+/* Filter <select>. This is the longest element in the row and the
+ * most likely to overflow — we give it a min-width, a max-width,
+ * and let it shrink when the row is narrow. The displayed text
+ * comes from i18n, so we set min-width based on the *longest*
+ * locale label (~"Routing / model not found" = 30 chars). 30ch
+ * keeps the row balanced in English while still letting zh-CN's
+ * 14-char label expand into the available space. */
 .live-stream__select {
   font-size: 12px;
   padding: 4px 10px;
@@ -219,25 +298,50 @@ function onSelect(requestId: string) {
   background: var(--bg, #0f1117);
   color: var(--text, #e6edf3);
   cursor: pointer;
-}
-.live-stream__btn:hover {
-  background: var(--bg-subtle, #161b22);
-  border-color: var(--accent, #6366f1);
+  /* Width policy:
+   *   - min-width 120px so the dropdown always shows the current
+   *     selection truncated to "Failure bre…" (the longest stable
+   *     prefix)
+   *   - max-width 220px so on a 1920px display the filter does not
+   *     eat the count badge
+   *   - flex 0 1 auto lets the select shrink below intrinsic width
+   *     but still honour min-width */
+  flex: 0 1 auto;
+  min-width: 120px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .live-stream__select option {
   background: var(--card, #1c2128);
   color: var(--text, #e6edf3);
 }
 
+/* Counter badge: fixed width (matches 3 digits + / + 2 digits). */
 .live-stream__count {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--muted, #8b949e);
-  padding: 2px 6px;
+  padding: 4px 10px;
   border: 1px solid var(--border, #30363d);
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--bg, #0f1117);
   font-variant-numeric: tabular-nums;
+  min-width: 78px;
+  justify-content: center;
+}
+.live-stream__count-num {
+  color: var(--text, #e6edf3);
+  font-weight: 600;
+}
+.live-stream__count-sep {
+  color: var(--border, #30363d);
 }
 
 .live-stream__track {

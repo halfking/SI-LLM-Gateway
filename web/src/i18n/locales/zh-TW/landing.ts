@@ -4,10 +4,12 @@
 //
 // 使用 camelCase 巢狀物件，便於 vue-i18n 的 t() 插值與 t('landing.features.X.title', {...}) 替換。
 export default {
-  kicker: 'Enterprise AI & Agent Gateway',
-  title: '開軒企業 AI 與智慧體閘道',
-  subtitle:
-    '從大模型代理到智慧體編排的統一入口。統一接入多家 LLM，智慧路由、安全護盾、快取降本、全鏈路稽核——讓企業的每一次 AI 呼叫可控、可觀測、可計費。',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'AI-Native 組織核心閘道',
+  subtitle: [
+    '讓 AI 成為組織的原生能力。',
+    '核心開源 + 企業增強 + Vibe Coding 治理 + 會話資產化。',
+  ],
   featuresTitle: '核心能力',
   featuresSubtitle: '覆蓋從接入到營運的關鍵環節',
   heroPoints: ['智慧路由', '呼叫安全', '快取降本', 'Agent 就緒', '全鏈路稽核', 'MaaS 計費'],

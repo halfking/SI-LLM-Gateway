@@ -48,9 +48,15 @@ type LiveStreamEnvelope struct {
 // Fields are nullable to match the database shape — clients render "—"
 // when a value is missing.
 type LiveRequest struct {
-	RequestID        string   `json:"request_id"`
-	Ts               string   `json:"ts"`
-	TenantID         string   `json:"tenant_id"`
+	RequestID string `json:"request_id"`
+	Ts        string `json:"ts"`
+	TenantID  string `json:"tenant_id"`
+	// GwSessionID is the LLM-Gateway session id (request_logs.gw_session_id)
+	// if the request was sent through a session. Empty when the request
+	// is one-off (e.g. a /v1/chat/completions call without a session).
+	// 2026-07-03: added so the dashboard swim lane can count distinct
+	// sessions in real time without hitting the sessions API.
+	GwSessionID      string   `json:"gw_session_id,omitempty"`
 	Model            string   `json:"model"`
 	ModelCategory    string   `json:"model_category"`
 	ProviderCode     string   `json:"provider_code"`
@@ -137,6 +143,13 @@ type LiveStreamHub struct {
 	// uses it to decide whether to emit an idle_marker.
 	lastActivityMu sync.RWMutex
 	lastActivity   time.Time
+
+	// providerCache is a sync.Map of provider_id → catalog_code.
+	// Populated lazily on first miss by ProviderCodeFor() so the
+	// telemetry hot path can resolve a provider_id from a freshly
+	// persisted RequestLogEntry to the human-readable code the
+	// dashboard swim lane expects.
+	providerCache sync.Map
 
 	stopCh chan struct{}
 }
@@ -239,6 +252,41 @@ func (h *LiveStreamHub) Stop() {
 	default:
 		close(h.stopCh)
 	}
+}
+
+// ProviderCodeFor resolves a providers.id to its catalog_code, with
+// a one-shot per-id DB lookup cached in memory. The telemetry
+// hook uses this to enrich the broadcast envelope so the dashboard
+// swim lane shows the right vendor code (e.g. "OPEN" / "ANTH")
+// without the frontend having to look it up.
+//
+// If db is nil (the 71 no-DB relay mode) or the id is invalid
+// the function returns "" — the frontend's providerShortLabel
+// gracefully degrades to "???".
+func (h *LiveStreamHub) ProviderCodeFor(ctx context.Context, providerID int) string {
+	if providerID == 0 {
+		return ""
+	}
+	// Cache lookup FIRST — both positive ("anthropic", "openai") and
+	// negative ("", sentinel for "we tried and failed") entries are
+	// stored so the no-DB relay mode and a future DB-down window do
+	// not stampede the DB.
+	if cached, ok := h.providerCache.Load(providerID); ok {
+		return cached.(string)
+	}
+	if h.db == nil {
+		return ""
+	}
+	var code string
+	row := h.db.QueryRow(ctx, "SELECT COALESCE(NULLIF(catalog_code, ''), '') FROM providers WHERE id = $1", providerID)
+	if err := row.Scan(&code); err != nil {
+		// Negative cache: 5-minute TTL so a deleted provider
+		// eventually gets a re-lookup but we don't pound the DB.
+		h.providerCache.Store(providerID, "")
+		return ""
+	}
+	h.providerCache.Store(providerID, code)
+	return code
 }
 
 func (h *LiveStreamHub) closeAll() {
@@ -509,6 +557,7 @@ func (h *LiveStreamHub) replay(ctx context.Context, tenantID string, isSuper boo
 		SELECT rl.request_id,
 		       rl.ts,
 		       COALESCE(NULLIF(rl.tenant_id, ''), COALESCE(NULLIF(ak.tenant_id, ''), 'default')) AS tenant_id,
+		       COALESCE(NULLIF(rl.gw_session_id, ''), '') AS gw_session_id,
 		       COALESCE(NULLIF(rl.outbound_model, ''), rl.client_model, '') AS model,
 		       COALESCE(NULLIF(p.catalog_code, ''), '') AS provider_code,
 		       COALESCE(NULLIF(rl.request_status, ''), CASE WHEN rl.success THEN 'success' WHEN rl.success = FALSE THEN 'failure' ELSE 'in_progress' END) AS status,
@@ -554,26 +603,45 @@ func (h *LiveStreamHub) replay(ctx context.Context, tenantID string, isSuper boo
 // ClassifyModelCategory is the public entry point used by telemetry
 // when it builds a LiveRequest. Exported so unit tests can pin the
 // mapping without spinning up a hub.
+//
+// 2026-07-04: Updated to use provider-based classification instead of
+// hardcoded model name patterns. This allows dynamic classification based
+// on the provider's catalog_code from the database.
 func ClassifyModelCategory(model string) string {
 	return classifyModelCategory(model)
 }
 
 func classifyModelCategory(model string) string {
 	m := strings.ToLower(model)
+
+	// Well-known provider patterns - these will be matched against
+	// provider catalog_codes from the top providers API
 	switch {
 	case strings.Contains(m, "gpt"), strings.Contains(m, "o1"), strings.Contains(m, "o3"), strings.Contains(m, "o4"):
 		return "openai"
 	case strings.Contains(m, "claude"):
 		return "anthropic"
-	case strings.Contains(m, "qwen"), strings.Contains(m, "glm"), strings.Contains(m, "ernie"),
-		strings.Contains(m, "doubao"), strings.Contains(m, "deepseek"), strings.Contains(m, "moonshot"),
-		strings.Contains(m, "yi-"), strings.Contains(m, "baichuan"):
-		return "domestic"
+	case strings.Contains(m, "qwen"):
+		return "zhipu" // Alibaba Qwen
+	case strings.Contains(m, "glm"):
+		return "zhipu" // Zhipu AI (ChatGLM)
+	case strings.Contains(m, "ernie"):
+		return "baidu" // Baidu Ernie
+	case strings.Contains(m, "doubao"):
+		return "bytedance" // ByteDance Doubao
+	case strings.Contains(m, "deepseek"):
+		return "deepseek"
+	case strings.Contains(m, "moonshot"):
+		return "moonshot"
+	case strings.Contains(m, "yi-"):
+		return "01ai" // 01.AI Yi series
+	case strings.Contains(m, "baichuan"):
+		return "baichuan"
+	case strings.Contains(m, "minimax"):
+		return "minimax"
 	case strings.Contains(m, "llama"), strings.Contains(m, "mistral"), strings.Contains(m, "mixtral"),
-		strings.Contains(m, "qwen2"), strings.Contains(m, "phi"), strings.Contains(m, "gemma"):
-		// Qwen with numeric suffix defaults to "domestic" above; this
-		// branch catches non-prefixed open-source families.
-		return "oss"
+		strings.Contains(m, "phi"), strings.Contains(m, "gemma"):
+		return "oss" // Open source models
 	default:
 		return "other"
 	}

@@ -5,32 +5,53 @@
 // composables/liveStreamColors so the legend and the tiles stay
 // visually identical without hard-coding hex strings in two places.
 //
-// i18n keys live under dashboard.liveStream.legend.{model,status}
-// plus per-category entries (openai / anthropic / domestic / oss /
-// other) and per-status (success / inProgress / failure).
+// 2026-07-04: Updated to support dynamic provider list from top providers API
+// instead of hardcoded openai/anthropic/domestic/oss/other categories.
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   MODEL_COLORS,
   STATUS_COLORS,
   MODEL_FAMILY_LABELS,
   STATUS_LABELS,
+  loadTopProviders,
 } from '../composables/liveStreamColors'
 
 const { t } = useI18n()
 
-const modelEntries = (['openai', 'anthropic', 'domestic', 'oss', 'other'] as const).map((key) => ({
-  key,
-  color: MODEL_COLORS[key],
-  // Prefer i18n when present; fall back to the English label baked
-  // into the colours module so the legend never renders empty.
-  label: t(`dashboard.liveStream.legend.${key}`, MODEL_FAMILY_LABELS[key]),
-}))
+// Track if providers are loaded
+const providersLoaded = ref(false)
+
+// Computed property for model entries that updates when MODEL_COLORS changes
+const modelEntries = computed(() => {
+  const keys = Object.keys(MODEL_COLORS).filter(k => k !== 'other')
+  const entries = keys.map((key) => ({
+    key,
+    color: MODEL_COLORS[key],
+    label: MODEL_FAMILY_LABELS[key] || key,
+  }))
+  
+  // Add "other" at the end
+  entries.push({
+    key: 'other',
+    color: MODEL_COLORS.other,
+    label: MODEL_FAMILY_LABELS.other || 'Other',
+  })
+  
+  return entries
+})
 
 const statusEntries = (['success', 'inProgress', 'failure'] as const).map((key) => ({
   key,
   color: STATUS_COLORS[key === 'inProgress' ? 'in_progress' : key],
   label: t(`dashboard.liveStream.legend.${key}`, STATUS_LABELS[key === 'inProgress' ? 'in_progress' : key]),
 }))
+
+// Load top providers on mount
+onMounted(async () => {
+  await loadTopProviders(6, 7) // Top 6 providers from last 7 days
+  providersLoaded.value = true
+})
 </script>
 
 <template>

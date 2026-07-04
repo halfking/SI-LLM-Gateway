@@ -310,5 +310,30 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
       clearReconnect()
       connect()
     },
+    /**
+     * Register a callback that fires every time a request_id is
+     * evicted from the buffer (either because the buffer is at
+     * capacity and the oldest was shifted out, or because an
+     * initial_data replay replaced the previous IDs).
+     *
+     * The dashboard uses this to keep its stat-card accumulators
+     * honest: when an ID leaves the buffer we know we'll never see
+     * it again in a delta, so any per-request stat already baked
+     * into the totals does NOT need to be subtracted (the totals
+     * are forever cumulative) — but the per-tenant "live in
+     * buffer" count CAN be decremented.
+     */
+    onRequestEvicted: (cb: (id: string) => void) => {
+      onEvict = cb
+    },
+    /**
+     * Reset both the visible buffer and the id index. Used by the
+     * "Refresh" button so the next delta starts from a clean slate.
+     */
+    reset: () => {
+      requests.value = []
+      idIndex.clear()
+      pending.length = 0
+    },
   }
 }

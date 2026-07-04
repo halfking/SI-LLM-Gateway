@@ -153,8 +153,11 @@ func (h *Handler) doHealthCheck(ctx context.Context, providerID, credID int) (ma
 	var modelsStatus int
 
 	if decErr != nil {
-		healthStatus = "error"
-		healthError = "decrypt failed"
+		// 2026-07-03: use "unreachable" instead of "error" to comply with
+		// chk_credentials_health_status CHECK constraint (unknown/healthy/warning/unreachable).
+		// Decrypt failure means the credential is effectively inaccessible.
+		healthStatus = "unreachable"
+		healthError = "decrypt failed: " + decErr.Error()
 		msg := healthError
 		apiModelsErr = &msg
 	} else {
@@ -169,10 +172,10 @@ func (h *Handler) doHealthCheck(ctx context.Context, providerID, credID int) (ma
 		// 422/402 fail fast; everything else (5xx, 408, 425, 429, network
 		// errors) retries.
 		var (
-			models     []string
-			source     string
-			fetchErr   error
-			attempts   int
+			models   []string
+			source   string
+			fetchErr error
+			attempts int
 		)
 		fetchStart := time.Now()
 		for _, delay := range probeutil.ProbeRetryDelays {
@@ -251,19 +254,19 @@ func (h *Handler) doHealthCheck(ctx context.Context, providerID, credID int) (ma
 	}
 
 	return map[string]any{
-		"credential_id":          credID,
-		"health_status":          healthStatus,
-		"probe_ok":               probeOk,
-		"models_ok":              modelsOk,
-		"models_count":           modelsCount,
-		"health_latency_ms":      healthLatencyMs,
-		"health_error":           healthError,
-		"models_failure_reason":  apiModelsErr,
-		"models_error":           apiModelsErr,
-		"models_status":          modelsStatus,
-		"sample_models":          sampleModels,
-		"effective_source":       effectiveSource,
-		"discovery_strategy":     cred.discoveryStrategy,
+		"credential_id":            credID,
+		"health_status":            healthStatus,
+		"probe_ok":                 probeOk,
+		"models_ok":                modelsOk,
+		"models_count":             modelsCount,
+		"health_latency_ms":        healthLatencyMs,
+		"health_error":             healthError,
+		"models_failure_reason":    apiModelsErr,
+		"models_error":             apiModelsErr,
+		"models_status":            modelsStatus,
+		"sample_models":            sampleModels,
+		"effective_source":         effectiveSource,
+		"discovery_strategy":       cred.discoveryStrategy,
 		"models_endpoint_template": cred.modelsEndpointTpl,
 	}, nil
 }
@@ -347,17 +350,17 @@ func (h *Handler) getCredentialUsage(w http.ResponseWriter, r *http.Request, cre
 	`, credID, days).Scan(&reqCount, &promptTok, &compTok, &cost, &avgLatency, &successRate)
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"credential_id":      credID,
-		"label":              label,
-		"status":             status,
-		"provider_name":      providerName,
-		"days":               days,
-		"request_count":      reqCount,
-		"prompt_tokens":      promptTok,
-		"completion_tokens":  compTok,
-		"cost_usd":           cost,
-		"avg_latency_ms":     avgLatency,
-		"success_rate":       successRate,
+		"credential_id":     credID,
+		"label":             label,
+		"status":            status,
+		"provider_name":     providerName,
+		"days":              days,
+		"request_count":     reqCount,
+		"prompt_tokens":     promptTok,
+		"completion_tokens": compTok,
+		"cost_usd":          cost,
+		"avg_latency_ms":    avgLatency,
+		"success_rate":      successRate,
 	})
 }
 
@@ -366,11 +369,12 @@ func (h *Handler) getCredentialUsage(w http.ResponseWriter, r *http.Request, cre
 // in internal/probeutil.
 //
 // Recognised fetch error shapes (produced by fetchVendorModels):
-//   "models endpoint returned 503: ..."  → status 503 → retryable
-//   "no models found from any candidate URL" → no status code → retryable
-//     (could be all-URLs 5xx or network blip)
-//   "Get \"...\": dial tcp: ..."         → network error → retryable
-//   "<url>: context canceled"           → ctx cancel → fail-fast (stop signal)
+//
+//	"models endpoint returned 503: ..."  → status 503 → retryable
+//	"no models found from any candidate URL" → no status code → retryable
+//	  (could be all-URLs 5xx or network blip)
+//	"Get \"...\": dial tcp: ..."         → network error → retryable
+//	"<url>: context canceled"           → ctx cancel → fail-fast (stop signal)
 func shouldRetryAdminFetchErr(err error) bool {
 	if err == nil {
 		return false
@@ -398,4 +402,3 @@ func shouldRetryAdminFetchErr(err error) bool {
 	// The shared classifier (status==0 → retryable) covers this.
 	return probeutil.IsProbeRetryableStatus(0)
 }
-

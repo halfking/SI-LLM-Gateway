@@ -3,6 +3,8 @@ package circuit
 import (
 	"testing"
 	"time"
+
+	"github.com/kaixuan/llm-gateway-go/errorsx"
 )
 
 func TestNewBreakerIsClosed(t *testing.T) {
@@ -234,18 +236,18 @@ func TestConsecutiveFailures(t *testing.T) {
 func TestManagerCreateAndGet(t *testing.T) {
 	m := NewManager()
 
-	b1 := m.GetOrCreate(1, 1)
-	b2 := m.GetOrCreate(1, 1)
+	b1 := m.GetOrCreate(1, 1, "model-a")
+	b2 := m.GetOrCreate(1, 1, "model-a")
 	if b1 != b2 {
 		t.Fatal("GetOrCreate should return same instance")
 	}
 
-	b3 := m.Get(1, 1)
+	b3 := m.Get(1, 1, "model-a")
 	if b3 != b1 {
 		t.Fatal("Get should return same instance")
 	}
 
-	b4 := m.Get(999, 999)
+	b4 := m.Get(999, 999, "model-a")
 	if b4 != nil {
 		t.Fatal("Get for non-existent should return nil")
 	}
@@ -254,32 +256,32 @@ func TestManagerCreateAndGet(t *testing.T) {
 func TestManagerRecordAndAllow(t *testing.T) {
 	m := NewManager()
 
-	if !m.Allow(1, 1) {
+	if !m.Allow(1, 1, "model-a") {
 		t.Fatal("should allow initially")
 	}
 
-	m.RecordFailure(1, 1, KindAuth)
-	if !m.Allow(1, 1) {
+	m.RecordFailure(1, 1, "model-a", KindAuth)
+	if !m.Allow(1, 1, "model-a") {
 		t.Fatal("should still allow after one unconfirmed auth failure")
 	}
-	m.RecordFailure(1, 1, KindAuth)
-	if m.Allow(1, 1) {
+	m.RecordFailure(1, 1, "model-a", KindAuth)
+	if m.Allow(1, 1, "model-a") {
 		t.Fatal("should not allow after auth failure")
 	}
 
-	m.RecordSuccess(1, 1)
-	if !m.Allow(1, 1) {
+	m.RecordSuccess(1, 1, "model-a")
+	if !m.Allow(1, 1, "model-a") {
 		t.Fatal("should allow after success")
 	}
 }
 
 func TestManagerStats(t *testing.T) {
 	m := NewManager()
-	m.GetOrCreate(1, 1)
-	m.GetOrCreate(2, 2)
+	m.GetOrCreate(1, 1, "model-a")
+	m.GetOrCreate(2, 2, "model-b")
 
-	m.RecordFailure(1, 1, KindAuth)
-	m.RecordFailure(1, 1, KindAuth) // quarantined
+	m.RecordFailure(1, 1, "model-a", KindAuth)
+	m.RecordFailure(1, 1, "model-a", KindAuth) // quarantined
 
 	stats := m.Stats()
 	if len(stats) != 2 {
@@ -301,45 +303,45 @@ func TestManagerStats(t *testing.T) {
 func TestManagerProbeCheck(t *testing.T) {
 	m := NewManager()
 	for i := 0; i < int(autoRecoveryFailureThreshold); i++ {
-		m.RecordFailure(1, 1, KindTransient)
+		m.RecordFailure(1, 1, "model-a", KindTransient)
 	}
 
 	// Should not probe while still cooling
-	if m.ProbeCheck(1, 1) {
+	if m.ProbeCheck(1, 1, "model-a") {
 		t.Fatal("should not probe while open")
 	}
 
 	// Manually expire cooling
-	b := m.Get(1, 1)
+	b := m.Get(1, 1, "model-a")
 	b.mu.Lock()
 	b.coolingExpires = time.Now().Add(-1 * time.Second)
 	b.mu.Unlock()
 
-	if !m.ProbeCheck(1, 1) {
+	if !m.ProbeCheck(1, 1, "model-a") {
 		t.Fatal("should probe after cooling expiry")
 	}
 
 	// Close the probe with success
-	m.CloseProbe(1, 1, true, "")
-	if m.Allow(1, 1) != true {
+	m.CloseProbe(1, 1, "model-a", true, "")
+	if m.Allow(1, 1, "model-a") != true {
 		t.Fatal("should allow after probe success")
 	}
 }
 
 func TestManagerResetAll(t *testing.T) {
 	m := NewManager()
-	m.RecordFailure(1, 1, KindAuth)
-	m.RecordFailure(1, 1, KindAuth)
-	m.RecordFailure(2, 2, KindQuota)
-	m.RecordFailure(2, 2, KindQuota)
+	m.RecordFailure(1, 1, "model-a", KindAuth)
+	m.RecordFailure(1, 1, "model-a", KindAuth)
+	m.RecordFailure(2, 2, "model-b", KindQuota)
+	m.RecordFailure(2, 2, "model-b", KindQuota)
 
-	if m.Allow(1, 1) || m.Allow(2, 2) {
+	if m.Allow(1, 1, "model-a") || m.Allow(2, 2, "model-b") {
 		t.Fatal("both should be blocked")
 	}
 
 	m.ResetAll()
 
-	if !m.Allow(1, 1) || !m.Allow(2, 2) {
+	if !m.Allow(1, 1, "model-a") || !m.Allow(2, 2, "model-b") {
 		t.Fatal("both should be allowed after reset")
 	}
 }
@@ -409,5 +411,85 @@ func TestConcurrentOverloadFiveMinuteCooling(t *testing.T) {
 	b.RecordSuccess()
 	if b.State() != StateClosed {
 		t.Fatalf("expected closed after probe success, got %s", b.State())
+	}
+}
+
+// TestClientBugFailureDoesNotOpenCircuit (2026-07-03 P0 regression).
+//
+// Reproduces the minimax-m3 production incident where the opencode CLI
+// sent requests with orphan tool_call_ids (tool_results referencing
+// tool_use_ids that were never generated in the same conversation).
+// MiniMax upstream returns HTTP 400 with "invalid params, tool result's
+// tool id(...) not found (2013)", which the gateway correctly classifies
+// as KindToolCallIdMismatch (a client bug). Before the fix, the circuit
+// breaker had no explicit policy for KindToolCallIdMismatch, so
+// RecordFailure fell through to the default KindTransient policy
+// (15s cooling, threshold 10). After 10 such caller mistakes the circuit
+// opened for 15 seconds, blocking all subsequent requests to a perfectly
+// healthy minimax-prod-1 upstream.
+//
+// After the fix, RecordFailure short-circuits to a no-op for every
+// IsClientBug kind: no counter bump, no log spam, no state transition.
+// The upstream-side error is still surfaced to the caller via
+// executor_chat.go:485 ("upstream rejected request as client bug") and
+// counted in candidate_failure_logs / request_logs for diagnostics, so
+// observability is preserved through a different channel.
+func TestClientBugFailureDoesNotOpenCircuit(t *testing.T) {
+	clientBugKinds := []ErrorKind{
+		errorsx.KindToolCallIdMismatch,
+		errorsx.KindModelNotFound,
+		errorsx.KindUnsupportedFeature,
+		errorsx.KindCanceled,
+	}
+
+	for _, kind := range clientBugKinds {
+		t.Run(string(kind), func(t *testing.T) {
+			b := New(1, 1)
+
+			// Fire far more than the auto-recovery threshold (10). For
+			// client bugs we expect the circuit to stay CLOSED the whole
+			// time AND the counter to stay at zero — recording a "failure"
+			// for a caller mistake would be a lie about the upstream's
+			// health.
+			overflow := int(autoRecoveryFailureThreshold) + 50
+			for i := 0; i < overflow; i++ {
+				b.RecordFailure(kind)
+			}
+
+			if b.State() != StateClosed {
+				t.Fatalf("client-bug kind %q must not open the circuit (got %s after %d failures)",
+					kind, b.State(), overflow)
+			}
+			if !b.Allow() {
+				t.Fatalf("client-bug kind %q must not block requests (Allow()=false)", kind)
+			}
+			if got := b.ConsecutiveFailures(); got != 0 {
+				t.Fatalf("client-bug kind %q must not bump ConsecutiveFailures (got %d, want 0)",
+					kind, got)
+			}
+
+			// A subsequent real failure must still be recorded normally
+			// after the client-bug spam. This guards against any future
+			// refactor that accidentally makes the entire breaker sticky.
+			b.RecordFailure(KindTransient)
+			if got := b.ConsecutiveFailures(); got != 1 {
+				t.Fatalf("non-client-bug failure after client-bug spam must still be counted (got %d, want 1)",
+					got)
+			}
+		})
+	}
+}
+
+// TestTransientFailureStillOpensCircuit is the negative-control: after
+// the client-bug fix lands, transient failures must still open the
+// circuit as before. Without this, a future refactor could accidentally
+// widen the no-op policy to include real upstream failures.
+func TestTransientFailureStillOpensCircuit(t *testing.T) {
+	b := New(1, 1)
+	for i := 0; i < int(autoRecoveryFailureThreshold); i++ {
+		b.RecordFailure(KindTransient)
+	}
+	if b.State() != StateOpen {
+		t.Fatalf("transient failures must still open the circuit, got %s", b.State())
 	}
 }

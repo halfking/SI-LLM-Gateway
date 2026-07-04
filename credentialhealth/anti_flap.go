@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kaixuan/llm-gateway-go/errorsx"
 )
 
 // AntiFlapConfig 防闪断配置。
@@ -98,7 +99,10 @@ func (a *AntiFlap) OnFailure(ctx context.Context, credentialID int, model string
 
 	nonNet := 0
 	for _, e := range entries {
-		if !e.Success && e.ErrorKind != "network" {
+		// 2026-07-03 P0 fix: skip client bugs (tool_call_id_mismatch, etc.)
+		// which should not count as credential failures. Previously these
+		// client errors triggered unnecessary passive probes and false alarms.
+		if !e.Success && e.ErrorKind != "network" && !errorsx.IsClientBug(errorsx.ErrorKind(e.ErrorKind)) {
 			nonNet++
 		}
 	}

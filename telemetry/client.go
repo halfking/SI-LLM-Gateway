@@ -115,6 +115,7 @@ type RequestLogEntry struct {
 	IdentityHash       *string `json:"identity_hash,omitempty"`
 	StreamFirstChunkMs *int    `json:"stream_first_chunk_ms,omitempty"`
 	StreamChunkCount   *int    `json:"stream_chunk_count,omitempty"`
+	StreamChunksSent   *int    `json:"stream_chunks_sent,omitempty"`
 	StreamDoneReceived *bool   `json:"stream_done_received,omitempty"`
 	StreamInterrupted  *bool   `json:"stream_interrupted,omitempty"`
 	// UpstreamStatusCode is the HTTP status code returned by the

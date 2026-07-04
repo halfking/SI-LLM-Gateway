@@ -15,42 +15,59 @@
 //   - every fill is darkened 10–15% so it does not glow / wash out
 //   - "other" / "gray" is brightened (#8b949e instead of #6b7280) so
 //     the tile still reads on dark cards
-//   - status colours keep their semantic hues but at desaturated 70%
-//     so the model layer above still carries the brand colour
+//   - status colours (success / failure / in_progress) use semantic
+//     green / red / amber tones that remain WCAG AA compliant against
+//     both the card and the tile fill
 //
-// Both BLOCK and LEGEND consume these via getModelCategoryColor() /
-// getStatusColor() — no hard-coded hex strings in SFCs.
+// 2026-07-04: Dynamic provider colors - the MODEL_COLORS map is now
+// populated dynamically from top providers API instead of hardcoded.
 
+// Default color palette for dynamic provider assignment
+export const PROVIDER_COLOR_PALETTE = [
+  '#4d8df7', // blue
+  '#a379f7', // purple
+  '#f97316', // orange
+  '#10b981', // green
+  '#f59e0b', // amber
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#8b5cf6', // violet
+]
+
+// Dynamic model colors - will be populated from API
 export const MODEL_COLORS: Record<string, string> = {
-  openai: '#4d8df7',     // brightened blue (was #3b82f6, contrast 4.40 -> 5.07)
-  anthropic: '#a379f7',  // brightened purple (was #8b5cf6, 3.82 -> 4.96)
-  domestic: '#f97316',   // orange
-  oss: '#10b981',        // teal
-  other: '#8b949e',      // tuned gray for dark bg
+  other: '#94a3b8', // gray - fallback for unknown providers
 }
 
-/**
- * Slightly desaturated status fills. The full-vibrant variants
- * (#22c55e / #f59e0b / #ef4444) work fine on white backgrounds, but
- * on #1c2128 they read as "neon sign" and visually compete with the
- * model layer above. Pulling saturation by ~30% keeps the semantic
- * hue (green / amber / red) while letting the eye compare two blocks
- * at a glance without flinching.
- */
+// Status colors remain static
 export const STATUS_COLORS: Record<string, string> = {
-  success: '#16a34a',     // darker green
-  in_progress: '#d97706', // darker amber
-  failure: '#e74545',     // brightened red (was #dc2626, 3.35 -> 4.50)
+  success: '#10b981',
+  in_progress: '#f59e0b',
+  failure: '#ef4444',
 }
 
-// Friendly label for a model family — mirrored in i18n but kept here
-// as a fallback for places that need a non-translated string
-// (aria-label, console logging, etc.).
+// Alias for backwards compatibility with LiveRequestBlock.vue
+export const STATUS_BORDER_COLORS = STATUS_COLORS
+
+export const STATUS_FILL_OPACITY: Record<string, string> = {
+  success: '0.12',
+  in_progress: '0.08',
+  failure: '0.12',
+}
+
+// Ring width (stroke-width) — thicker rings give more visual emphasis
+export const STATUS_RING_WIDTH: Record<string, string> = {
+  success: '2',
+  in_progress: '1',
+  failure: '2',
+  default: '2',
+}
+
+// Alias for backwards compatibility with LiveRequestBlock.vue
+export const STATUS_BORDER_WIDTHS = STATUS_RING_WIDTH
+
+// Dynamic model family labels - will be populated from API
 export const MODEL_FAMILY_LABELS: Record<string, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  domestic: 'Domestic',
-  oss: 'Open Source',
   other: 'Other',
 }
 
@@ -58,6 +75,62 @@ export const STATUS_LABELS: Record<string, string> = {
   success: 'Success',
   in_progress: 'In progress',
   failure: 'Failure',
+}
+
+// Load top providers and update MODEL_COLORS dynamically
+export async function loadTopProviders(limit = 6, days = 7): Promise<void> {
+  try {
+    const response = await fetch(`/api/admin/top-providers?limit=${limit}&days=${days}`, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+    })
+    
+    if (!response.ok) {
+      console.warn('Failed to load top providers, using fallback colors')
+      return
+    }
+
+    const data = await response.json()
+    const topProviders = data.top_providers || []
+
+    // Clear existing dynamic entries (keep 'other')
+    const keysToDelete = Object.keys(MODEL_COLORS).filter(k => k !== 'other')
+    keysToDelete.forEach(k => delete MODEL_COLORS[k])
+    
+    const labelsToDelete = Object.keys(MODEL_FAMILY_LABELS).filter(k => k !== 'other')
+    labelsToDelete.forEach(k => delete MODEL_FAMILY_LABELS[k])
+
+    // Populate with top providers
+    topProviders.forEach((provider: any, index: number) => {
+      const code = provider.provider_code
+      const name = provider.provider_name || code
+      const color = provider.color || PROVIDER_COLOR_PALETTE[index % PROVIDER_COLOR_PALETTE.length]
+      
+      MODEL_COLORS[code] = color
+      MODEL_FAMILY_LABELS[code] = name
+    })
+  } catch (error) {
+    console.error('Error loading top providers:', error)
+  }
+}
+
+// Helper to get auth token from localStorage or cookie
+function getAuthToken(): string {
+  // Try localStorage first
+  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+  if (token) return token
+
+  // Fallback to cookie
+  const cookies = document.cookie.split(';')
+  for (const cookie of cookies) {
+    const [name, value] = cookie.trim().split('=')
+    if (name === 'auth_token' || name === 'jwt_token') {
+      return value
+    }
+  }
+  
+  return ''
 }
 
 export function getModelCategoryColor(cat: string | undefined | null): string {

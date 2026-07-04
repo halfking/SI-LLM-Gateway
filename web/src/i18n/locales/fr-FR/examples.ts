@@ -5,6 +5,28 @@ export default {
   intro: 'La passerelle est compatible avec l\'API OpenAI. Pointez votre base_url ici pour utiliser n\'importe quel modèle pris en charge, ou utilisez la page « Chat » intégrée depuis la barre latérale.',
   sectionClientConfig: 'Configurations client courantes',
   sectionApiExamples: 'Exemples de requêtes API',
+  tools: {
+    zcode: {
+      name: 'ZCode',
+      description: 'IDE de programmation Zhipu AI, basé sur le schéma de configuration OpenCode',
+    },
+    opencode: {
+      name: 'OpenCode',
+      description: 'Agent de codage AI en terminal (opencode.ai)',
+    },
+    cursor: {
+      name: 'Cursor',
+      description: 'Éditeur de code AI-first, prend en charge l\'API compatible OpenAI',
+    },
+    cherry_studio: {
+      name: 'Cherry Studio',
+      description: 'Client de bureau multi-modèles, prend en charge l\'importation par lots de fournisseurs',
+    },
+    roocode: {
+      name: 'Roo Code / VS Code',
+      description: 'VS Code + extension Roo Code, configurer roo-cline',
+    },
+  },
   keyHint: 'La clé API dans le code d\'exemple est masquée. Cliquez sur « Tester » pour l\'exécuter avec votre clé de session actuelle. Remplacez-la par une vraie clé avant utilisation.',
   copyKey: 'Copier la clé complète',
   copied: 'Copié !',

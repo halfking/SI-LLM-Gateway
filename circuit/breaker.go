@@ -59,15 +59,15 @@ func (s State) String() string {
 type ErrorKind = errorsx.ErrorKind
 
 var (
-	KindTransient      = errorsx.KindTransient
-	KindTimeout        = errorsx.KindTimeout
-	KindNetwork        = errorsx.KindNetwork
-	KindRateLimit      = errorsx.KindRateLimit
-	KindAuth           = errorsx.KindAuth
-	KindQuota          = errorsx.KindQuota
-	KindUpstreamDown   = errorsx.KindUpstreamDown
-	KindStreamTimeout  = errorsx.KindStreamTimeout
-	KindConcurrent     = errorsx.KindConcurrent
+	KindTransient     = errorsx.KindTransient
+	KindTimeout       = errorsx.KindTimeout
+	KindNetwork       = errorsx.KindNetwork
+	KindRateLimit     = errorsx.KindRateLimit
+	KindAuth          = errorsx.KindAuth
+	KindQuota         = errorsx.KindQuota
+	KindUpstreamDown  = errorsx.KindUpstreamDown
+	KindStreamTimeout = errorsx.KindStreamTimeout
+	KindConcurrent    = errorsx.KindConcurrent
 )
 
 const (
@@ -77,9 +77,9 @@ const (
 	// 完全不可用。10 次连续失败才开 + 15s 冷却(下面 defaultPolicies),
 	// 大幅降低误判,同时不牺牲对真正持续故障的检测。
 	// Override via env LLM_GATEWAY_CIRCUIT_TRANSIENT_THRESHOLD.
-	defaultAutoRecoveryFailureThreshold        int32 = 10
-	exponentialRecoveryFailureThreshold        int32 = 2
-	permanentRecoveryFailureThreshold          int32 = 2
+	defaultAutoRecoveryFailureThreshold int32 = 10
+	exponentialRecoveryFailureThreshold int32 = 2
+	permanentRecoveryFailureThreshold   int32 = 2
 )
 
 // 2026-07-01 (V3.2.0): Allow runtime override of the auto-recovery
@@ -125,14 +125,14 @@ var defaultPolicies = map[ErrorKind]CoolingPolicy{
 	// 2026-07-01 (V3.2.0): transient 错误频发 (特别是 minimax 在 11:26 出现
 	// "all 4 candidates failed: circuit open" 错误),把冷却从 60s 缩到 15s
 	// 让用户感知更短。threshold 在 NewWithPolicy 中可以调整。
-	KindTransient:      {InitialCooling: 15 * time.Second, MaxCooling: 15 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
-	KindTimeout:        {InitialCooling: 60 * time.Second, MaxCooling: 60 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
-	KindNetwork:        {InitialCooling: 60 * time.Second, MaxCooling: 60 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
-	KindRateLimit:      {InitialCooling: 900 * time.Second, MaxCooling: 900 * time.Second, RecoveryType: RecoveryExponential, ShrinkFactor: 0.7},
-	KindAuth:           {InitialCooling: 0, MaxCooling: 0, RecoveryType: RecoveryPermanent, ShrinkFactor: 0},
-	KindQuota:          {InitialCooling: 0, MaxCooling: 0, RecoveryType: RecoveryPermanent, ShrinkFactor: 0},
-	KindUpstreamDown:   {InitialCooling: 30 * time.Second, MaxCooling: 1800 * time.Second, RecoveryType: RecoveryExponential, ShrinkFactor: 0.5},
-	KindStreamTimeout:  {InitialCooling: 30 * time.Second, MaxCooling: 30 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
+	KindTransient:     {InitialCooling: 15 * time.Second, MaxCooling: 15 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
+	KindTimeout:       {InitialCooling: 60 * time.Second, MaxCooling: 60 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
+	KindNetwork:       {InitialCooling: 60 * time.Second, MaxCooling: 60 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
+	KindRateLimit:     {InitialCooling: 900 * time.Second, MaxCooling: 900 * time.Second, RecoveryType: RecoveryExponential, ShrinkFactor: 0.7},
+	KindAuth:          {InitialCooling: 0, MaxCooling: 0, RecoveryType: RecoveryPermanent, ShrinkFactor: 0},
+	KindQuota:         {InitialCooling: 0, MaxCooling: 0, RecoveryType: RecoveryPermanent, ShrinkFactor: 0},
+	KindUpstreamDown:  {InitialCooling: 30 * time.Second, MaxCooling: 1800 * time.Second, RecoveryType: RecoveryExponential, ShrinkFactor: 0.5},
+	KindStreamTimeout: {InitialCooling: 30 * time.Second, MaxCooling: 30 * time.Second, RecoveryType: RecoveryAuto, ShrinkFactor: 0},
 	// KindConcurrent: upstream reports "service overloaded / too many
 	// concurrent requests". Apply a fixed 5-minute cooling window so the
 	// credential is taken out of rotation long enough for the upstream's
@@ -140,6 +140,15 @@ var defaultPolicies = map[ErrorKind]CoolingPolicy{
 	// of cooling) is the right policy because concurrent overload is
 	// typically a transient platform-level condition.
 	errorsx.KindConcurrent: {InitialCooling: 5 * time.Minute, MaxCooling: 5 * time.Minute, RecoveryType: RecoveryAuto, ShrinkFactor: 0.5},
+	// 2026-07-03 fix (P0): client-bug kinds (KindToolCallIdMismatch,
+	// KindModelNotFound, KindUnsupportedFeature, KindCanceled) MUST NOT
+	// open the circuit. The handling lives in RecordFailure itself — see
+	// the early-return guarded by errorsx.IsClientBug — so no entry is
+	// needed here. Recording a "failure" for a caller mistake would
+	// punish the credential for a fault that is not its own; reproducing
+	// the minimax-prod-1 / minimax-m3 incident where 10 conversations
+	// with orphan tool_call_ids opened a 15s circuit on a perfectly
+	// healthy upstream.
 }
 
 // ---------------------------------------------------------------------------
@@ -236,6 +245,18 @@ func (b *Breaker) tryTransitionToHalfOpen() bool {
 
 // RecordFailure records a failure and transitions the circuit state.
 func (b *Breaker) RecordFailure(kind ErrorKind) {
+	// 2026-07-03 fix (P0): client-bug kinds are caller mistakes (e.g. an
+	// opencode CLI conversation echoes a tool_call_id the upstream never
+	// generated). The upstream is healthy; recording a "failure" would
+	// punish the credential for a fault that is not its own. Return early
+	// so the counter, log, and state machine all stay untouched. Health
+	// trackers and observability hooks downstream can still see the
+	// client-side error via the upstream error itself — see
+	// executor_chat.go:485 ("upstream rejected request as client bug").
+	if errorsx.IsClientBug(kind) {
+		return
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

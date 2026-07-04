@@ -828,7 +828,13 @@ func (e *Executor) executeAnthropicOnce(
 				//nolint:errcheck // HTTP write error non-recoverable
 				params.W.Write(body[:n])
 			}
-			return nil, fmt.Errorf("upstream %d", resp.StatusCode)
+			// 2026-07-03 P0 fix: preserve errKind instead of degrading to transient
+			return nil, &upstreampkg.Error{
+				Kind:       errKind,
+				StatusCode: resp.StatusCode,
+				Body:       append([]byte(nil), body[:n]...),
+				Message:    fmt.Sprintf("upstream %d", resp.StatusCode),
+			}
 		}
 		// Even for retryable kinds (e.g. 413 classified as KindTransient),
 		// check if this is a heuristic-compact candidate (413 or body-size
@@ -842,7 +848,13 @@ func (e *Executor) executeAnthropicOnce(
 				headers: resp.Header.Clone(),
 			}
 		}
-		return nil, &retryableError{err: fmt.Errorf("upstream %d", resp.StatusCode)}
+		// 2026-07-03 P0 fix: preserve errKind in retryableError wrapper
+		return nil, &retryableError{err: &upstreampkg.Error{
+			Kind:       errKind,
+			StatusCode: resp.StatusCode,
+			Body:       append([]byte(nil), body[:n]...),
+			Message:    fmt.Sprintf("upstream %d", resp.StatusCode),
+		}}
 	}
 
 	e.Circuit.RecordSuccess(cand.ProviderID, cand.CredentialID, cand.RawModel)

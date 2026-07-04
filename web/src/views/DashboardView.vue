@@ -51,7 +51,21 @@ let statsRecalibrateTimer: ReturnType<typeof setInterval> | null = null
 // through a watch to incrementally update the stat cards instead of
 // re-fetching the full summary on every push (which would create
 // a thundering-herd under QPS=50+).
-const { requests: liveRequests } = useLiveStream()
+//
+// ID-based dedup: the composable buffers up to N requests and
+// silently evicts the oldest when full. We cannot rely on a
+// positional delta (`items[prevCount:]`) because the buffer can
+// roll over between two ticks. Instead, every request_id is added
+// to `seenLiveRequestIds` the first time it shows up in the buffer
+// (and removed when the composable evicts it via `onRequestEvicted`).
+// Stat accumulators are only ever touched for IDs we have NOT
+// seen before — so a 5-minute recalibrate cycle can drop and
+// re-fetch the summary without us ever inflating the totals.
+const {
+  requests: liveRequests,
+  onRequestEvicted,
+  reset: resetLiveStream,
+} = useLiveStream()
 const activeRequestId = ref<string | null>(null)
 function openRequestDetail(id: string) {
   activeRequestId.value = id
@@ -60,28 +74,32 @@ function closeRequestDrawer() {
   activeRequestId.value = null
 }
 
-// Track which request IDs we have already credited so a re-mount of
-// the stream (initial_data replay) does not double-count. Cleared
-// whenever load() refetches the full summary.
+// Track which request IDs we have already credited. Populated on
+// first sight of an ID; depopulated when the composable evicts the
+// ID. Cleared whenever load() refetches the full summary so the
+// next delta starts from a clean slate.
 const seenLiveRequestIds = new Set<string>()
-let prevLiveCount = 0
+
+// Hook the composable's eviction signal: when an ID leaves the
+// buffer, remove it from our set so the next initial_data replay
+// (or eviction-then-replay cycle) doesn't double-count it.
+onRequestEvicted((id: string) => {
+  seenLiveRequestIds.delete(id)
+})
 
 function applyIncrementalStats() {
   if (!summary.value) return
-  // Only count requests NEW since the previous tick. The composable
-  // keeps up to 100, so we cap the delta at 100 (anything beyond
-  // that was already ejected by the buffer and re-counted only when
-  // the user reloads via load()).
+  // Scan the whole buffer (not a positional delta) — the buffer is
+  // bounded to capacity and rolls over, so positions are not stable.
+  // Dedup is purely ID-based via seenLiveRequestIds.
   const items = liveRequests.value
   const added: LiveRequest[] = []
-  for (let i = prevLiveCount; i < items.length; i++) {
-    const r = items[i]
+  for (const r of items) {
     if (r.type !== 'request' || !r.request_id) continue
     if (seenLiveRequestIds.has(r.request_id)) continue
     seenLiveRequestIds.add(r.request_id)
     added.push(r)
   }
-  prevLiveCount = items.length
   if (added.length === 0) return
 
   const tokensDelta =
@@ -141,8 +159,12 @@ function scheduleStatsRecalibrate() {
     try {
       const fresh = await getUsageSummary(days.value)
       summary.value = fresh
+      // Drop the dedup set AND clear the in-memory buffer so the
+      // next push starts clean. resetLiveStream() also clears the
+      // composable's idIndex, so the next applyIncrementalStats
+      // scan treats every live buffer entry as fresh.
       seenLiveRequestIds.clear()
-      prevLiveCount = 0
+      resetLiveStream()
     } catch {
       /* non-blocking; next tick will retry */
     }
@@ -202,7 +224,7 @@ async function load() {
     // Re-baseline the live-stream delta tracker against the freshly
     // fetched summary so the next push starts from a clean slate.
     seenLiveRequestIds.clear()
-    prevLiveCount = 0
+    resetLiveStream()
     void loadCompressionStats()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('dashboard.loadError')
