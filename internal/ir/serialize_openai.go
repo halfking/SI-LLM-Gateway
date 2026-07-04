@@ -187,7 +187,11 @@ func serializeOpenAIMessage(msg Message) map[string]any {
 
 	// Handle content for non-tool roles
 	if len(msg.Content) == 0 {
-		// Empty content - may need tool_calls
+		// Empty content - but may have tool_calls for assistant
+		out["content"] = ""
+		if len(msg.ToolCalls) > 0 {
+			out["tool_calls"] = serializeOpenAIToolCalls(msg.ToolCalls)
+		}
 	} else if len(msg.Content) == 1 && msg.Content[0].Type == "text" && msg.ToolCalls == nil {
 		// Simple text content - use string format
 		out["content"] = msg.Content[0].Text
