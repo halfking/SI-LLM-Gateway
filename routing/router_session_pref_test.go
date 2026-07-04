@@ -57,8 +57,8 @@ func TestRouter_PlanCandidates_FilterByRouteNodeHealth(t *testing.T) {
 	_ = store.Delete(ctx, credIDDisabled, model)
 	t.Cleanup(func() { _ = store.Delete(ctx, credIDDisabled, model) })
 
-	// 让 credIDDisabled 连续失败 3 次
-	for i := 0; i < 3; i++ {
+	// 让 credIDDisabled 连续失败 5 次（DefaultRouteNodeFailStreakLimit=5）
+	for i := 0; i < 5; i++ {
 		_, _, _ = store.RecordFailure(ctx, credIDDisabled, model, "r", "rate_limit")
 	}
 
@@ -209,9 +209,9 @@ func TestRouter_PlanCandidates_AllFilteredByHealth_ReturnNil(t *testing.T) {
 		_ = store.Delete(ctx, cred2, model)
 	})
 
-	// 两个 cred 都触发 Disabled
+	// 两个 cred 都触发 Disabled（需要 5 次失败，DefaultRouteNodeFailStreakLimit=5）
 	for _, id := range []int{cred1, cred2} {
-		for i := 0; i < 3; i++ {
+		for i := 0; i < 5; i++ {
 			_, _, _ = store.RecordFailure(ctx, id, model, "r", "rate_limit")
 		}
 	}

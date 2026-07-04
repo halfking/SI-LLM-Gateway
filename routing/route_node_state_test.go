@@ -342,16 +342,18 @@ func TestRouteNodeStore_RecordAndGet(t *testing.T) {
 		t.Fatalf("SuccessCount=%d, want 1", got.SuccessCount)
 	}
 
-	// 5 次失败触发 Disabled
+	// 5 次失败触发 Disabled（DefaultRouteNodeFailStreakLimit=5）
 	_, justDisabled1, _ := store.RecordFailure(ctx, credID, model, "req-f1", "rate_limit")
 	_, justDisabled2, _ := store.RecordFailure(ctx, credID, model, "req-f2", "rate_limit")
 	_, justDisabled3, _ := store.RecordFailure(ctx, credID, model, "req-f3", "rate_limit")
+	_, justDisabled4, _ := store.RecordFailure(ctx, credID, model, "req-f4", "rate_limit")
+	_, justDisabled5, _ := store.RecordFailure(ctx, credID, model, "req-f5", "rate_limit")
 
-	if justDisabled1 || justDisabled2 {
-		t.Fatal("justDisabled should only be true on 3rd failure")
+	if justDisabled1 || justDisabled2 || justDisabled3 || justDisabled4 {
+		t.Fatal("justDisabled should only be true on 5th failure")
 	}
-	if !justDisabled3 {
-		t.Fatal("3rd failure should trigger justDisabled")
+	if !justDisabled5 {
+		t.Fatal("5th failure should trigger justDisabled")
 	}
 
 	// IsUsable 应返回 false
@@ -388,12 +390,14 @@ func TestRouteNodeStore_FilterUsableCandidates(t *testing.T) {
 		_ = store.Delete(ctx, credB, model)
 	})
 
-	// credA: 5 次失败 → 不可用
+	// credA: 5 次失败 → 不可用（DefaultRouteNodeFailStreakLimit=5）
 	_, _, _ = store.RecordFailure(ctx, credA, model, "a1", "rate_limit")
 	_, _, _ = store.RecordFailure(ctx, credA, model, "a2", "rate_limit")
-	_, justDisabled, _ := store.RecordFailure(ctx, credA, model, "a3", "rate_limit")
+	_, _, _ = store.RecordFailure(ctx, credA, model, "a3", "rate_limit")
+	_, _, _ = store.RecordFailure(ctx, credA, model, "a4", "rate_limit")
+	_, justDisabled, _ := store.RecordFailure(ctx, credA, model, "a5", "rate_limit")
 	if !justDisabled {
-		t.Fatal("credA should be disabled")
+		t.Fatal("credA should be disabled after 5 failures")
 	}
 
 	// credB: 1 次成功 → 可用
