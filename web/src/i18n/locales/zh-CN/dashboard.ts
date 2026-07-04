@@ -81,6 +81,8 @@ export default {
   noData: '该时段暂无数据',
   costSuffix: 'USD',
   viewFailedRequests: '查看失败请求',
+  switchToClassic: '切换到经典布局',
+  switchToNew: '切换到新版布局',
   liveStream: {
     title: '实时请求流',
     connected: '已连接',
@@ -100,6 +102,9 @@ export default {
     idleLabel: '空闲 {duration}',
     countTooltip: '缓冲区内 {buffer} / 屏上可见 {visible}',
     countAria: '缓冲区内 {buffer} 个请求，屏上可见 {visible}',
+    groupByVendor: '按原厂',
+    groupByProvider: '按供应商',
+    other: '其他',
     legend: {
       title: '图例',
       model: '供应商',

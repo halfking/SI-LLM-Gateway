@@ -3,21 +3,21 @@
 //
 // 使用 camelCase 嵌套对象，便于 vue-i18n 的 t() 插值与 t('landing.features.X.title', {...}) 替换。
 export default {
-  kicker: 'AI-Native · 企业治理',
-  title: 'AI-Native 组织核心网关',
+  kicker: '核心开源 · 中国本地化 · 企业级',
+  title: 'LLM Gateway — 面向全球市场的开源 AI 网关',
   subtitle: [
-    '让 AI 成为组织的原生能力。',
-    '核心开源 + 企业增强 + Vibe Coding 治理 + 会话资产化。',
+    '唯一兼具核心开源与深度中国本地化的 AI 网关，服务全球企业。',
+    '企业级治理、全球 LLM 接入、合规与数据主权 — 全部核心开源。',
   ],
   featuresTitle: '核心能力',
   featuresSubtitle: '覆盖从接入到运营的关键环节',
   heroPoints: [
+    '核心开源 · Apache 2.0',
+    '中国本地化 · 等保 2.0',
     '企业级 AI 入口',
     'Vibe Coding 治理',
     'AI 会话资产化',
-    '企业知识沉淀',
     '数据安全护盾',
-    '完全私有部署',
   ],
   features: {
     smartRouting: {
@@ -55,15 +55,15 @@ export default {
       description: '套餐 + 积分 + 加油包 · 比 SaaS 便宜 60%+。完整的商业化闭环，多租户隔离，PostgreSQL RLS 行级安全 L1=0。',
     },
   },
-  advantagesTitle: '差异化优势',
-  advantagesSubtitle: '海外厂商给不了的能力',
+  advantagesTitle: '为什么选择 LLM Gateway',
+  advantagesSubtitle: '面向有中国业务需求的全球企业',
   advantages: {
-    local: { title: '中国本地化', description: '全中文界面、开源模型优先、支付宝/微信支付接入、等保合规模板' },
+    local: { title: '深度中国本地化', description: '全中文界面、国产开源 LLM 优先对接、支付宝/微信支付接入、等保 2.0 合规模板、国内云基础设施就绪' },
     private: { title: '私有化部署', description: '完全私有部署，数据不出企业，k3s + Docker 双形态，零外部依赖' },
     antiBan: { title: '抗封号体系', description: '50+ UA 轮换 + utls TLS 指纹池 + 11 浏览器 profile + 5 分钟自动轮换' },
     perf: { title: 'Go 高性能数据面', description: '原生 Go 实现，40MB 轻量镜像，200 并发 P99 < 500ms，SSE 流式稳定中继' },
   },
-  footer: '开轩 LLM Gateway · [GATEWAY_DOMAIN] · 私有部署 · 中国本地化',
+  footer: 'LLM Gateway · [GATEWAY_DOMAIN] · 核心开源 · 中国本地化 · 私有部署',
   ariaPoints: '核心亮点',
   roadmap: {
     title: '产品演进路线',

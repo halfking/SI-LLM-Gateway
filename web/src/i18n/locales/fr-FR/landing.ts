@@ -6,21 +6,21 @@
 // Keys use camelCase nested objects so vue-i18n's `t()` interpolation and
 // `t('landing.features.X.title', { ... })` substitution both work.
 export default {
-  kicker: 'AI-Native · Enterprise Governance',
-  title: 'Passerelle cœur d\'organisation AI-Native',
+  kicker: 'Open Core · Localisation Chine · Enterprise Grade',
+  title: 'LLM Gateway — Passerelle IA Open Core pour les marchés mondiaux',
   subtitle: [
-    'Faites de l\'IA une capacité native de votre organisation.',
-    'Open core + renforcement entreprise + gouvernance Vibe Coding + monétisation des sessions.',
+    'La seule passerelle IA alliant open core et localisation Chine profonde — pour les entreprises mondiales.',
+    'Gouvernance d\'entreprise, accès LLM global, conformité et souveraineté des données — entièrement open core.',
   ],
   featuresTitle: 'Capacités clés',
   featuresSubtitle: 'Couvre toute la chaîne, de l\'accès à l\'exploitation',
   heroPoints: [
+    'Open Core · Apache 2.0',
+    'Localisation Chine · MLPS 2.0',
     'Routage intelligent',
     'Sécurité des appels',
     'Réduction des coûts par cache',
     'Prêt pour les agents',
-    'Audit de bout en bout',
-    'Facturation MaaS',
   ],
   features: {
     smartRouting: {
@@ -66,12 +66,12 @@ export default {
         'Sécurité au niveau des lignes RLS PostgreSQL + audit de 43 tours L1=0, zéro fuite de données entre locataires, politique et quota par locataire.',
     },
   },
-  advantagesTitle: 'Avantages différenciants',
-  advantagesSubtitle: 'Ce que les fournisseurs mondiaux ne peuvent pas offrir',
+  advantagesTitle: 'Pourquoi LLM Gateway',
+  advantagesSubtitle: 'Conçu pour les entreprises mondiales ayant des besoins en Chine',
   advantages: {
     local: {
-      title: 'Localisation en Chine',
-      description: 'Interface entièrement en chinois, priorité aux modèles nationaux, Alipay / WeChat Pay, modèles conformes MLPS',
+      title: 'Localisation Chine approfondie',
+      description: 'Interface entièrement en chinois, priorité aux LLM open source chinois, Alipay / WeChat Pay, modèles conformes MLPS 2.0, déploiement sur cloud chinois'
     },
     private: {
       title: 'Déploiement privé',
@@ -86,7 +86,7 @@ export default {
       description: 'Go natif, image légère de 40 Mo, 200 simultanés P99 < 500 ms, relais de streaming SSE stable',
     },
   },
-  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Déploiement privé · Localisation en Chine',
+  footer: 'LLM Gateway · [GATEWAY_DOMAIN] · Open Core · Localisation Chine · Déploiement privé',
   ariaPoints: 'Points forts',
   roadmap: {
     title: 'Feuille de route produit',

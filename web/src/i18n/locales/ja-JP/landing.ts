@@ -4,15 +4,22 @@
 //
 // camelCase のネストされたオブジェクトを使用し、vue-i18n の t() 補間と t('landing.features.X.title', {...}) の置換に対応します。
 export default {
-  kicker: 'AI-Native · Enterprise Governance',
-  title: 'AI-Native 組織コアゲートウェイ',
+  kicker: 'オープンコア · 中国ローカライズ · エンタープライズ',
+  title: 'LLM Gateway — グローバル市場向けオープンコア AI ゲートウェイ',
   subtitle: [
-    'AI を組織のネイティブ能力に。',
-    'オープンコア + エンタープライズ強化 + Vibe Coding ガバナンス + セッション資産化。',
+    'オープンコアと深い中国ローカライズを兼ね備えた、唯一の AI ゲートウェイ。',
+    'エンタープライズガバナンス、グローバル LLM アクセス、コンプライアンス、データ主権 — すべてオープンコア。',
   ],
   featuresTitle: 'コア機能',
   featuresSubtitle: '接続から運用までの重要なステップをカバー',
-  heroPoints: ['スマートルーティング', '呼び出しのセキュリティ', 'キャッシュによるコスト削減', 'Agent 対応', 'エンドツーエンド監査', 'MaaS 課金'],
+  heroPoints: [
+    'オープンコア · Apache 2.0',
+    '中国ローカライズ · 等保 2.0',
+    'スマートルーティング',
+    '呼び出しのセキュリティ',
+    'キャッシュによるコスト削減',
+    'Agent 対応',
+  ],
   features: {
     smartRouting: {
       title: 'スマートルーティングと認証情報プール',
@@ -51,15 +58,15 @@ export default {
       description: 'PostgreSQL RLS による行レベルセキュリティ + 43 ラウンドの監査 L1=0 で、テナント間のデータ漏洩ゼロを実現。各テナントごとに独立したポリシーとクォータ。',
     },
   },
-  advantagesTitle: '差別化された優位性',
-  advantagesSubtitle: '海外ベンダーが提供できない能力',
+  advantagesTitle: 'LLM Gateway を選ぶ理由',
+  advantagesSubtitle: '中国でのビジネスニーズを持つグローバル企業向け',
   advantages: {
-    local: { title: '中国ローカライズ', description: '完全な中国語インターフェース、国内モデル優先、Alipay/WeChat Pay 統合、等保コンプライアンステンプレート' },
+    local: { title: 'ディープ中国ローカライズ', description: '完全な中国語インターフェース、中国製オープンソース LLM 優先、Alipay/WeChat Pay 統合、等保 2.0 コンプライアンス、国内クラウド対応' },
     private: { title: 'プライベートデプロイ', description: '完全なプライベートデプロイでデータは企業外に出ません。k3s + Docker 両対応で外部依存ゼロ' },
     antiBan: { title: '垢バン対策', description: '50+ UA ローテーション + utls TLS 指紋プール + 11種類のブラウザプロファイル + 5分ごとの自動切替' },
     perf: { title: 'Go 高性能データプレーン', description: 'ネイティブ Go 実装、40MB 軽量イメージ、200 並行で P99 < 500ms、SSE ストリーミングを安定中継' },
   },
-  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · プライベートデプロイ · 中国ローカライズ',
+  footer: 'LLM Gateway · [GATEWAY_DOMAIN] · オープンコア · 中国ローカライズ · プライベートデプロイ',
   ariaPoints: '主な特徴',
   roadmap: {
     title: '製品ロードマップ',

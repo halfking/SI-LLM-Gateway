@@ -5,21 +5,21 @@
 // Keys use camelCase nested objects so vue-i18n's `t()` interpolation and
 // `t('landing.features.X.title', { ... })` substitution both work.
 export default {
-  kicker: 'AI-Native · Enterprise Governance',
-  title: 'AI-Native Organization Core Gateway',
+  kicker: 'Open Core · China Localized · Enterprise Grade',
+  title: 'LLM Gateway — Open Core AI Gateway for Global Markets',
   subtitle: [
-    'Make AI a native capability of your organization.',
-    'Open core + enterprise enhancement + Vibe Coding governance + session asset-ification.',
+    'The only AI gateway built on open core with deep China localization — for global enterprises.',
+    'Enterprise governance, global LLM access, compliance, and data sovereignty — all in one open core.',
   ],
   featuresTitle: 'Core Capabilities',
   featuresSubtitle: 'Covering the full chain from access to operations',
   heroPoints: [
+    'Open Core · Apache 2.0',
+    'China Localization · MLPS 2.0',
     'Enterprise AI Entry',
     'Vibe Coding Governance',
     'AI Session Assets',
-    'Enterprise Knowledge',
     'Data Security Shield',
-    'Private Deployment',
   ],
   features: {
     smartRouting: {
@@ -57,12 +57,12 @@ export default {
       description: 'Plans + credits + top-up · 60%+ cheaper than SaaS. Complete commercialization loop with multi-tenant isolation, PostgreSQL RLS row-level security L1=0.',
     },
   },
-  advantagesTitle: 'Differentiated Advantages',
-  advantagesSubtitle: 'What global vendors cannot offer',
+  advantagesTitle: 'Why LLM Gateway',
+  advantagesSubtitle: 'Designed for global enterprises with China needs',
   advantages: {
     local: {
-      title: 'China Localization',
-      description: 'Full Chinese UI, open-source model priority, Alipay / WeChat Pay, MLPS-compliant templates',
+      title: 'Deep China Localization',
+      description: 'Full Chinese UI, Chinese open-source LLM priority, Alipay / WeChat Pay, MLPS 2.0 compliance templates, domestic cloud and infrastructure ready'
     },
     private: {
       title: 'Private Deployment',
@@ -77,7 +77,7 @@ export default {
       description: 'Native Go, 40MB lightweight image, 200 concurrent P99 < 500ms, stable SSE streaming relay',
     },
   },
-  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Private deployment · China localization',
+  footer: 'LLM Gateway · [GATEWAY_DOMAIN] · Open Core · China Localized · Private Deployment',
   ariaPoints: 'Highlight points',
   roadmap: {
     title: 'Product Evolution Roadmap',

@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/kaixuan/llm-gateway-go/internal/ir"
 )
@@ -25,7 +26,7 @@ func NewMinimax() *Minimax {
 	return &Minimax{}
 }
 
-func (m *Minimax) Name() string         { return "minimax" }
+func (m *Minimax) Name() string           { return "minimax" }
 func (m *Minimax) CatalogCodes() []string { return []string{"minimax"} }
 
 func (m *Minimax) AdaptRequest(req *ir.InternalRequest) (*ir.InternalRequest, error) {
@@ -45,7 +46,18 @@ func (m *Minimax) SerializeRequest(req *ir.InternalRequest) ([]byte, error) {
 	// Defensive double-check: if TargetProvider wasn't set (e.g., a caller
 	// bypassed AdaptRequest), rewrite the field names in the serialized body.
 	// This makes the adapter robust to direct SerializeRequest calls.
-	return ensureToolCallID(body), nil
+	body = ensureToolCallID(body)
+
+	// Validate tool call integrity on the serialized body before sending upstream.
+	// This catches orphaned tool results (Bug #2) that pass through the Anthropic
+	// serialization path where SerializeAnthropic doesn't validate.
+	if len(req.Messages) > 2 {
+		if err := validateMinimaxToolCallIntegrity(body); err != nil {
+			return nil, fmt.Errorf("tool_call validation failed: %w", err)
+		}
+	}
+
+	return body, nil
 }
 
 func (m *Minimax) ParseResponse(body []byte) (*ir.InternalResponse, error) {
@@ -56,12 +68,12 @@ func (m *Minimax) ParseResponse(body []byte) (*ir.InternalResponse, error) {
 
 func (m *Minimax) GetCapabilities() Capabilities {
 	return Capabilities{
-		SupportsToolCalling:   true,
-		SupportsStreaming:     true,
-		SupportsVision:        true,
-		SupportsThinking:      false, // MiniMax packs reasoning in <think> tags, not native
-		SupportsCacheControl:  false,
-		MaxTokens:             8192,
+		SupportsToolCalling:  true,
+		SupportsStreaming:    true,
+		SupportsVision:       true,
+		SupportsThinking:     false, // MiniMax packs reasoning in <think> tags, not native
+		SupportsCacheControl: false,
+		MaxTokens:            8192,
 		ToolIDField:          "tool_call_id", // MiniMax-specific
 	}
 }
@@ -122,4 +134,87 @@ func rewriteToolUseIDInMessage(msg map[string]any) bool {
 		}
 	}
 	return changed
+}
+
+// validateMinimaxToolCallIntegrity checks all tool_result blocks in Anthropic-format
+// messages have matching tool_use blocks. This is the Anthropic equivalent of
+// ir.validateToolCallIntegrity, operating on the final serialized JSON body.
+func validateMinimaxToolCallIntegrity(body []byte) error {
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil // not JSON — skip validation
+	}
+	messages, ok := raw["messages"].([]any)
+	if !ok || len(messages) <= 2 {
+		return nil // not enough messages to validate
+	}
+
+	// Collect all tool_use IDs from assistant messages
+	toolUseIDs := make(map[string]bool)
+	for _, msg := range messages {
+		msgMap, ok := msg.(map[string]any)
+		if !ok {
+			continue
+		}
+		role, _ := msgMap["role"].(string)
+		if role != "assistant" {
+			continue
+		}
+		content, ok := msgMap["content"].([]any)
+		if !ok {
+			continue
+		}
+		for _, block := range content {
+			blockMap, ok := block.(map[string]any)
+			if !ok {
+				continue
+			}
+			if blockMap["type"] == "tool_use" {
+				if id, ok := blockMap["id"].(string); ok && id != "" {
+					toolUseIDs[id] = true
+				}
+			}
+		}
+	}
+
+	// Check all tool_result blocks have matching tool_use ID
+	var orphanedIDs []string
+	for _, msg := range messages {
+		msgMap, ok := msg.(map[string]any)
+		if !ok {
+			continue
+		}
+		content, ok := msgMap["content"].([]any)
+		if !ok {
+			continue
+		}
+		for _, block := range content {
+			blockMap, ok := block.(map[string]any)
+			if !ok {
+				continue
+			}
+			if blockMap["type"] != "tool_result" {
+				continue
+			}
+			// Check both tool_use_id (standard) and tool_call_id (minimax after ensureToolCallID)
+			id, _ := blockMap["tool_call_id"].(string)
+			if id == "" {
+				id, _ = blockMap["tool_use_id"].(string)
+			}
+			if id != "" && !toolUseIDs[id] {
+				orphanedIDs = append(orphanedIDs, id)
+			}
+		}
+	}
+
+	if len(orphanedIDs) > 0 {
+		limit := 3
+		if len(orphanedIDs) < limit {
+			limit = len(orphanedIDs)
+		}
+		return fmt.Errorf("found %d orphaned tool result(s) without matching assistant tool_use: %v (likely client bug: assistant messages with tool_use were removed during context compression)",
+			len(orphanedIDs), orphanedIDs[:limit])
+	}
+
+	return nil
 }

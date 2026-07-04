@@ -84,6 +84,8 @@ export default {
   noData: 'No data for this period',
   costSuffix: 'USD',
   viewFailedRequests: 'View failed requests',
+  switchToClassic: 'Switch to classic layout',
+  switchToNew: 'Switch to new layout',
   liveStream: {
     title: 'Real-time request stream',
     connected: 'Connected',
@@ -103,6 +105,9 @@ export default {
     idleLabel: 'Idle {duration}',
     countTooltip: '{buffer} in buffer / {visible} visible on screen',
     countAria: '{buffer} requests in buffer, {visible} visible',
+    groupByVendor: 'By vendor',
+    groupByProvider: 'By provider',
+    other: 'Other',
     legend: {
       title: 'Legend',
       model: 'Provider',

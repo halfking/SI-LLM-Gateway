@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/kaixuan/llm-gateway-go/internal/ir"
@@ -122,10 +123,10 @@ func TestFactory_CatalogCodeAliases(t *testing.T) {
 	f := NewFactory()
 
 	cases := map[string]string{
-		"kimi":     "moonshot",
-		"glm":      "zhipu",
-		"qwen3":    "qwen",
-		"qwq":      "qwen",
+		"kimi":  "moonshot",
+		"glm":   "zhipu",
+		"qwen3": "qwen",
+		"qwq":   "qwen",
 	}
 	for catalogCode, expectedAdapter := range cases {
 		a, err := f.Get(catalogCode)
@@ -154,4 +155,135 @@ func TestCapabilities_VerifyAllAdaptersHaveSensibleDefaults(t *testing.T) {
 			t.Errorf("adapter %q has empty ToolIDField", name)
 		}
 	}
+}
+
+// TestMinimax_ValidateOrphanedToolResults verifies that orphaned tool results
+// (tool_result blocks without matching assistant tool_use) are detected and
+// rejected in the Anthropic serialization path.
+func TestMinimax_ValidateOrphanedToolResults(t *testing.T) {
+	m := NewMinimax()
+	req := &ir.InternalRequest{
+		Model: "abab6.5s-chat",
+		Messages: []ir.Message{
+			{
+				Role:    "user",
+				Content: []ir.ContentBlock{{Type: "text", Text: "Run a command"}},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_orphaned_001",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "Result 1"}},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_orphaned_002",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "Result 2"}},
+			},
+		},
+	}
+
+	_, err := m.SerializeRequest(req)
+	if err == nil {
+		t.Fatal("Expected error for orphaned tool results in Anthropic path, got nil")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "orphaned tool result") {
+		t.Errorf("Expected error to mention 'orphaned tool result', got: %s", errMsg)
+	}
+	if !strings.Contains(errMsg, "call_orphaned_001") {
+		t.Errorf("Expected error to include orphaned ID, got: %s", errMsg)
+	}
+	t.Logf("✓ Correctly rejected orphaned tool results in Anthropic path: %s", errMsg)
+}
+
+// TestMinimax_ValidToolCalling passes through the Anthropic path.
+func TestMinimax_ValidToolCalling(t *testing.T) {
+	m := NewMinimax()
+	req := &ir.InternalRequest{
+		Model: "abab6.5s-chat",
+		Messages: []ir.Message{
+			{
+				Role:    "user",
+				Content: []ir.ContentBlock{{Type: "text", Text: "Check weather"}},
+			},
+			{
+				Role:    "assistant",
+				Content: []ir.ContentBlock{}, // empty content
+				ToolCalls: []ir.ToolCall{
+					{
+						ID:   "call_valid_001",
+						Type: "function",
+						Function: struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						}{Name: "get_weather", Arguments: `{"city":"Beijing"}`},
+					},
+				},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_valid_001",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "sunny, 72°F"}},
+			},
+		},
+	}
+
+	body, err := m.SerializeRequest(req)
+	if err != nil {
+		t.Fatalf("Valid tool calling should not error: %v", err)
+	}
+	if len(body) == 0 {
+		t.Fatal("Expected non-empty body")
+	}
+	t.Logf("✓ Valid tool calling passed Anthropic path validation")
+}
+
+// TestMinimax_ValidatePartialOrphans tests mixed case: some valid, some orphaned.
+func TestMinimax_ValidatePartialOrphans(t *testing.T) {
+	m := NewMinimax()
+	req := &ir.InternalRequest{
+		Model: "abab6.5s-chat",
+		Messages: []ir.Message{
+			{
+				Role:    "user",
+				Content: []ir.ContentBlock{{Type: "text", Text: "Task 1"}},
+			},
+			{
+				Role:    "assistant",
+				Content: []ir.ContentBlock{},
+				ToolCalls: []ir.ToolCall{
+					{
+						ID:   "call_valid_001",
+						Type: "function",
+						Function: struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						}{Name: "bash", Arguments: `{}`},
+					},
+				},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_valid_001",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "OK"}},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_orphaned_002",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "Orphaned"}},
+			},
+		},
+	}
+
+	_, err := m.SerializeRequest(req)
+	if err == nil {
+		t.Fatal("Expected error for partially orphaned tool results, got nil")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "call_orphaned_002") {
+		t.Errorf("Expected error to mention orphaned ID 'call_orphaned_002', got: %s", errMsg)
+	}
+	t.Logf("✓ Correctly detected partial orphans: %s", errMsg)
 }

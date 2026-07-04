@@ -4,15 +4,22 @@
 //
 // 使用 camelCase 巢狀物件，便於 vue-i18n 的 t() 插值與 t('landing.features.X.title', {...}) 替換。
 export default {
-  kicker: 'AI-Native · Enterprise Governance',
-  title: 'AI-Native 組織核心閘道',
+  kicker: '核心開源 · 中國本地化 · 企業級',
+  title: 'LLM Gateway — 面向全球市場的開源 AI 閘道',
   subtitle: [
-    '讓 AI 成為組織的原生能力。',
-    '核心開源 + 企業增強 + Vibe Coding 治理 + 會話資產化。',
+    '唯一兼具核心開源與深度中國本地化的 AI 閘道，服務全球企業。',
+    '企業級治理、全球 LLM 接入、合規與數據主權 — 全部核心開源。',
   ],
   featuresTitle: '核心能力',
   featuresSubtitle: '覆蓋從接入到營運的關鍵環節',
-  heroPoints: ['智慧路由', '呼叫安全', '快取降本', 'Agent 就緒', '全鏈路稽核', 'MaaS 計費'],
+  heroPoints: [
+    '核心開源 · Apache 2.0',
+    '中國本地化 · 等保 2.0',
+    '智慧路由',
+    '呼叫安全',
+    '快取降本',
+    'Agent 就緒',
+  ],
   features: {
     smartRouting: {
       title: '智慧路由與憑證池',
@@ -51,15 +58,15 @@ export default {
       description: 'PostgreSQL RLS 列級安全 + 43 輪稽核 L1=0，租戶間資料零洩漏，每租戶獨立策略與配額。',
     },
   },
-  advantagesTitle: '差異化優勢',
-  advantagesSubtitle: '海外廠商給不了的能力',
+  advantagesTitle: '為什麼選擇 LLM Gateway',
+  advantagesSubtitle: '面向有中國業務需求的全球企業',
   advantages: {
-    local: { title: '中國本地化', description: '全中文介面、國產模型優先、支付寶/微信支付接入、等保合規模板' },
+    local: { title: '深度中國本地化', description: '全中文介面、國產開源 LLM 優先對接、支付寶/微信支付接入、等保 2.0 合規模板、國內雲基礎設施就緒' },
     private: { title: '私有化部署', description: '完全私有部署，資料不出企業，k3s + Docker 雙形態，零外部依賴' },
     antiBan: { title: '抗封號體系', description: '50+ UA 輪換 + utls TLS 指紋池 + 11 瀏覽器 profile + 5 分鐘自動輪換' },
     perf: { title: 'Go 高效能資料面', description: '原生 Go 實作，40MB 輕量映像，200 並行 P99 < 500ms，SSE 串流穩定中繼' },
   },
-  footer: '開軒 LLM Gateway · [GATEWAY_DOMAIN] · 私有部署 · 中國本地化',
+  footer: 'LLM Gateway · [GATEWAY_DOMAIN] · 核心開源 · 中國本地化 · 私有部署',
   ariaPoints: '核心亮點',
   roadmap: {
     title: '產品演進路線',

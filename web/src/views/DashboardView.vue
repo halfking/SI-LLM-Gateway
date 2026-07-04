@@ -4,6 +4,8 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MemoraStatusButton from '../components/MemoraStatusButton.vue'
 import LiveRequestStream from '../components/LiveRequestStream.vue'
+import LiveRequestStreamLanes from '../components/LiveRequestStreamLanes.vue'
+import StatsModal from '../components/StatsModal.vue'
 import RequestLogDrawer from '../components/RequestLogDrawer.vue'
 import TenantDashboardView from './TenantDashboardView.vue'
 import {
@@ -29,6 +31,22 @@ import { useLocale } from '../i18n/useLocale'
 
 const { t } = useI18n()
 const { locale } = useLocale() // ensures `t()` re-renders when locale changes
+
+// ── 新旧版本切换 ──────────────────────────────────────────────────
+const useNewLayout = ref(true)
+
+// ── 统计数据弹窗 ──────────────────────────────────────────────────
+const statsModalVisible = ref(false)
+const statsModalType = ref<'hot-keys' | 'models'>('hot-keys')
+
+function openStatsModal(type: 'hot-keys' | 'models') {
+  statsModalType.value = type
+  statsModalVisible.value = true
+}
+
+function closeStatsModal() {
+  statsModalVisible.value = false
+}
 
 const days    = ref(7)
 const summary = ref<UsageSummary | null>(null)
@@ -336,6 +354,50 @@ function scheduleProbeFailuresPoll() {
         <MemoraStatusButton />
       </div>
       <div class="page-header-actions">
+        <!-- 新增：统计数据快捷按钮 -->
+        <button
+          v-if="useNewLayout"
+          class="btn btn-ghost btn-sm"
+          @click="openStatsModal('hot-keys')"
+          :title="t('dashboard.table.hotKeysTitle')"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          API Keys
+        </button>
+        <button
+          v-if="useNewLayout"
+          class="btn btn-ghost btn-sm"
+          @click="openStatsModal('models')"
+          :title="t('dashboard.table.byModelTitle')"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          {{ t('dashboard.table.byModelTitle') }}
+        </button>
+        <!-- 版本切换按钮 -->
+        <button
+          class="btn btn-ghost btn-sm"
+          @click="useNewLayout = !useNewLayout"
+          :title="useNewLayout ? t('dashboard.switchToClassic') : t('dashboard.switchToNew')"
+        >
+          <svg v-if="useNewLayout" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          </svg>
+        </button>
         <span class="tenant-badge" :class="{ 'tenant-badge--admin': isSuperAdmin(), 'tenant-badge--default': isDefaultTenant() }">
           {{ tenantLabel }}
         </span>
@@ -411,7 +473,57 @@ function scheduleProbeFailuresPoll() {
       <RouterLink to="/routing-v2?tab=resolve&row=model">{{ t('nav.item.routingOverview') }}</RouterLink>
     </div>
 
-    <LiveRequestStream @open-detail="openRequestDetail" />
+    <!-- ========== 新版布局 ========== -->
+    <template v-if="useNewLayout">
+      <!-- 统计卡片：单行紧凑布局 -->
+      <div class="compact-stat-grid" v-if="summary && overview">
+        <div class="compact-stat-card">
+          <div class="compact-stat-label">{{ t('dashboard.stat.totalRequests') }}</div>
+          <div class="compact-stat-value">{{ fmt(summary.total_requests) }}</div>
+        </div>
+        <div class="compact-stat-card">
+          <div class="compact-stat-label">{{ t('dashboard.stat.totalTokens') }}</div>
+          <div class="compact-stat-value">{{ fmt((summary.total_prompt_tokens ?? 0) + (summary.total_completion_tokens ?? 0)) }}</div>
+        </div>
+        <div class="compact-stat-card">
+          <div class="compact-stat-label">{{ t('dashboard.stat.totalCost') }}</div>
+          <div class="compact-stat-value">{{ fmtCost(summary.total_cost_usd) }}</div>
+        </div>
+        <div class="compact-stat-card">
+          <div class="compact-stat-label">{{ t('dashboard.stat.successRate') }}</div>
+          <div class="compact-stat-value" :style="{ color: (summary.success_rate ?? 1) > 0.95 ? 'var(--success)' : 'var(--warning)' }">
+            {{ fmtPct(summary.success_rate) }}
+          </div>
+        </div>
+        <div class="compact-stat-card">
+          <div class="compact-stat-label">{{ t('dashboard.stat.avgLatency') }}</div>
+          <div class="compact-stat-value">{{ fmt(summary.avg_latency_ms) }}ms</div>
+        </div>
+        <div class="compact-stat-card">
+          <div class="compact-stat-label">{{ t('dashboard.stat.apiKeys') }}</div>
+          <div class="compact-stat-value">{{ fmt(overview.active_api_keys_in_window) }}/{{ fmt(overview.total_api_keys) }}</div>
+        </div>
+        <div class="compact-stat-card">
+          <div class="compact-stat-label">{{ t('dashboard.stat.models') }}</div>
+          <div class="compact-stat-value">{{ fmt(overview.active_models_in_window) }}/{{ fmt(overview.total_models) }}</div>
+        </div>
+        <div class="compact-stat-card">
+          <div class="compact-stat-label">{{ t('dashboard.stat.providers') }}</div>
+          <div class="compact-stat-value">{{ fmt(overview.active_providers) }}/{{ fmt(overview.total_providers) }}</div>
+        </div>
+        <div class="compact-stat-card" v-if="compStats">
+          <div class="compact-stat-label">{{ t('dashboard.compression.title') }}</div>
+          <div class="compact-stat-value">{{ compStats.compressed_total }}/{{ compStats.total_requests }}</div>
+        </div>
+      </div>
+
+      <!-- 泳道式实时请求流 -->
+      <LiveRequestStreamLanes @open-detail="openRequestDetail" />
+    </template>
+
+    <!-- ========== 旧版布局 ========== -->
+    <template v-else>
+      <LiveRequestStream @open-detail="openRequestDetail" />
 
     <div class="stat-grid" v-if="summary && overview">
       <div class="stat-card">
@@ -572,15 +684,85 @@ function scheduleProbeFailuresPoll() {
     <div v-if="!loading && !error && (!summary || summary.total_requests === 0)" class="empty" style="margin-top:40px">
       <span v-html="t('dashboard.empty.firstUse')"></span>
     </div>
+    </template>
+
+    <!-- 统计数据模态框 -->
+    <StatsModal
+      :visible="statsModalVisible"
+      :type="statsModalType"
+      :hot-keys="hotKeys"
+      :models="models"
+      :days="days"
+      @close="closeStatsModal"
+    />
+
     <RequestLogDrawer :request-id="activeRequestId" @close="closeRequestDrawer" />
   </div>
 </template>
 
 <style scoped>
+/* ========== 新版紧凑统计卡片 ========== */
+.compact-stat-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: var(--card, #1c2128);
+  border: 1px solid var(--border, #30363d);
+  border-radius: var(--radius, 8px);
+}
+
+.compact-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  min-width: 100px;
+  background: var(--bg-subtle, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 6px;
+  transition: all 0.2s;
+  flex-shrink: 0;          /* 卡片不被压缩 */
+  white-space: nowrap;     /* 卡片内禁止折行 */
+}
+
+.compact-stat-card:hover {
+  background: var(--bg, #0f1117);
+  border-color: var(--accent, #6366f1);
+  transform: translateY(-1px);
+}
+
+.compact-stat-label {
+  font-size: 11px;
+  color: var(--muted, #8b949e);
+  margin-bottom: 4px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.compact-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text, #e6edf3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;     /* 数字不折行 */
+}
+
+/* ========== 旧版统计卡片 ========== */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
+}
+
+/* ========== 快捷按钮样式 ========== */
+.btn svg {
+  margin-right: 4px;
 }
 
 .text-end {
@@ -651,12 +833,23 @@ function scheduleProbeFailuresPoll() {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .page-header-actions {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: nowrap;       /* 按钮不折行 */
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.page-header-actions > * {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Model probe failures (spec 2026-06-18-model-probe-rounds) */
