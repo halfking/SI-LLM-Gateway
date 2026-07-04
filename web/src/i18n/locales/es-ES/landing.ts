@@ -1,21 +1,21 @@
 // Auto-translated draft (es-ES) · 2026-07-02 · please review
 // landing.ts — Página de aterrizaje pública.
 export default {
-  kicker: 'Open Core · Localización China · Enterprise Grade',
-  title: 'LLM Gateway — Puerta de enlace IA Open Core para mercados globales',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'Pasarela núcleo de organización AI-Native',
   subtitle: [
-    'La única puerta de enlace IA que combina open core con profunda localización china — para empresas globales.',
-    'Gobernanza empresarial, acceso LLM global, cumplimiento y soberanía de datos — todo open core.',
+    'Haz que la IA sea una capacidad nativa de tu organización.',
+    'Núcleo abierto + refuerzo empresarial + gobernanza Vibe Coding + capitalización de sesiones.',
   ],
   featuresTitle: 'Capacidades principales',
   featuresSubtitle: 'Cubriendo toda la cadena, desde el acceso hasta las operaciones',
   heroPoints: [
-    'Open Core · Apache 2.0',
-    'Localización China · MLPS 2.0',
     'Enrutamiento inteligente',
     'Seguridad de llamadas',
     'Reducción de costes por caché',
     'Listo para agentes',
+    'Auditoría de extremo a extremo',
+    'Facturación MaaS',
   ],
   features: {
     smartRouting: {
@@ -61,12 +61,12 @@ export default {
         'Seguridad a nivel de fila (RLS) de PostgreSQL + auditoría de 43 rondas L1=0, cero fugas de datos entre inquilinos, política y cuota por inquilino.',
     },
   },
-  advantagesTitle: 'Por qué LLM Gateway',
-  advantagesSubtitle: 'Diseñado para empresas globales con necesidades en China',
+  advantagesTitle: 'Ventajas diferenciales',
+  advantagesSubtitle: 'Lo que los proveedores globales no pueden ofrecer',
   advantages: {
-    local: {
-      title: 'Localización china profunda',
-      description: 'Interfaz completamente en chino, prioridad a LLM open source chinos, Alipay / WeChat Pay, plantillas compatibles con MLPS 2.0, despliegue en nubes chinas'
+    openSource: {
+      title: 'Núcleo Abierto',
+      description: 'Código base Open Core · Licencia compatible con Apache 2.0 · Construido por desarrolladores globales · Transparente y auditable',
     },
     private: {
       title: 'Despliegue privado',
@@ -81,31 +81,31 @@ export default {
       description: 'Go nativo, imagen ligera de 40 MB, P99 < 500 ms con 200 concurrentes, retransmisión estable de SSE en streaming',
     },
   },
-  footer: 'LLM Gateway · [GATEWAY_DOMAIN] · Open Core · Localización China · Despliegue privado',
+  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Despliegue privado · Núcleo Abierto',
   ariaPoints: 'Puntos destacados',
   roadmap: {
     title: 'Hoja de ruta de evolución del producto',
     subtitle: 'Del plano de datos LLM a la pasarela de agentes empresariales, en construcción continua',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'API Hub Asset Center + hosting de herramientas MCP',
       description:
         'Registro unificado de endpoints LLM, servicios MCP y agentes. Autoservicio de descubrimiento y reutilización para desarrolladores.',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
+      phase: 'Step 2',
       title: 'Escudo de seguridad GA + integración SIEM + SpecBoost',
       description:
         'Bloqueo de inyección de prompt, enmascaramiento de datos sensibles, enriquecimiento inteligente de la descripción de la API para mejorar la precisión del Function Calling.',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'Registro de agentes + pasarela de protocolo A2A',
       description:
         'Delegación y orquestación de tareas entre agentes, entrada unificada de OpenClaw y agentes de negocio.',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
+      phase: 'Step 4',
       title: 'Soluciones sectoriales GA',
       description:
         'Plantillas sectoriales para atención al cliente, RR. HH., ventas y logística: soluciones de agentes listas para usar.',

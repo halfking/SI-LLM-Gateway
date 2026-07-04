@@ -43,7 +43,7 @@ const features = computed(() =>
 )
 
 const ADVANTAGE_META: ReadonlyArray<{ key: string; icon: string }> = [
-  { key: 'local', icon: '🇨🇳' },
+  { key: 'openSource', icon: '🌐' },
   { key: 'private', icon: '🔒' },
   { key: 'antiBan', icon: '🛡️' },
   { key: 'perf', icon: '⚡' },

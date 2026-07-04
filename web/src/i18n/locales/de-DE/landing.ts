@@ -6,21 +6,21 @@
 // Keys use camelCase nested objects so vue-i18n's `t()` interpolation and
 // `t('landing.features.X.title', { ... })` substitution both work.
 export default {
-  kicker: 'Open Core · China-Lokalisierung · Enterprise Grade',
-  title: 'LLM Gateway — Open-Core-AI-Gateway für globale Märkte',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'KI-native Organisations-Kern-Gateway',
   subtitle: [
-    'Das einzige AI-Gateway, das Open Core mit umfassender China-Lokalisierung vereint — für globale Unternehmen.',
-    'Enterprise-Governance, globaler LLM-Zugang, Compliance und Datensouveränität — vollständig Open Core.',
+    'Machen Sie KI zur nativen Fähigkeit Ihrer Organisation.',
+    'Open Core + Enterprise-Erweiterung + Vibe-Coding-Governance + Sitzungs-Assetisierung.',
   ],
   featuresTitle: 'Kernfunktionen',
   featuresSubtitle: 'Deckt die gesamte Kette vom Zugang bis zum Betrieb ab',
   heroPoints: [
-    'Open Core · Apache 2.0',
-    'China-Lokalisierung · MLPS 2.0',
     'Intelligentes Routing',
     'Aufrufsicherheit',
     'Cache-Kostenreduzierung',
     'Agent-bereit',
+    'Vollständige Audit-Kette',
+    'MaaS-Abrechnung',
   ],
   features: {
     smartRouting: {
@@ -66,12 +66,12 @@ export default {
         'PostgreSQL RLS-Zeilenebene-Sicherheit + 43-Runden-Audit L1=0, null mandantenübergreifender Datenverlust, pro-Mandant-Richtlinie und -Kontingent.',
     },
   },
-  advantagesTitle: 'Warum LLM Gateway',
-  advantagesSubtitle: 'Entwickelt für globale Unternehmen mit China-Anforderungen',
+  advantagesTitle: 'Differenzierte Vorteile',
+  advantagesSubtitle: 'Was globale Anbieter nicht bieten können',
   advantages: {
-    local: {
-      title: 'Umfassende China-Lokalisierung',
-      description: 'Vollständige chinesische Benutzeroberfläche, Priorität für chinesische Open-Source-LLMs, Alipay / WeChat Pay, MLPS 2.0-konforme Vorlagen, Bereitstellung in chinesischen Clouds'
+    openSource: {
+      title: 'Open Core',
+      description: 'Open-Core-Codebasis · Apache-2.0-freundliche Lizenz · Mitwirkende weltweit · Transparent & auditierbar',
     },
     private: {
       title: 'Private Bereitstellung',
@@ -86,31 +86,31 @@ export default {
       description: 'Natives Go, 40 MB leichtgewichtiges Image, 200 gleichzeitig P99 < 500 ms, stabiles SSE-Streaming-Relais',
     },
   },
-  footer: 'LLM Gateway · [GATEWAY_DOMAIN] · Open Core · China-Lokalisierung · Private Bereitstellung',
+  footer: 'Kaixuan LLM Gateway · [GATEWAY_DOMAIN] · Private Bereitstellung · Open Core',
   ariaPoints: 'Highlights',
   roadmap: {
     title: 'Produktentwicklungs-Roadmap',
     subtitle: 'Von der LLM-Datenebene zum Enterprise-Agent-Gateway — kontinuierlich aufgebaut',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'API-Hub-Asset-Center + MCP-Tool-Hosting',
       description:
         'Einheitliche Registrierung von LLM-Endpunkten, MCP-Diensten und Agenten. Self-Service-Entdeckung und -Wiederverwendung für Entwickler.',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
+      phase: 'Step 2',
       title: 'Sicherheits-Schild GA + SIEM-Integration + SpecBoost',
       description:
         'Prompt-Injection-Blockierung, Maskierung sensibler Daten, intelligente API-Beschreibungs-Anreicherung zur Verbesserung der Function-Calling-Genauigkeit.',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'Agent-Registry + A2A-Protokoll-Gateway',
       description:
         'Mandantenübergreifende Aufgabendelegation und -Orchestrierung, einheitlicher Einstieg für OpenClaw und Geschäfts-Agenten.',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
+      phase: 'Step 4',
       title: 'Branchenlösungen GA',
       description:
         'Kundenservice-, HR-, Vertriebs- und Logistik-Branchenvorlagen — sofort einsatzbereite Agent-Lösungen.',

@@ -4,22 +4,15 @@
 //
 // 使用 camelCase 巢狀物件，便於 vue-i18n 的 t() 插值與 t('landing.features.X.title', {...}) 替換。
 export default {
-  kicker: '核心開源 · 中國本地化 · 企業級',
-  title: 'LLM Gateway — 面向全球市場的開源 AI 閘道',
+  kicker: 'AI-Native · Enterprise Governance',
+  title: 'AI-Native 組織核心閘道',
   subtitle: [
-    '唯一兼具核心開源與深度中國本地化的 AI 閘道，服務全球企業。',
-    '企業級治理、全球 LLM 接入、合規與數據主權 — 全部核心開源。',
+    '讓 AI 成為組織的原生能力。',
+    '核心開源 + 企業增強 + Vibe Coding 治理 + 會話資產化。',
   ],
   featuresTitle: '核心能力',
   featuresSubtitle: '覆蓋從接入到營運的關鍵環節',
-  heroPoints: [
-    '核心開源 · Apache 2.0',
-    '中國本地化 · 等保 2.0',
-    '智慧路由',
-    '呼叫安全',
-    '快取降本',
-    'Agent 就緒',
-  ],
+  heroPoints: ['智慧路由', '呼叫安全', '快取降本', 'Agent 就緒', '全鏈路稽核', 'MaaS 計費'],
   features: {
     smartRouting: {
       title: '智慧路由與憑證池',
@@ -58,36 +51,39 @@ export default {
       description: 'PostgreSQL RLS 列級安全 + 43 輪稽核 L1=0，租戶間資料零洩漏，每租戶獨立策略與配額。',
     },
   },
-  advantagesTitle: '為什麼選擇 LLM Gateway',
-  advantagesSubtitle: '面向有中國業務需求的全球企業',
+  advantagesTitle: '差異化優勢',
+  advantagesSubtitle: '海外廠商給不了的能力',
   advantages: {
-    local: { title: '深度中國本地化', description: '全中文介面、國產開源 LLM 優先對接、支付寶/微信支付接入、等保 2.0 合規模板、國內雲基礎設施就緒' },
+    openSource: {
+      title: '核心開源',
+      description: 'Open Core 開源核心 · Apache 2.0 友善授權 · 全球開發者共建 · 透明可審計',
+    },
     private: { title: '私有化部署', description: '完全私有部署，資料不出企業，k3s + Docker 雙形態，零外部依賴' },
     antiBan: { title: '抗封號體系', description: '50+ UA 輪換 + utls TLS 指紋池 + 11 瀏覽器 profile + 5 分鐘自動輪換' },
     perf: { title: 'Go 高效能資料面', description: '原生 Go 實作，40MB 輕量映像，200 並行 P99 < 500ms，SSE 串流穩定中繼' },
   },
-  footer: 'LLM Gateway · [GATEWAY_DOMAIN] · 核心開源 · 中國本地化 · 私有部署',
+  footer: '開軒 LLM Gateway · [GATEWAY_DOMAIN] · 私有部署 · 核心開源',
   ariaPoints: '核心亮點',
   roadmap: {
     title: '產品演進路線',
     subtitle: '從 LLM 資料面到企業 Agent 閘道，持續建置',
     v31: {
-      phase: 'v3.1 · 2026 Q3',
+      phase: 'Step 1',
       title: 'API Hub 資產中心 + MCP 工具託管',
       description: '統一登記 LLM 端點、MCP 服務與 Agent，開發者自助發現與複用。',
     },
     v32: {
-      phase: 'v3.2 · 2026 Q4',
+      phase: 'Step 2',
       title: '安全護盾 GA + SIEM 對接 + SpecBoost',
       description: '提示詞注入攔截、敏感資料脫敏、API 描述智慧豐富提升 Function Calling 準確率。',
     },
     v40: {
-      phase: 'v4.0 · 2027 Q1',
+      phase: 'Step 3',
       title: 'Agent 註冊中心 + A2A 協定閘道',
       description: '跨智慧體任務委派與編排，OpenClaw 與業務 Agent 統一接入。',
     },
     v50: {
-      phase: 'v5.0 · 2027 Q3',
+      phase: 'Step 4',
       title: '行業方案 GA',
       description: '客服、人資、銷售、物流四大行業範本，開箱即用的智慧體方案。',
     },
