@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/kaixuan/llm-gateway-go/internal/ir"
@@ -122,10 +123,10 @@ func TestFactory_CatalogCodeAliases(t *testing.T) {
 	f := NewFactory()
 
 	cases := map[string]string{
-		"kimi":     "moonshot",
-		"glm":      "zhipu",
-		"qwen3":    "qwen",
-		"qwq":      "qwen",
+		"kimi":  "moonshot",
+		"glm":   "zhipu",
+		"qwen3": "qwen",
+		"qwq":   "qwen",
 	}
 	for catalogCode, expectedAdapter := range cases {
 		a, err := f.Get(catalogCode)
@@ -154,4 +155,182 @@ func TestCapabilities_VerifyAllAdaptersHaveSensibleDefaults(t *testing.T) {
 			t.Errorf("adapter %q has empty ToolIDField", name)
 		}
 	}
+}
+
+// TestMinimax_ValidateOrphanedToolResults_OpenAIFormat verifies orphaned tool
+// results are detected when using OpenAI format (tool_calls array + tool role messages).
+func TestMinimax_ValidateOrphanedToolResults_OpenAIFormat(t *testing.T) {
+	m := NewMinimax()
+	req := &ir.InternalRequest{
+		Model: "abab6.5s-chat",
+		Messages: []ir.Message{
+			{
+				Role:    "user",
+				Content: []ir.ContentBlock{{Type: "text", Text: "Run commands"}},
+			},
+			{
+				Role:    "assistant",
+				Content: []ir.ContentBlock{},
+				ToolCalls: []ir.ToolCall{
+					{
+						ID:   "call_valid_001",
+						Type: "function",
+						Function: struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						}{Name: "bash", Arguments: `{}`},
+					},
+				},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_valid_001",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "OK"}},
+			},
+			// Orphaned tool results (no matching assistant tool_calls)
+			{
+				Role:       "tool",
+				ToolCallID: "call_orphaned_002",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "Orphan 1"}},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_orphaned_003",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "Orphan 2"}},
+			},
+		},
+	}
+
+	body, err := m.SerializeRequest(req)
+
+	// Debug: print serialized body
+	var pretty map[string]any
+	if json.Unmarshal(body, &pretty) == nil {
+		msgs := pretty["messages"]
+		t.Logf("Serialized message count: %d", len(msgs.([]any)))
+		out, _ := json.MarshalIndent(pretty, "", "  ")
+		t.Logf("Serialized body:\n%s", out)
+	}
+
+	if err == nil {
+		t.Fatal("Expected error for orphaned tool results in OpenAI format, got nil")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "orphaned tool result") {
+		t.Errorf("Expected error to mention 'orphaned tool result', got: %s", errMsg)
+	}
+	if !strings.Contains(errMsg, "call_orphaned_002") {
+		t.Errorf("Expected error to include orphaned ID, got: %s", errMsg)
+	}
+	t.Logf("✓ Correctly rejected orphaned tool results in OpenAI format: %s", errMsg)
+}
+
+// TestMinimax_ValidToolCalling_OpenAIFormat verifies valid tool calling passes validation.
+func TestMinimax_ValidToolCalling_OpenAIFormat(t *testing.T) {
+	m := NewMinimax()
+	req := &ir.InternalRequest{
+		Model: "abab6.5s-chat",
+		Messages: []ir.Message{
+			{
+				Role:    "user",
+				Content: []ir.ContentBlock{{Type: "text", Text: "Check weather"}},
+			},
+			{
+				Role:    "assistant",
+				Content: []ir.ContentBlock{},
+				ToolCalls: []ir.ToolCall{
+					{
+						ID:   "call_valid_001",
+						Type: "function",
+						Function: struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						}{Name: "get_weather", Arguments: `{"city":"Beijing"}`},
+					},
+				},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_valid_001",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "sunny, 72°F"}},
+			},
+		},
+	}
+
+	body, err := m.SerializeRequest(req)
+	if err != nil {
+		t.Fatalf("Valid tool calling should not error: %v", err)
+	}
+	if len(body) == 0 {
+		t.Fatal("Expected non-empty body")
+	}
+	t.Logf("✓ Valid tool calling passed OpenAI format validation")
+}
+
+// TestMinimax_ValidatePartialOrphans_OpenAIFormat tests mixed case.
+func TestMinimax_ValidatePartialOrphans_OpenAIFormat(t *testing.T) {
+	m := NewMinimax()
+	req := &ir.InternalRequest{
+		Model: "abab6.5s-chat",
+		Messages: []ir.Message{
+			{
+				Role:    "user",
+				Content: []ir.ContentBlock{{Type: "text", Text: "Task 1"}},
+			},
+			{
+				Role:    "assistant",
+				Content: []ir.ContentBlock{},
+				ToolCalls: []ir.ToolCall{
+					{
+						ID:   "call_valid_001",
+						Type: "function",
+						Function: struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						}{Name: "bash", Arguments: `{}`},
+					},
+					{
+						ID:   "call_valid_002",
+						Type: "function",
+						Function: struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						}{Name: "bash", Arguments: `{}`},
+					},
+				},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_valid_001",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "OK"}},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_valid_002",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "OK"}},
+			},
+			// Next assistant + tool, but this tool is orphaned
+			{
+				Role:    "assistant",
+				Content: []ir.ContentBlock{{Type: "text", Text: "Continuing..."}},
+			},
+			{
+				Role:       "tool",
+				ToolCallID: "call_orphaned_003",
+				Content:    []ir.ContentBlock{{Type: "text", Text: "Orphaned"}},
+			},
+		},
+	}
+
+	_, err := m.SerializeRequest(req)
+	if err == nil {
+		t.Fatal("Expected error for partially orphaned tool results, got nil")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "call_orphaned_003") {
+		t.Errorf("Expected error to mention orphaned ID 'call_orphaned_003', got: %s", errMsg)
+	}
+	t.Logf("✓ Correctly detected partial orphans: %s", errMsg)
 }
