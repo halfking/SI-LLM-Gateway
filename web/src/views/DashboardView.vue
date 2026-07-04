@@ -65,25 +65,8 @@ let probeFailuresPollTimer: ReturnType<typeof setInterval> | null = null
 let statsRecalibrateTimer: ReturnType<typeof setInterval> | null = null
 
 // ── Live request stream (2026-07-03) ─────────────────────────────────
-// The composable owns the WebSocket connection. We pass requests
-// through a watch to incrementally update the stat cards instead of
-// re-fetching the full summary on every push (which would create
-// a thundering-herd under QPS=50+).
-//
-// ID-based dedup: the composable buffers up to N requests and
-// silently evicts the oldest when full. We cannot rely on a
-// positional delta (`items[prevCount:]`) because the buffer can
-// roll over between two ticks. Instead, every request_id is added
-// to `seenLiveRequestIds` the first time it shows up in the buffer
-// (and removed when the composable evicts it via `onRequestEvicted`).
-// Stat accumulators are only ever touched for IDs we have NOT
-// seen before — so a 5-minute recalibrate cycle can drop and
-// re-fetch the summary without us ever inflating the totals.
-const {
-  requests: liveRequests,
-  onRequestEvicted,
-  reset: resetLiveStream,
-} = useLiveStream()
+// 🔥 注意：LiveRequestStreamLanes 组件内部已调用 useLiveStream()
+// 这里不再重复调用，避免 watch 冲突导致新请求被标记为"已见过"
 const activeRequestId = ref<string | null>(null)
 function openRequestDetail(id: string) {
   activeRequestId.value = id
@@ -92,82 +75,11 @@ function closeRequestDrawer() {
   activeRequestId.value = null
 }
 
-// Track which request IDs we have already credited. Populated on
-// first sight of an ID; depopulated when the composable evicts the
-// ID. Cleared whenever load() refetches the full summary so the
-// next delta starts from a clean slate.
-const seenLiveRequestIds = new Set<string>()
-
-// Hook the composable's eviction signal: when an ID leaves the
-// buffer, remove it from our set so the next initial_data replay
-// (or eviction-then-replay cycle) doesn't double-count it.
-onRequestEvicted((id: string) => {
-  seenLiveRequestIds.delete(id)
-})
-
+// 🔥 暂时移除增量统计更新逻辑，避免与 LiveRequestStreamLanes 冲突
+// 后续可以通过事件总线或 provide/inject 来同步统计数据
 function applyIncrementalStats() {
-  if (!summary.value) return
-  // Scan the whole buffer (not a positional delta) — the buffer is
-  // bounded to capacity and rolls over, so positions are not stable.
-  // Dedup is purely ID-based via seenLiveRequestIds.
-  const items = liveRequests.value
-  const added: LiveRequest[] = []
-  for (const r of items) {
-    if (r.type !== 'request' || !r.request_id) continue
-    if (seenLiveRequestIds.has(r.request_id)) continue
-    seenLiveRequestIds.add(r.request_id)
-    added.push(r)
-  }
-  if (added.length === 0) return
-
-  const tokensDelta =
-    added.reduce((s, r) => s + (r.total_tokens ?? ((r.prompt_tokens ?? 0) + (r.completion_tokens ?? 0))), 0)
-  const costDelta = added.reduce((s, r) => s + (r.cost_usd ?? 0), 0)
-  const successes = added.filter((r) => r.status === 'success').length
-  const failures = added.filter((r) => r.status === 'failure').length
-  const inProgress = added.filter((r) => r.status === 'in_progress').length
-
-  // Bump raw counts.
-  summary.value.total_requests = (summary.value.total_requests ?? 0) + added.length
-  summary.value.total_prompt_tokens = (summary.value.total_prompt_tokens ?? 0) +
-    added.reduce((s, r) => s + (r.prompt_tokens ?? 0), 0)
-  summary.value.total_completion_tokens = (summary.value.total_completion_tokens ?? 0) +
-    added.reduce((s, r) => s + (r.completion_tokens ?? 0), 0)
-  summary.value.total_cost_usd = (summary.value.total_cost_usd ?? 0) + costDelta
-
-  // Latency: weighted running average. Cheaper than recomputing and
-  // accurate enough at the dashboard's display granularity.
-  const addedLatency = added.reduce((s, r) => s + (r.latency_ms ?? 0), 0)
-  const addedLatencyN = added.filter((r) => r.latency_ms != null).length
-  if (addedLatencyN > 0) {
-    const prevAvg = summary.value.avg_latency_ms ?? 0
-    const prevN = Math.max(0, (summary.value.total_requests ?? 0) - added.length)
-    const totalN = prevN + addedLatencyN
-    if (totalN > 0) {
-      summary.value.avg_latency_ms = Math.round((prevAvg * prevN + addedLatency) / totalN)
-    }
-  }
-
-  // Success rate: incremental Bayesian update so a few new failures
-  // don't visibly nudge a stable 99.9%.
-  const knownSuccesses = Math.round((summary.value.success_rate ?? 1) * (summary.value.total_requests - added.length))
-  const newSuccesses = knownSuccesses + successes
-  if (summary.value.total_requests > 0) {
-    summary.value.success_rate = newSuccesses / summary.value.total_requests
-  }
-  // Touched counts surfaced via console for debugging — the stat
-  // cards themselves don't render these yet.
-  if (inProgress > 0) {
-    console.debug('[liveStream] in-progress skipped for success_rate:', inProgress)
-  }
-  // failures / successes are consumed by the success-rate math above;
-  // we keep the variables in scope so future stat cards can pick them
-  // up without re-deriving.
-  void failures
-  void tokensDelta
+  // TODO: 从 LiveRequestStreamLanes 接收增量统计事件
 }
-
-watch(liveRequests, applyIncrementalStats, { deep: true })
 
 // Periodic recalibration against the backend to wipe out any
 // client-side drift. 5 minutes matches the spec (REQ §2.2.2).
@@ -177,12 +89,6 @@ function scheduleStatsRecalibrate() {
     try {
       const fresh = await getUsageSummary(days.value)
       summary.value = fresh
-      // Drop the dedup set AND clear the in-memory buffer so the
-      // next push starts clean. resetLiveStream() also clears the
-      // composable's idIndex, so the next applyIncrementalStats
-      // scan treats every live buffer entry as fresh.
-      seenLiveRequestIds.clear()
-      resetLiveStream()
     } catch {
       /* non-blocking; next tick will retry */
     }
