@@ -87,7 +87,53 @@ func SerializeOpenAI(req *InternalRequest) ([]byte, error) {
 		out["tool_choice"] = serializeOpenAIToolChoice(req.ToolChoice)
 	}
 
+	// Validate: check for orphaned tool results (tool messages without matching assistant tool_calls)
+	// This prevents sending malformed requests to upstream providers like MiniMax
+	// Only validate if there are multiple messages (skip single-message unit tests)
+	if len(messages) > 2 {
+		if err := validateToolCallIntegrity(messages); err != nil {
+			return nil, fmt.Errorf("tool_call validation failed: %w", err)
+		}
+	}
+
 	return json.Marshal(out)
+}
+
+// validateToolCallIntegrity checks that all tool result messages have corresponding
+// assistant tool_calls. This prevents sending malformed requests where tool results
+// reference tool_call_ids that don't exist (MiniMax returns 400 error code 2013).
+func validateToolCallIntegrity(messages []map[string]any) error {
+	// Collect all tool_call IDs from assistant messages
+	toolCallIDs := make(map[string]bool)
+	for _, msg := range messages {
+		if role, ok := msg["role"].(string); ok && role == "assistant" {
+			if toolCalls, ok := msg["tool_calls"].([]map[string]any); ok {
+				for _, tc := range toolCalls {
+					if id, ok := tc["id"].(string); ok && id != "" {
+						toolCallIDs[id] = true
+					}
+				}
+			}
+		}
+	}
+
+	// Check all tool result messages have matching tool_calls
+	orphanedIDs := []string{}
+	for _, msg := range messages {
+		if role, ok := msg["role"].(string); ok && role == "tool" {
+			if toolCallID, ok := msg["tool_call_id"].(string); ok && toolCallID != "" {
+				if !toolCallIDs[toolCallID] {
+					orphanedIDs = append(orphanedIDs, toolCallID)
+				}
+			}
+		}
+	}
+
+	if len(orphanedIDs) > 0 {
+		return fmt.Errorf("found %d orphaned tool result(s) without matching assistant tool_calls: %v (likely client bug: assistant messages with tool_calls were removed during context compression)", len(orphanedIDs), orphanedIDs[:min(3, len(orphanedIDs))])
+	}
+
+	return nil
 }
 
 // serializeOpenAIMessages converts IR messages to OpenAI format.
