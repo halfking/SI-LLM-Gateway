@@ -322,6 +322,8 @@ func TestRouteNodeStore_RecordAndGet(t *testing.T) {
 
 	const credID = 88002
 	const model = "minimax-m3-test-2"
+	// 先清理可能残留的状态（避免测试间污染）
+	_ = store.Delete(ctx, credID, model)
 	t.Cleanup(func() { _ = store.Delete(ctx, credID, model) })
 
 	// 第一次成功
