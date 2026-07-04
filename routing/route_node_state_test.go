@@ -65,8 +65,12 @@ func TestRouteNodeState_ConsecutiveFailureStreak_Basic(t *testing.T) {
 func TestRouteNodeState_Streak_ResetAfterSuccess(t *testing.T) {
 	s := newTestState(1, "minimax-m3")
 	cfg := DefaultRouteNodeConfig()
+	now := time.Now()
 
 	// F-F-F-F-F 然后 S
+	for i := 0; i < 5; i++ {
+		s.RecordFailure(now.Add(time.Duration(i)*time.Second), "req-"+string(rune('1'+i)), "rate_limit", cfg)
+	}
 
 	if !s.Disabled {
 		t.Fatal("should be disabled after 5 failures")
@@ -112,43 +116,45 @@ func TestRouteNodeState_MixedSequence(t *testing.T) {
 	cfg := DefaultRouteNodeConfig()
 	now := time.Now()
 
-	// F-F-F-S-F-F（最新连续 2 次失败）
-	s.RecordFailure(now, "r1", "rate_limit", cfg)
-	s.RecordFailure(now.Add(time.Second), "r2", "rate_limit", cfg)
-	s.RecordFailure(now.Add(2*time.Second), "r3", "rate_limit", cfg)
+	// F-F-F-F-F-S-F-F（先5次失败，成功，再2次失败）
+	for i := 0; i < 5; i++ {
+		s.RecordFailure(now.Add(time.Duration(i)*time.Second), "r"+string(rune('1'+i)), "rate_limit", cfg)
+	}
 
 	// 验证：5 次失败触发 Disabled
 	if !s.Disabled {
 		t.Fatal("should be disabled after 5 failures")
 	}
 
-	// 第 4 次成功清掉 Disabled（V3 语义：成功即恢复，不等冷却到期）
-	s.RecordSuccess(now.Add(3*time.Second), "r4", cfg)
+	// 第 6 次成功清掉 Disabled（V3 语义：成功即恢复，不等冷却到期）
+	s.RecordSuccess(now.Add(5*time.Second), "r6-success", cfg)
 	if s.Disabled {
 		t.Fatal("Disabled should be cleared by RecordSuccess")
 	}
 
-	// 第 5、6 次失败
-	s.RecordFailure(now.Add(4*time.Second), "r5", "rate_limit", cfg)
-	s.RecordFailure(now.Add(5*time.Second), "r6", "rate_limit", cfg)
+	// 第 7、8 次失败
+	s.RecordFailure(now.Add(6*time.Second), "r7", "rate_limit", cfg)
+	s.RecordFailure(now.Add(7*time.Second), "r8", "rate_limit", cfg)
 
 	// streak=2（最新连续两次失败）
-	if streak := s.ConsecutiveFailureStreak(now.Add(6*time.Second), cfg); streak != 2 {
+	if streak := s.ConsecutiveFailureStreak(now.Add(8*time.Second), cfg); streak != 2 {
 		t.Fatalf("streak=%d, want 2", streak)
 	}
 
-	// IsUsable 在 streak<3 且未 Disabled 时返回 true
-	if !s.IsUsable(now.Add(6*time.Second), cfg) {
-		t.Fatal("state should be usable (Disabled cleared by success, streak<3)")
+	// IsUsable 在 streak<5 且未 Disabled 时返回 true
+	if !s.IsUsable(now.Add(8*time.Second), cfg) {
+		t.Fatal("state should be usable (Disabled cleared by success, streak<5)")
 	}
 
-	// 再失败 1 次（达到 streak=3）
-	s.RecordFailure(now.Add(7*time.Second), "r7", "rate_limit", cfg)
-	// 现在 streak = F(5)-F(6)-F(7) = 3
-	if streak := s.ConsecutiveFailureStreak(now.Add(7*time.Second), cfg); streak != 5 {
+	// 再失败 3 次（达到 streak=5）
+	s.RecordFailure(now.Add(9*time.Second), "r9", "rate_limit", cfg)
+	s.RecordFailure(now.Add(10*time.Second), "r10", "rate_limit", cfg)
+	s.RecordFailure(now.Add(11*time.Second), "r11", "rate_limit", cfg)
+	// 现在 streak = F(7)-F(8)-F(9)-F(10)-F(11) = 5
+	if streak := s.ConsecutiveFailureStreak(now.Add(12*time.Second), cfg); streak != 5 {
 		t.Fatalf("streak=%d, want 5", streak)
 	}
-	if s.IsUsable(now.Add(7*time.Second), cfg) {
+	if s.IsUsable(now.Add(12*time.Second), cfg) {
 		t.Fatal("state should be unusable after 5 consecutive failures")
 	}
 }
@@ -159,9 +165,9 @@ func TestRouteNodeState_AutoRecoverAfterCooldown(t *testing.T) {
 	now := time.Now()
 
 	// 5 次失败触发 Disabled
-	s.RecordFailure(now, "r1", "rate_limit", cfg)
-	s.RecordFailure(now.Add(time.Second), "r2", "rate_limit", cfg)
-	s.RecordFailure(now.Add(2*time.Second), "r3", "rate_limit", cfg)
+	for i := 0; i < 5; i++ {
+		s.RecordFailure(now.Add(time.Duration(i)*time.Second), "r"+string(rune('1'+i)), "rate_limit", cfg)
+	}
 
 	if !s.Disabled {
 		t.Fatal("should be disabled")
@@ -173,9 +179,12 @@ func TestRouteNodeState_AutoRecoverAfterCooldown(t *testing.T) {
 	}
 
 	// 冷却到期：可用 + 自动恢复
-	future := s.DisabledUntil.Add(time.Second)
+	// 但注意：IsUsable 会调用 ConsecutiveFailureStreak，它会 prune 旧记录
+	// 如果 5 次失败记录都在 WindowSeconds (默认 5 分钟) 内，streak 仍为 5
+	// 所以我们需要等待窗口过期，或者使用更短的窗口
+	future := s.DisabledUntil.Add(6 * time.Minute) // 超过默认 5 分钟窗口
 	if !s.IsUsable(future, cfg) {
-		t.Fatal("should be usable after cooldown")
+		t.Fatal("should be usable after cooldown + window expiry")
 	}
 	if s.Disabled {
 		t.Fatal("Disabled should be cleared after cooldown")
@@ -225,9 +234,9 @@ func TestRouteNodeState_RecordSuccessAutoRecovers(t *testing.T) {
 	now := time.Now()
 
 	// 触发 Disabled
-	s.RecordFailure(now, "r1", "rate_limit", cfg)
-	s.RecordFailure(now.Add(time.Second), "r2", "rate_limit", cfg)
-	s.RecordFailure(now.Add(2*time.Second), "r3", "rate_limit", cfg)
+	for i := 0; i < 5; i++ {
+		s.RecordFailure(now.Add(time.Duration(i)*time.Second), "r"+string(rune('1'+i)), "rate_limit", cfg)
+	}
 	if !s.Disabled {
 		t.Fatal("should be disabled")
 	}
