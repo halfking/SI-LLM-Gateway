@@ -126,8 +126,8 @@
 
 ```bash
 # 1. 克隆
-git clone https://codeup.aliyun.com/kaixuan/official-deploy/llm-gateway-go.git
-cd llm-gateway-go
+git clone git@github.com:halfking/SI-LLM-Gateway.git
+cd SI-LLM-Gateway
 
 # 2. 安装钩子
 ./scripts/pre-commit-install.sh        # pre-commit: go vet + SQL lint + migration 编号
