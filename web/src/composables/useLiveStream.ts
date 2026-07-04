@@ -66,7 +66,38 @@ export interface UseLiveStreamOptions {
   noAutoReconnect?: boolean
 }
 
+// ==================== 单例模式 ====================
+// 全局唯一的 WebSocket 连接实例，避免多个组件创建多个连接
+let globalInstance: ReturnType<typeof createLiveStreamInstance> | null = null
+let refCount = 0
+
 export function useLiveStream(options: UseLiveStreamOptions = {}) {
+  console.log('[useLiveStream] called, refCount:', refCount)
+  
+  if (!globalInstance) {
+    console.log('[useLiveStream] creating new global instance')
+    globalInstance = createLiveStreamInstance(options)
+  }
+  
+  refCount++
+  
+  onBeforeUnmount(() => {
+    refCount--
+    console.log('[useLiveStream] component unmounted, refCount:', refCount)
+    
+    // 当所有组件都卸载时，断开连接
+    if (refCount === 0 && globalInstance) {
+      console.log('[useLiveStream] all components unmounted, disposing instance')
+      globalInstance.dispose()
+      globalInstance = null
+    }
+  })
+  
+  return globalInstance
+}
+
+function createLiveStreamInstance(options: UseLiveStreamOptions = {}) {
+  console.log('[createLiveStreamInstance] options:', options)
   const capacity = options.capacity ?? MAX_VISIBLE
   const endpoint = options.endpoint ?? '/api/admin/live-stream'
 
@@ -286,6 +317,7 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
   }
 
   function disconnect() {
+    console.log('[liveStream] disconnect called')
     disposed = true
     clearReconnect()
     if (ws) {
@@ -299,13 +331,10 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
     connection.value = 'closed'
   }
 
-  onMounted(() => {
-    disposed = false
-    connect()
-  })
-  onBeforeUnmount(() => {
-    disconnect()
-  })
+  // 自动连接（在创建实例时调用）
+  console.log('[createLiveStreamInstance] auto-connecting...')
+  disposed = false
+  connect()
 
   const isConnected = computed(() => connection.value === 'open')
 
@@ -348,5 +377,6 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
       idIndex.clear()
       pending.length = 0
     },
+    dispose: disconnect,
   }
 }
