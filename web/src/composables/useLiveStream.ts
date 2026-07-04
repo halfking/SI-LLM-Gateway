@@ -224,7 +224,8 @@ function createLiveStreamInstance(options: UseLiveStreamOptions = {}) {
     }
     if (e.type === 'request' && e.request) {
       console.log('[liveStream] new request:', { request_id: e.request.request_id, model: e.request.model, status: e.request.status })
-      appendRequest(e.request)
+      // 🔥 包装 type 字段，保持与 LiveRequest 类型一致
+      appendRequest({ type: 'request', ...e.request })
       return
     }
     if (e.type === 'idle_marker') {
