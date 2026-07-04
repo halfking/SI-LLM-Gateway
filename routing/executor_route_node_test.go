@@ -18,7 +18,7 @@ func newTestExecParams(sessionID string) *ExecParams {
 	}
 	r.Header.Set("X-Request-Id", "test-request-id-1")
 	return &ExecParams{
-		R:        r,
+		R:         r,
 		SessionID: sessionID,
 	}
 }
@@ -148,22 +148,24 @@ func TestRecordRouteNodeFailure_3Streak_TriggersDisabled(t *testing.T) {
 
 	params := newTestExecParams("any")
 
-	// 3 次失败
+	// 5 次失败触发 Disabled（DefaultRouteNodeFailStreakLimit=5）
 	just1 := e.recordRouteNodeFailure(params, credID, model, errorsx.KindRateLimit)
 	just2 := e.recordRouteNodeFailure(params, credID, model, errorsx.KindConcurrent)
 	just3 := e.recordRouteNodeFailure(params, credID, model, errorsx.KindStreamTimeout)
+	just4 := e.recordRouteNodeFailure(params, credID, model, errorsx.KindRateLimit)
+	just5 := e.recordRouteNodeFailure(params, credID, model, errorsx.KindConcurrent)
 
-	if just1 || just2 {
-		t.Fatal("1st/2nd failure should not trigger disabled")
+	if just1 || just2 || just3 || just4 {
+		t.Fatal("1st-4th failure should not trigger disabled")
 	}
-	if !just3 {
-		t.Fatal("3rd consecutive failure should trigger justDisabled")
+	if !just5 {
+		t.Fatal("5th consecutive failure should trigger justDisabled")
 	}
 
 	// 验证 RouteNodeState 已 Disabled
 	state, _, _ := routeStore.Get(ctx, credID, model)
 	if !state.Disabled {
-		t.Fatal("state should be Disabled after 3 failures")
+		t.Fatal("state should be Disabled after 5 failures")
 	}
 }
 
@@ -241,14 +243,14 @@ func TestRecordRouteNodeSuccess_AfterDisabled_Recovers(t *testing.T) {
 
 	params := newTestExecParams("any")
 
-	// 3 次失败触发 Disabled
-	for i := 0; i < 3; i++ {
+	// 5 次失败触发 Disabled（DefaultRouteNodeFailStreakLimit=5）
+	for i := 0; i < 5; i++ {
 		e.recordRouteNodeFailure(params, credID, model, errorsx.KindRateLimit)
 	}
 
 	state, _, _ := routeStore.Get(ctx, credID, model)
 	if !state.Disabled {
-		t.Fatal("should be disabled")
+		t.Fatal("should be disabled after 5 failures")
 	}
 
 	// 上游成功应清 Disabled
@@ -321,14 +323,14 @@ func TestIntegration_SessionPrefAndRouteNodeState(t *testing.T) {
 		t.Fatalf("session_pref not set: got=%d found=%v", gotEntry.CredentialID, found)
 	}
 
-	// 2. 同会话后续 3 次失败：触发 RouteNodeState Disabled
-	for i := 0; i < 3; i++ {
+	// 2. 同会话后续 5 次失败：触发 RouteNodeState Disabled（DefaultRouteNodeFailStreakLimit=5）
+	for i := 0; i < 5; i++ {
 		e.recordRouteNodeFailure(params, credID, model, errorsx.KindRateLimit)
 	}
 
 	state, _, _ := routeStore.Get(ctx, credID, model)
 	if !state.Disabled {
-		t.Fatal("should be disabled after 3 failures")
+		t.Fatal("should be disabled after 5 failures")
 	}
 
 	// 3. 此时 PlanCandidates 应过滤掉该 candidate
