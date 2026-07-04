@@ -1284,10 +1284,10 @@ func (h *Handler) usageLiveStreamInit(w http.ResponseWriter, r *http.Request) {
 	// 汇总原厂（vendor）：从模型名提取
 	vendorMap := make(map[string]int)
 	rows, err := h.db.Query(ctx, `
-		SELECT model, COUNT(*)::int AS cnt
+		SELECT raw_model_name, COUNT(*)::int AS cnt
 		FROM usage_ledger
-		WHERE `+whereClause+`
-		GROUP BY model
+		WHERE `+whereClause+` AND raw_model_name IS NOT NULL
+		GROUP BY raw_model_name
 		ORDER BY cnt DESC
 		LIMIT 20
 	`, args...)
@@ -1306,13 +1306,14 @@ func (h *Handler) usageLiveStreamInit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 汇总供应商（provider_code）
+	// 汇总供应商（provider）：JOIN providers 表获取 catalog_code
 	providerMap := make(map[string]int)
 	rows2, err := h.db.Query(ctx, `
-		SELECT provider_code, COUNT(*)::int AS cnt
-		FROM usage_ledger
-		WHERE `+whereClause+` AND provider_code IS NOT NULL
-		GROUP BY provider_code
+		SELECT p.catalog_code, COUNT(*)::int AS cnt
+		FROM usage_ledger ul
+		LEFT JOIN providers p ON ul.provider_id = p.id
+		WHERE `+whereClause+` AND p.catalog_code IS NOT NULL
+		GROUP BY p.catalog_code
 		ORDER BY cnt DESC
 		LIMIT 20
 	`, args...)
@@ -1333,10 +1334,10 @@ func (h *Handler) usageLiveStreamInit(w http.ResponseWriter, r *http.Request) {
 	// 汇总模型（model）
 	modelMap := make(map[string]int)
 	rows3, err := h.db.Query(ctx, `
-		SELECT model, COUNT(*)::int AS cnt
+		SELECT raw_model_name, COUNT(*)::int AS cnt
 		FROM usage_ledger
-		WHERE `+whereClause+`
-		GROUP BY model
+		WHERE `+whereClause+` AND raw_model_name IS NOT NULL
+		GROUP BY raw_model_name
 		ORDER BY cnt DESC
 		LIMIT 20
 	`, args...)
