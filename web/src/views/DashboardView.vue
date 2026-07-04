@@ -187,7 +187,7 @@ const tenantLabel = computed(() => {
   }
 })
 
-const showTenantDashboard = computed(() => true) // Always show new dashboard (2026-07-05)
+const showTenantDashboard = computed(() => !isDefaultTenant())
 
 const proxyWarning = computed(() => {
   const p = health.value?.proxy
