@@ -160,8 +160,10 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
   }
 
   function envelope(e: LiveStreamEnvelope) {
+    console.log('[liveStream] processing envelope:', { type: e.type, ts: e.ts })
     lastEventAt.value = Date.now()
     if (e.type === 'initial_data' && Array.isArray(e.requests)) {
+      console.log('[liveStream] initial_data:', e.requests.length, 'requests')
       // Replace buffer with replay — sort ASC so older entries end up
       // on the left as required. We also clear idIndex first so the
       // replay IDs become the new source of truth (the previous IDs
@@ -186,17 +188,21 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
         if (r.type === 'request' && r.request_id) idIndex.add(r.request_id)
       }
       requests.value = kept
+      console.log('[liveStream] initial_data processed, buffer size:', requests.value.length)
       return
     }
     if (e.type === 'request' && e.request) {
+      console.log('[liveStream] new request:', { request_id: e.request.request_id, model: e.request.model, status: e.request.status })
       appendRequest(e.request)
       return
     }
     if (e.type === 'idle_marker') {
+      console.log('[liveStream] idle_marker')
       appendRequest({ type: 'idle_marker', ts: e.ts })
       return
     }
     // 'ping' or unknown: ignore.
+    console.log('[liveStream] ignored envelope type:', e.type)
   }
 
   function clearReconnect() {
@@ -238,8 +244,10 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
     // upgrade path. Tokens never appear in browser history because
     // the upgrade response is 101 and the URL is replaced.
     const qs = bearer ? `?token=${encodeURIComponent(bearer)}` : ''
+    const wsUrl = `${proto}//${location.host}${endpoint}${qs}`
+    console.log('[liveStream] connecting to:', wsUrl.replace(/token=[^&]+/, 'token=***'))
     try {
-      ws = new WebSocket(`${proto}//${location.host}${endpoint}${qs}`)
+      ws = new WebSocket(wsUrl)
     } catch (err) {
       console.warn('[liveStream] WebSocket construct failed', err)
       scheduleReconnect()
@@ -248,21 +256,26 @@ export function useLiveStream(options: UseLiveStreamOptions = {}) {
     connection.value = 'connecting'
 
     ws.onopen = () => {
+      console.log('[liveStream] WebSocket connected')
       connection.value = 'open'
       reconnectAttempt = 0
     }
     ws.onmessage = (ev) => {
+      console.log('[liveStream] received message:', ev.data.substring(0, 200))
       try {
         const data = JSON.parse(ev.data) as LiveStreamEnvelope
+        console.log('[liveStream] parsed envelope:', { type: data.type, hasRequest: !!data.request, requestsCount: data.requests?.length })
         envelope(data)
       } catch (err) {
         console.warn('[liveStream] bad envelope', err)
       }
     }
-    ws.onerror = () => {
+    ws.onerror = (err) => {
+      console.error('[liveStream] WebSocket error:', err)
       // onclose follows; reconnect happens there.
     }
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
+      console.log('[liveStream] WebSocket closed:', { code: ev.code, reason: ev.reason })
       ws = null
       if (disposed) {
         connection.value = 'closed'
