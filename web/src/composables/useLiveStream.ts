@@ -155,9 +155,13 @@ function createLiveStreamInstance(options: UseLiveStreamOptions = {}) {
       return
     }
     // If we have already seen this ID (e.g. WS broadcast + telemetry
-    // replay), skip — it would otherwise inflate the buffer and
-    // double-count stats downstream.
+    // replay), update the existing item instead of skipping.
     if (item.type === 'request' && item.request_id && idIndex.has(item.request_id)) {
+      const existingIndex = requests.value.findIndex(r => r.request_id === item.request_id)
+      if (existingIndex >= 0) {
+        console.log('[liveStream] updating existing request:', item.request_id, 'status:', item.status)
+        requests.value[existingIndex] = item  // 🔥 更新现有请求
+      }
       return
     }
     if (item.type === 'request' && item.request_id) {

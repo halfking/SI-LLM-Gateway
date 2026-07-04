@@ -555,6 +555,41 @@ onMounted(async () => {
   sortTimer = setInterval(() => {
     scheduleSort()
   }, 5000)
+  
+  // 🔥 空闲标记：每分钟检查一次，如果超过1分钟没有新请求，插入空闲块
+  let lastRequestTime = Date.now()
+  const idleCheckTimer = setInterval(() => {
+    const now = Date.now()
+    const idleDuration = now - lastRequestTime
+    if (idleDuration >= 60_000) {  // 1分钟
+      console.log('[LiveStreamLanes] idle for 1 minute, inserting idle markers')
+      // 为每个泳道插入空闲标记
+      for (const laneKey of laneQueues.value.keys()) {
+        const queue = laneQueues.value.get(laneKey)
+        if (queue) {
+          queue.push({
+            type: 'idle_marker',
+            ts: new Date(lastRequestTime).toISOString(),
+          })
+        }
+      }
+      // 触发响应式更新
+      laneQueues.value = new Map(laneQueues.value)
+      lastRequestTime = now  // 重置时间，避免连续插入
+    }
+  }, 60_000)  // 每分钟检查一次
+  
+  // 监听新请求，更新最后请求时间
+  watch(requests, (newReqs) => {
+    if (newReqs.length > 0 && newReqs[newReqs.length - 1]?.type === 'request') {
+      lastRequestTime = Date.now()
+    }
+  }, { deep: true })
+  
+  // 清理定时器
+  onBeforeUnmount(() => {
+    clearInterval(idleCheckTimer)
+  })
 })
 
 onBeforeUnmount(() => {

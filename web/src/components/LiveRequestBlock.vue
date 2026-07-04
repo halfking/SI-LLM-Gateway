@@ -126,13 +126,15 @@ const line3Label = computed(() => {
   const mode = props.groupMode || 'vendor'
   if (mode === 'vendor') {
     // 原厂模式：显示供应商名称
-    return providerLabel.value
+    const provider = props.request.provider_code || props.request.provider || '未知供应商'
+    return provider === '?' ? '未知供应商' : provider
   } else if (mode === 'provider') {
     // 供应商模式：显示模型家族名称
     return getModelFamily(props.request.model)
   } else {
     // 模型模式：显示供应商名称
-    return providerLabel.value
+    const provider = props.request.provider_code || props.request.provider || '未知供应商'
+    return provider === '?' ? '未知供应商' : provider
   }
 })
 
