@@ -35,6 +35,17 @@ var (
 		},
 		[]string{"model"},
 	)
+
+	// autoDiscoveredModelTotal counts models that hit the auto_discovered fallback path
+	// (no canonical/alias match, "ghost" canonical created). High counts indicate missing
+	// model_offers registration for upstream-supported models (e.g. claude-fable-5 incident).
+	autoDiscoveredModelTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "llm_gateway_model_auto_discovered_total",
+			Help: "Total number of times a model hit the auto_discovered fallback (unregistered model)",
+		},
+		[]string{"model"},
+	)
 )
 
 // RecordQualityGateFallback records when the quality gate had to use a relaxed threshold
@@ -50,6 +61,12 @@ func RecordQualityGateFiltered(model string, threshold float64, count int) {
 // RecordRoutingCandidates records the number of candidates returned
 func RecordRoutingCandidates(model string, count int) {
 	routingCandidatesTotal.WithLabelValues(model).Observe(float64(count))
+}
+
+// RecordAutoDiscoveredModel records when a model hits the auto_discovered fallback path.
+// Added 2026-07-05 to detect unregistered-but-upstream-available models (claude-fable-5 incident).
+func RecordAutoDiscoveredModel(model string) {
+	autoDiscoveredModelTotal.WithLabelValues(model).Inc()
 }
 
 func formatThreshold(t float64) string {

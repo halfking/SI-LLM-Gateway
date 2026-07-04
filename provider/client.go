@@ -542,6 +542,17 @@ func (c *Client) resolveModelDB(ctx context.Context, model, profile string) (*re
 			VALUES ($1, 'unknown', 'auto_discovered', 'active')
 			ON CONFLICT (canonical_name) DO NOTHING
 		`, stdName)
+		// 2026-07-05: Monitoring auto_discovered fallback to detect unregistered-but-available models.
+		// When a model hits this path, it means:
+		//   (1) No canonical / alias match in SQL
+		//   (2) A "ghost" canonical is created (family=unknown, source=auto_discovered)
+		//   (3) If the model is actually available upstream but not in model_offers, routing will fail with no_candidate
+		// This log + metric helps ops detect such cases (e.g. claude-fable-5 incident on 2026-07-04).
+		slog.Warn("model resolve: auto_discovered fallback",
+			"client_model", model,
+			"normalized", stdName,
+			"hint", "this model has no canonical/alias/offer registration; if upstream supports it, add to model_offers")
+		RecordAutoDiscoveredModel(stdName)
 	}
 	return &resolveResponse{ClientModel: model, CanonicalID: nil, CanonicalName: "", ResolutionPath: "direct", RawModels: []string{stdName}}, nil
 }
