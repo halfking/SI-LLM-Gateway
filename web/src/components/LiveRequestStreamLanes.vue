@@ -207,12 +207,26 @@ function scheduleBatchUpdate() {
 }
 
 watch(requests, (newReqs, oldReqs) => {
+  console.log('[LiveStreamLanes] requests watch triggered:', {
+    oldCount: oldReqs.length,
+    newCount: newReqs.length,
+    initialStatsLoaded: initialStatsLoaded.value,
+    laneQueueKeys: Array.from(laneQueues.value.keys()),
+  })
+
   const oldIds = new Set(oldReqs.filter(r => r.request_id).map(r => r.request_id!))
   const newItems = newReqs.filter(r => r.type === 'request' && r.request_id && !oldIds.has(r.request_id))
 
-  if (newItems.length === 0) return
+  if (newItems.length === 0) {
+    console.log('[LiveStreamLanes] no new items detected')
+    return
+  }
 
-  console.log('[LiveStreamLanes] detected', newItems.length, 'new requests')
+  console.log('[LiveStreamLanes] detected', newItems.length, 'new requests:', newItems.map(r => ({
+    id: r.request_id,
+    model: r.model,
+    provider: r.provider_code,
+  })))
 
   // 加入待处理队列
   pendingRequests.push(...newItems)
@@ -951,7 +965,7 @@ function onSelect(requestId: string) {
   pointer-events: none;
 }
 
-// 泳道轨道滑入动画：新请求从右侧滑入
+/* 泳道轨道滑入动画：新请求从右侧滑入 */
 .lane-slide-enter-active {
   transition:
     transform 0.45s cubic-bezier(0.18, 1.25, 0.32, 1.0),
@@ -963,7 +977,7 @@ function onSelect(requestId: string) {
   transform: translateX(40px);
 }
 
-// 移动到队尾动画（去重更新时）
+/* 移动到队尾动画（去重更新时） */
 .lane-slide-move {
   transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
