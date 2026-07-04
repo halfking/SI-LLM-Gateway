@@ -107,10 +107,22 @@ func validateToolCallIntegrity(messages []map[string]any) error {
 	toolCallIDs := make(map[string]bool)
 	for _, msg := range messages {
 		if role, ok := msg["role"].(string); ok && role == "assistant" {
-			if toolCalls, ok := msg["tool_calls"].([]map[string]any); ok {
-				for _, tc := range toolCalls {
-					if id, ok := tc["id"].(string); ok && id != "" {
-						toolCallIDs[id] = true
+			// Handle both []interface{} (from json.Unmarshal) and []map[string]any
+			if toolCallsAny, ok := msg["tool_calls"]; ok && toolCallsAny != nil {
+				switch tcs := toolCallsAny.(type) {
+				case []interface{}:
+					for _, tc := range tcs {
+						if tcMap, ok := tc.(map[string]interface{}); ok {
+							if id, ok := tcMap["id"].(string); ok && id != "" {
+								toolCallIDs[id] = true
+							}
+						}
+					}
+				case []map[string]any:
+					for _, tc := range tcs {
+						if id, ok := tc["id"].(string); ok && id != "" {
+							toolCallIDs[id] = true
+						}
 					}
 				}
 			}
