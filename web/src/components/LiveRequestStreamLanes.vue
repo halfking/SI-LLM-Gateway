@@ -224,6 +224,15 @@ watch(requests, (newReqs) => {
     laneQueueKeys: Array.from(laneQueues.value.keys()),
   })
 
+  // 🔥 调试：输出 buffer 中的请求结构
+  console.log('[LiveStreamLanes] buffer contents:', newReqs.map(r => ({
+    type: r.type,
+    request_id: r.request_id,
+    model: r.model,
+    hasRequestId: !!r.request_id,
+    alreadyProcessed: r.request_id ? processedRequestIds.has(r.request_id) : false,
+  })))
+
   // 🔥 找出尚未处理的新请求
   const newItems = newReqs.filter(r => 
     r.type === 'request' && 
