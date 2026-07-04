@@ -61,10 +61,18 @@ function handleLegendToggle(type: 'group' | 'status', key: string) {
   }
 }
 
-// 监听新请求，累计统计
+// 监听新请求，累计统计（调试：添加日志）
 watch(requests, (newReqs, oldReqs) => {
+  console.log('[LiveStreamLanes] requests changed:', {
+    oldCount: oldReqs.length,
+    newCount: newReqs.length,
+    newReqs: newReqs.slice(-3), // 最后3个
+  })
+  
   const oldIds = new Set(oldReqs.filter(r => r.request_id).map(r => r.request_id!))
   const newItems = newReqs.filter(r => r.type === 'request' && r.request_id && !oldIds.has(r.request_id))
+  
+  console.log('[LiveStreamLanes] new items:', newItems.length)
   
   for (const req of newItems) {
     // 累计原厂统计
@@ -81,6 +89,12 @@ watch(requests, (newReqs, oldReqs) => {
       cumulativeStats.value.model.set(req.model, (cumulativeStats.value.model.get(req.model) || 0) + 1)
     }
   }
+  
+  console.log('[LiveStreamLanes] cumulative stats:', {
+    vendorCount: cumulativeStats.value.vendor.size,
+    providerCount: cumulativeStats.value.provider.size,
+    modelCount: cumulativeStats.value.model.size,
+  })
 }, { deep: true })
 
 // 模型名 → 原厂（vendor/manufacturer）
@@ -295,6 +309,9 @@ function getLaneKey(req: LiveRequest): string {
 // 按泳道分组请求，支持去重和自动移动到末尾
 // 优化版：使用 Map 提升性能，从 O(n²) 降至 O(n)
 const laneRequests = computed(() => {
+  console.log('[laneRequests] computing, requests.length:', requests.value.length)
+  console.log('[laneRequests] lanes:', lanes.value.map(l => l.key))
+  
   const grouped = new Map<string, LiveRequest[]>()
 
   // 初始化所有泳道
@@ -316,6 +333,8 @@ const laneRequests = computed(() => {
     }
   }
   
+  console.log('[laneRequests] latestRequestMap size:', latestRequestMap.size)
+  
   // 第二遍：将最新版本的请求分配到对应泳道
   for (const req of latestRequestMap.values()) {
     const laneKey = getLaneKey(req)
@@ -330,6 +349,10 @@ const laneRequests = computed(() => {
     const lane = grouped.get(OTHER_VENDOR)
     if (lane) lane.push(req)
   }
+
+  console.log('[laneRequests] result:', 
+    Array.from(grouped.entries()).map(([k, v]) => `${k}: ${v.length}`).join(', ')
+  )
 
   return grouped
 })
