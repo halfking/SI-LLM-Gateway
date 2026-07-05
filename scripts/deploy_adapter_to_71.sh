@@ -4,10 +4,10 @@
 
 set -e
 
-SERVER_IP="14.103.174.71"
+SERVER_IP="${SERVER_IP:-target-server}"
 SERVER_PORT="25022"
 SERVER_USER="root"
-export SSHPASS="Kaixuan2026&#*9527"
+export SSHPASS="${SSHPASS:-<your-password>}"
 REMOTE_PATH="/opt/llm-gateway-go"
 
 echo "=========================================="

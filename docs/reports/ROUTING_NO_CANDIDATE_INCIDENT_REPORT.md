@@ -189,17 +189,17 @@ ON CONFLICT DO NOTHING;
 
 ```bash
 # 1. 应用 066 迁移
-psql -h 172.31.0.4 -U llm_gateway -d llm_gateway \
+psql -h <DB_HOST> -U <DB_USER> -d <DB_NAME> \
   -f deploy/sql/migrations/066_fix_routable_view_free_billing_mode.sql
 
 # 2. 验证修复
-psql -h 172.31.0.4 -U llm_gateway -d llm_gateway \
+psql -h <DB_HOST> -U <DB_USER> -d <DB_NAME> \
   -c "SELECT COUNT(*) FROM v_routable_credential_models 
       WHERE is_routable = false AND unavailable_reason LIKE 'plan_incompatible%';"
 # 期望结果: 0
 
 # 3. 标记 065 已应用（如果需要）
-psql -h 172.31.0.4 -U llm_gateway -d llm_gateway \
+psql -h <DB_HOST> -U <DB_USER> -d <DB_NAME> \
   -c "INSERT INTO schema_migrations (version, description, applied_at)
       VALUES ('065', 'routable_view_respects_manual_disabled', NOW())
       ON CONFLICT DO NOTHING;"

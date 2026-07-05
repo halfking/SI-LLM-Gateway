@@ -3,8 +3,8 @@ set -euo pipefail
 
 BUILD_NUM="717"
 VERSION="v2.3.0-3ac0638b-20260630-717"
-SSH_HOST="root@14.103.174.71"
-SSH_PORT="25022"
+SSH_HOST="${SSH_HOST:-root@target-server}"
+SSH_PORT="${SSH_PORT:-22}"
 REMOTE_DIR="/opt/llm-gateway-go"
 SERVICE_NAME="llm-gateway-go.service"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)

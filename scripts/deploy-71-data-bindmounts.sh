@@ -19,8 +19,8 @@
 
 set -euo pipefail
 
-SSH_TARGET="${SSH_TARGET:-root@14.103.174.71}"
-SSH_PORT="${SSH_PORT:-25022}"
+SSH_TARGET="${SSH_TARGET:-root@target-server}"
+SSH_PORT="${SSH_PORT:-22}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/llm-gateway-go}"
 SERVICE_NAME="${SERVICE_NAME:-llm-gateway-go.service}"
 BIN_NAME="${BIN_NAME:-llm-gateway-go.v321.linux.amd64}"
@@ -39,11 +39,11 @@ log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
 
 usage() {
     cat <<USAGE
-Usage: SSH_TARGET=root@14.103.174.71 ./scripts/deploy-71-data-bindmounts.sh
+Usage: SSH_TARGET=root@target-server ./scripts/deploy-71-data-bindmounts.sh
 
 Environment overrides:
-  SSH_TARGET          (default root@14.103.174.71)
-  SSH_PORT            (default 25022)
+  SSH_TARGET          (default root@target-server)
+  SSH_PORT            (default 22)
   REMOTE_DIR          (default /opt/llm-gateway-go)
   SERVICE_NAME        (default llm-gateway-go.service)
   BIN_NAME            (default llm-gateway-go.v321.linux.amd64)

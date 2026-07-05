@@ -2,12 +2,12 @@
 # 部署到71服务器 (14.103.174.71:25022)
 set -euo pipefail
 
-cd /Users/xutaohuang/workspace/llm-gateway-go-2
+cd "$(dirname "$0")"
 
 BINARY_PATH="bin/llm-gateway"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-SSH_HOST="root@14.103.174.71"
-SSH_PORT="25022"
+SSH_HOST="${SSH_HOST:-root@target-server}"
+SSH_PORT="${SSH_PORT:-22}"
 REMOTE_DIR="/opt/llm-gateway-go"
 SERVICE_NAME="llm-gateway"
 

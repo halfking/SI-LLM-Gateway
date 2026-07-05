@@ -21,9 +21,9 @@
 /tmp/start-gateway.sh
 
 # 方式2：手动启动
-cd /Users/xutaohuang/workspace/llm-gateway-go-2
-export LLM_GATEWAY_DATABASE_URL="postgresql://kxuser:kxpass@localhost:5432/llm_gateway"
-export LLM_GATEWAY_SECRET_KEY="test-secret-key-12345"
+cd /path/to/llm-gateway-go-2
+export LLM_GATEWAY_DATABASE_URL="postgresql://user:password@localhost:5432/llm_gateway"
+export LLM_GATEWAY_SECRET_KEY="your-secret-key"
 export LLM_GATEWAY_LISTEN=":9088"
 go run ./cmd/gateway
 ```

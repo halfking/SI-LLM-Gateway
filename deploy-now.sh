@@ -4,9 +4,9 @@
 
 set -euo pipefail
 
-cd /Users/xutaohuang/workspace/llm-gateway-go-2
+cd "$(dirname "$0")"
 
-BINARY_NAME="llm-gateway-0c75b62a-fpslot-fix-20260629-185854"
+BINARY_NAME="${BINARY_NAME:-llm-gateway}"
 SERVER_71="root@[PROD_DOMAIN]"
 REMOTE_DIR="/opt/llm-gateway-go"
 SERVICE_NAME="llm-gateway"

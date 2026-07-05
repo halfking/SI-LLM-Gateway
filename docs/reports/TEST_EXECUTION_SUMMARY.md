@@ -4,8 +4,8 @@
 **目标服务**: llm.kxpms.cn  
 **测试模型**: minimax-m3  
 **API Keys**: 
-- sk-1R7IBh2THq1Id2BDWOWHstpFu2oG09Qd1kgYn9hasxFcKZw7
-- sk-1vH6C2I9pywyvUXaUXj4vdMZbeYVE5VB0fBYVgqA97JrltE9
+- <API_KEY_1>
+- <API_KEY_2>
 
 ## 测试目标
 
@@ -30,7 +30,7 @@
 **使用方法**:
 ```bash
 # 在71服务器上运行（可访问数据库）
-export LLM_GATEWAY_DATABASE_URL="postgresql://user:pass@host:port/dbname"
+export LLM_GATEWAY_DATABASE_URL="<DATABASE_URL>"
 ./scripts/test_71_complete.sh
 
 # 本地运行（仅API测试）
@@ -58,7 +58,7 @@ export REQUESTS_PER_ROUND=10
 
 **使用方法** (需要在71服务器上运行):
 ```bash
-export LLM_GATEWAY_DATABASE_URL="postgresql://user:pass@host:port/dbname"
+export LLM_GATEWAY_DATABASE_URL="<DATABASE_URL>"
 ./scripts/diagnose_nvidia_nim_empty_response.sh minimax-m3
 
 # 自定义回溯时间
@@ -78,9 +78,9 @@ export LOOKBACK_MINUTES=120
 
 **使用方法**:
 ```bash
-export API_KEY="your-api-key"
-export GATEWAY_URL="https://llm.kxpms.cn"
-export LLM_GATEWAY_DATABASE_URL="postgresql://..."
+export API_KEY="<API_KEY>"
+export GATEWAY_URL="https://<GATEWAY_HOST>"
+export LLM_GATEWAY_DATABASE_URL="<DATABASE_URL>"
 export ROUNDS=5
 export REQUESTS_PER_ROUND=10
 ./scripts/test_minimax_comprehensive.sh
@@ -136,9 +136,9 @@ Content: 正常的AI定义文本
 
 1. **设置数据库连接并运行完整测试**:
 ```bash
-ssh 192.168.1.71
+ssh <SERVER_IP>
 cd /path/to/llm-gateway-go-2
-export LLM_GATEWAY_DATABASE_URL="postgresql://..."
+export LLM_GATEWAY_DATABASE_URL="<DATABASE_URL>"
 ./scripts/test_71_complete.sh
 ```
 

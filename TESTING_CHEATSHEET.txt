@@ -4,8 +4,8 @@
 
 🚀 快速开始
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 在71服务器上（推荐）
-ssh 192.168.1.71
+# 在目标服务器上（推荐）
+ssh root@<target-server>
 cd /path/to/llm-gateway-go-2
 ./scripts/test_71_complete.sh
 
@@ -64,12 +64,12 @@ GROUP BY c.id, c.label ORDER BY requests DESC;"
 export TEST_ROUNDS=5                # 测试轮数
 export REQUESTS_PER_ROUND=10        # 每轮请求数
 export GATEWAY_URL="https://llm.kxpms.cn"
-export API_KEY="sk-1R7IBh2THq1Id2BDWOWHstpFu2oG09Qd1kgYn9hasxFcKZw7"
+export API_KEY="<your-api-key>"
 
-🔑 可用 API Keys
+🔑 API Key 配置
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-sk-1R7IBh2THq1Id2BDWOWHstpFu2oG09Qd1kgYn9hasxFcKZw7
-sk-1vH6C2I9pywyvUXaUXj4vdMZbeYVE5VB0fBYVgqA97JrltE9
+# 请在 .env 文件中设置你的 API Key
+# GATEWAY_API_KEY=<your-api-key>
 
 📚 文档
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

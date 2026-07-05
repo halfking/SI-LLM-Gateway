@@ -1,50 +1,16 @@
-# Provider Adapter Architecture - 提供商适配器架构设计
+# Provider Adapter 架构指南
 
-## 问题背景
+**文档版本**: 1.0  
+**创建日期**: 2026-07-04  
+**状态**: ✅ 已实施并验证
 
-不同的大模型提供商虽然声称支持标准协议（OpenAI/Anthropic），但实际上存在各种差异：
+---
 
-### 已知的提供商差异
+## 1. 概述
 
-1. **MiniMax**
-   - 使用 `tool_call_id` 而不是 `tool_use_id`
-   - 可能有其他特定的参数要求
+Provider Adapter 是 llm-gateway-go 的提供商协议适配层，位于 IR（中间表示）和上游提供商 API 之间。它负责处理不同提供商之间的协议差异，使得 IR 层可以保持纯粹的标准化逻辑。
 
-2. **其他提供商的潜在差异**
-   - 参数名称不同
-   - 默认值不同
-   - 支持的功能子集不同
-   - 错误响应格式不同
-   - 流式响应的事件格式差异
-
-### 当前实现的问题
-
-```go
-// 当前的硬编码方式
-if targetProvider == "minimax" {
-    toolResult["tool_call_id"] = msg.ToolCallID
-} else {
-    toolResult["tool_use_id"] = msg.ToolCallID
-}
-```
-
-这种方式的问题：
-- ❌ 难以扩展（每个提供商都要加 if-else）
-- ❌ 职责不清晰（IR 层承担了太多提供商特定逻辑）
-- ❌ 难以测试（每个组合都要测试）
-- ❌ 难以维护（逻辑分散）
-
-## 架构设计
-
-### 核心概念：Provider Adapter（提供商适配器）
-
-每个提供商有自己的适配器，负责：
-1. **协议转换**：处理该提供商的特殊字段映射
-2. **参数验证**：验证并调整参数以符合提供商要求
-3. **错误处理**：转换提供商特定的错误格式
-4. **功能适配**：处理不支持的功能（降级或报错）
-
-### 架构图
+### 1.1 架构图
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -81,9 +47,26 @@ if targetProvider == "minimax" {
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 接口设计
+---
 
-### 1. ProviderAdapter 接口
+## 2. 已支持的提供商
+
+| 提供商 | catalog_code | 协议 | 特殊处理 |
+|--------|-------------|------|---------|
+| Anthropic | `anthropic` | anthropic-messages | 标准基类 |
+| OpenAI | `openai` | openai-completions | 标准基类 |
+| MiniMax | `minimax` | anthropic-messages | `tool_call_id` 替代 `tool_use_id` |
+| DeepSeek | `deepseek` | openai-completions | max_tokens ≤ 8192 |
+| 通义千问 | `qwen` `qwen2` `qwen3` `qwq` | openai-completions | max_tokens ≤ 8192, temperature/top_p 互斥 |
+| 豆包 | `doubao` | openai-completions | max_tokens ≤ 4096, temperature ∈ [0,1] |
+| Moonshot | `moonshot` `kimi` | openai-completions | max_tokens ≤ 8192 |
+| 智谱AI | `zhipu` `glm` | openai-completions | max_tokens ≤ 8192 |
+
+---
+
+## 3. 接口设计
+
+### 3.1 ProviderAdapter 接口
 
 ```go
 package adapter
@@ -127,7 +110,7 @@ type ProviderCapabilities struct {
 }
 ```
 
-### 2. Adapter Factory
+### 3.2 Adapter Factory
 
 ```go
 package adapter
@@ -187,7 +170,15 @@ func (f *Factory) GetOrDefault(provider string) ProviderAdapter {
 }
 ```
 
-### 3. MiniMax Adapter 实现示例
+---
+
+## 4. MiniMax 适配示例
+
+### 4.1 问题背景
+
+MiniMax 使用非标准的 `tool_call_id` 字段（标准 Anthropic 使用 `tool_use_id`）。
+
+### 4.2 解决方案
 
 ```go
 package adapter
@@ -219,9 +210,6 @@ func (a *MinimaxAdapter) AdaptRequest(req *ir.InternalRequest) (*ir.InternalRequ
     // 标记这是 MiniMax 请求（用于序列化时的判断）
     adapted.TargetProvider = "minimax"
     
-    // 其他 MiniMax 特定的调整
-    // 例如：调整参数范围、添加默认值等
-    
     return &adapted, nil
 }
 
@@ -238,7 +226,7 @@ func (a *MinimaxAdapter) SerializeRequest(req *ir.InternalRequest) ([]byte, erro
         return nil, err
     }
     
-    // 替换 tool_use_id 为 tool_call_id（这个逻辑可以移到这里）
+    // 替换 tool_use_id 为 tool_call_id
     if messages, ok := data["messages"].([]any); ok {
         for _, msg := range messages {
             if msgMap, ok := msg.(map[string]any); ok {
@@ -266,56 +254,6 @@ func (a *MinimaxAdapter) adaptToolResultFields(msg map[string]any) {
     }
 }
 
-func (a *MinimaxAdapter) ParseResponse(body []byte) (*ir.InternalResponse, error) {
-    // MiniMax 的响应格式可能也有差异
-    // 先做 MiniMax 特定的预处理
-    var data map[string]any
-    if err := json.Unmarshal(body, &data); err != nil {
-        return nil, err
-    }
-    
-    // 将 tool_call_id 转换为 tool_use_id（标准化）
-    a.normalizeToolFields(data)
-    
-    // 重新序列化后使用标准解析器
-    normalized, _ := json.Marshal(data)
-    return ir.ParseAnthropicResponse(normalized)
-}
-
-func (a *MinimaxAdapter) normalizeToolFields(data map[string]any) {
-    // 将 MiniMax 的 tool_call_id 转换回标准的 tool_use_id
-    // 这样 IR 层只需要处理标准格式
-}
-
-func (a *MinimaxAdapter) AdaptError(err error, body []byte) error {
-    // MiniMax 特定的错误处理
-    return a.base.AdaptError(err, body)
-}
-
-func (a *MinimaxAdapter) ValidateRequest(req *ir.InternalRequest) error {
-    // 验证 MiniMax 是否支持该请求
-    caps := a.GetCapabilities()
-    
-    if req.MaxTokens > caps.MaxTokens {
-        return fmt.Errorf("max_tokens %d exceeds MiniMax limit %d", 
-            req.MaxTokens, caps.MaxTokens)
-    }
-    
-    // 检查模型是否支持
-    supported := false
-    for _, model := range caps.SupportedModels {
-        if model == req.Model {
-            supported = true
-            break
-        }
-    }
-    if !supported {
-        return fmt.Errorf("model %s not supported by MiniMax", req.Model)
-    }
-    
-    return nil
-}
-
 func (a *MinimaxAdapter) GetCapabilities() ProviderCapabilities {
     return ProviderCapabilities{
         SupportsToolCalling: true,
@@ -328,152 +266,203 @@ func (a *MinimaxAdapter) GetCapabilities() ProviderCapabilities {
             "abab6.5-chat",
             "abab5.5-chat",
         },
-        CustomParameters: map[string]any{
-            "tool_id_field": "tool_call_id", // 标记使用的字段名
-        },
     }
 }
 ```
 
-## 使用方式
+---
 
-### 在路由层集成
+## 5. 使用方式
+
+### 5.1 创建 Factory
 
 ```go
-package relay
+import "github.com/kaixuan/llm-gateway-go/internal/adapter"
 
-import (
-    "github.com/kaixuan/llm-gateway-go/adapter"
-    "github.com/kaixuan/llm-gateway-go/internal/ir"
-)
+factory := adapter.NewFactory()
+// 自动注册所有内置 adapter
+```
 
-type Handler struct {
-    adapterFactory *adapter.Factory
+### 5.2 获取 Adapter
+
+```go
+// 按 catalog_code 精确获取
+pa, err := factory.Get("minimax")
+
+// 按 catalog_code + protocol 获取（带 fallback）
+pa := factory.GetOrDefault(cand.CatalogCode, cand.Protocol)
+```
+
+### 5.3 适配请求
+
+```go
+// ParseOpenAI → IR → AdaptRequest → SerializeAnthropic
+irReq, err := ir.ParseOpenAI(clientBody)
+pa := factory.GetOrDefault(cand.CatalogCode, cand.Protocol)
+irReq, err = pa.AdaptRequest(irReq)
+bodyBytes, err := ir.SerializeAnthropic(irReq)
+```
+
+### 5.4 查询能力
+
+```go
+caps := pa.GetCapabilities()
+if !caps.SupportsToolCalling {
+    return errors.New("provider does not support tool calling")
 }
-
-func NewHandler() *Handler {
-    return &Handler{
-        adapterFactory: adapter.NewFactory(),
-    }
-}
-
-func (h *Handler) HandleRequest(req *ir.InternalRequest, provider string) ([]byte, error) {
-    // 1. 获取对应的适配器
-    adapter, err := h.adapterFactory.Get(provider)
-    if err != nil {
-        return nil, err
-    }
-    
-    // 2. 验证请求
-    if err := adapter.ValidateRequest(req); err != nil {
-        return nil, fmt.Errorf("request validation failed: %w", err)
-    }
-    
-    // 3. 适配请求
-    adaptedReq, err := adapter.AdaptRequest(req)
-    if err != nil {
-        return nil, fmt.Errorf("request adaptation failed: %w", err)
-    }
-    
-    // 4. 序列化
-    body, err := adapter.SerializeRequest(adaptedReq)
-    if err != nil {
-        return nil, fmt.Errorf("serialization failed: %w", err)
-    }
-    
-    // 5. 发送到上游
-    respBody, err := h.sendToUpstream(provider, body)
-    if err != nil {
-        // 6. 错误适配
-        return nil, adapter.AdaptError(err, respBody)
-    }
-    
-    // 7. 解析响应
-    resp, err := adapter.ParseResponse(respBody)
-    if err != nil {
-        return nil, err
-    }
-    
-    return resp, nil
+if irReq.MaxTokens > caps.MaxTokens {
+    // handle or clamp
 }
 ```
 
-## 优势分析
+---
 
-### ✅ 可扩展性
-- 新增提供商只需实现一个 Adapter
-- 不需要修改 IR 核心代码
-- 可以独立测试每个 Adapter
+## 6. 如何添加新提供商
 
-### ✅ 职责清晰
-- IR 层：只负责标准化的中间表示
-- Adapter 层：负责提供商特定的转换
-- 路由层：负责选择和使用 Adapter
+### 步骤 1: 创建 Adapter 文件
 
-### ✅ 易于维护
-- 每个提供商的逻辑集中在一个文件
-- 容易定位和修复问题
-- 代码结构清晰
+创建 `internal/adapter/newvendor.go`:
 
-### ✅ 易于测试
-- 可以 mock Adapter 接口
-- 每个 Adapter 可以独立测试
-- 容易添加集成测试
+```go
+package adapter
 
-### ✅ 功能丰富
-- Capabilities 系统可以动态检查功能支持
-- 可以实现功能降级策略
-- 支持运行时动态注册 Adapter
+import "github.com/kaixuan/llm-gateway-go/internal/ir"
 
-## 迁移路径
+// NewVendor speaks OpenAI Chat Completions with minor quirks.
+type NewVendor struct {
+    StandardOpenAI  // 匿名嵌入标准 OpenAI adapter
+}
 
-### Phase 1: 创建基础架构
-1. 定义 ProviderAdapter 接口
-2. 创建 Factory
-3. 实现 StandardAnthropicAdapter
+func NewNewVendor() *NewVendor { return &NewVendor{} }
 
-### Phase 2: 迁移 MiniMax
-1. 创建 MinimaxAdapter
-2. 将现有的 MiniMax 特殊处理逻辑移到 Adapter
-3. 更新测试
+func (n *NewVendor) Name() string           { return "newvendor" }
+func (n *NewVendor) CatalogCodes() []string { return []string{"newvendor", "nv"} }
 
-### Phase 3: 集成到路由层
-1. 在路由层注入 AdapterFactory
-2. 根据 provider 参数选择 Adapter
-3. 更新请求处理流程
+func (n *NewVendor) AdaptRequest(req *ir.InternalRequest) (*ir.InternalRequest, error) {
+    adapted := clampMaxTokens(req, 4096)  // 限制 max_tokens
+    out := *adapted
+    out.TargetProvider = "newvendor"
+    return &out, nil
+}
 
-### Phase 4: 扩展到其他提供商
-1. 为每个提供商创建 Adapter
-2. 逐步迁移现有的特殊处理逻辑
-3. 完善测试覆盖
-
-## 目录结构建议
-
-```
-internal/
-├── adapter/
-│   ├── adapter.go              # 接口定义
-│   ├── factory.go              # Factory 实现
-│   ├── base_anthropic.go       # 标准 Anthropic Adapter
-│   ├── minimax.go              # MiniMax Adapter
-│   ├── deepseek.go             # DeepSeek Adapter
-│   ├── openai_compatible.go    # 通用 OpenAI 兼容 Adapter
-│   └── adapter_test.go         # 测试
-├── ir/
-│   ├── types.go                # IR 类型定义
-│   ├── parse_anthropic.go      # 标准 Anthropic 解析
-│   ├── serialize_anthropic.go  # 标准 Anthropic 序列化
-│   └── ...
-└── ...
+func (n *NewVendor) GetCapabilities() Capabilities {
+    return Capabilities{
+        SupportsToolCalling:  true,
+        SupportsStreaming:    true,
+        SupportsVision:       false,
+        SupportsThinking:     false,
+        SupportsCacheControl: false,
+        MaxTokens:            4096,
+        ToolIDField:          "tool_call_id",
+    }
+}
 ```
 
-## 总结
+### 步骤 2: 注册到 Factory
 
-使用 Provider Adapter 模式可以：
-1. **解耦**: IR 层不再需要知道具体提供商的差异
-2. **扩展**: 轻松添加新的提供商支持
-3. **维护**: 每个提供商的逻辑集中管理
-4. **测试**: 更容易编写和维护测试
-5. **灵活**: 支持运行时动态配置和热更新
+在 `internal/adapter/standard.go` 的 `defaultAdapters()` 中添加:
 
-这是一个更加优雅和可维护的架构设计。
+```go
+func defaultAdapters() []ProviderAdapter {
+    return []ProviderAdapter{
+        StandardAnthropic{},
+        StandardOpenAI{},
+        NewMinimax(),
+        // ... existing adapters ...
+        NewNewVendor(),  // ← 新增
+    }
+}
+```
+
+### 步骤 3: 编写测试
+
+创建 `internal/adapter/newvendor_test.go`:
+
+```go
+func TestNewVendor_AdaptRequest_ClampsMaxTokens(t *testing.T) {
+    n := NewNewVendor()
+    req := &ir.InternalRequest{MaxTokens: 10000}
+    out, err := n.AdaptRequest(req)
+    if err != nil { t.Fatalf("AdaptRequest: %v", err) }
+    if out.MaxTokens != 4096 {
+        t.Errorf("MaxTokens = %d, want 4096", out.MaxTokens)
+    }
+}
+```
+
+---
+
+## 7. 测试
+
+### 7.1 运行所有测试
+
+```bash
+go test ./internal/adapter/ -v
+```
+
+### 7.2 测试覆盖
+
+| 类别 | 测试数 | 内容 |
+|------|--------|------|
+| 单元测试 | 16 | 各提供商 AdaptRequest 逻辑 |
+| Factory 测试 | 3 | 路由 + 别名 + fallback |
+| 端到端测试 | 6 | 完整 Parse→Adapt→Serialize 流程 |
+| 编译检查 | 8 | 接口合规性 |
+| **总计** | **33** | |
+
+---
+
+## 8. 架构设计原则
+
+1. **组合优于继承** — adapter 通过匿名嵌入复用基类逻辑
+2. **接口驱动** — ProviderAdapter 接口定义清晰契约
+3. **零破坏** — AdapterFactory 为 nil 时完全回退到原有逻辑
+4. **防御性编程** — MiniMax 双保险（IR 层 TargetProvider + body rewrite）
+5. **可测试** — 每个 adapter 可以独立测试，不需要真实 API
+
+---
+
+## 9. 文件结构
+
+```
+internal/adapter/
+├── adapter.go              # ProviderAdapter 接口 + Capabilities
+├── factory.go              # Factory（路由 + 别名 + fallback）
+├── standard.go             # StandardAnthropic + StandardOpenAI 基类
+├── minimax.go              # MiniMax adapter
+├── providers.go            # DeepSeek/Qwen/Doubao/Moonshot/Zhipu
+├── minimax_test.go         # MiniMax + Factory 测试
+├── providers_test.go       # 各提供商适配测试
+├── e2e_test.go             # 端到端集成测试
+└── adapter_compile_test.go # 编译时接口检查
+```
+
+---
+
+## 10. 实施计划
+
+### Phase 1: 基础架构 + 标准协议（第1周）
+- 创建 Adapter 基础架构
+- 实现 StandardAnthropicAdapter
+- 实现 StandardOpenAIAdapter
+
+### Phase 2: Tool Calling 提供商（第2周）
+- MiniMax Adapter（最高优先级）
+- 智谱 AI Adapter
+- Anthropic/OpenAI Adapter
+
+### Phase 3: 高流量提供商（第3周）
+- DeepSeek Adapter
+- 通义千问 Adapter
+- 豆包 Adapter
+- Moonshot Adapter
+
+### Phase 4: 集成和优化（第4周）
+- 路由层集成
+- 监控和诊断
+- 文档和培训
+
+---
+
+**文档所有权**: Infrastructure Team  
+**最后更新**: 2026-07-04

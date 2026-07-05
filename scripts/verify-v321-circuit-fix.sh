@@ -4,8 +4,8 @@
 
 set -e
 
-REMOTE_HOST="root@14.103.174.71"
-REMOTE_PORT="25022"
+REMOTE_HOST="${REMOTE_HOST:-root@target-server}"
+REMOTE_PORT="${REMOTE_PORT:-22}"
 
 echo "=========================================="
 echo "验证 v3.2.1 Circuit Fix"

@@ -20,16 +20,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-SSH_TARGET="${SSH_TARGET:-root@14.103.174.71}"
+SSH_TARGET="${SSH_TARGET:-root@target-server}"
 SSH_PORT="${SSH_PORT:-25022}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/llm-gateway-go}"
 SERVICE_NAME="${SERVICE_NAME:-llm-gateway-go.service}"
 BIN_NAME="${BIN_NAME:-llm-gateway-go.v321.linux.amd64}"
 
 # Expected 71 hosts (any of these is acceptable)
-EXPECTED_71_HOSTS="${EXPECTED_71_HOSTS:-172.31.0.3}"
+EXPECTED_71_HOSTS="${EXPECTED_71_HOSTS:-<db-internal-ip>}"
 # Banned hosts (would mean we are accidentally pointing at the wrong server)
-BANNED_HOSTS="${BANNED_HOSTS:-172.31.0.4}"
+BANNED_HOSTS="${BANNED_HOSTS:-<banned-db-internal-ip>}"
 
 SEQ="${SEQ:-}"
 SKIP_FRONTEND="${SKIP_FRONTEND:-true}"

@@ -7,7 +7,7 @@ echo "========================================="
 echo ""
 
 # 设置环境变量
-export LLM_GATEWAY_DATABASE_URL="postgresql://xutaohuang@localhost:5432/llm_gateway"
+export LLM_GATEWAY_DATABASE_URL="${LLM_GATEWAY_DATABASE_URL:-postgresql://user@localhost:5432/llm_gateway}"
 export LLM_GATEWAY_LISTEN=":8080"
 export LLM_GATEWAY_LOG_LEVEL="info"
 

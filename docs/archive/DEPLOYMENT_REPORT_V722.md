@@ -140,7 +140,7 @@ git checkout 2d7169d8 -- VERSION version.json web/public/version.json web/dist/v
 ./scripts/bump-version.sh --seq 721 --ssh root@14.103.174.71
 
 # 3. 或直接恢复上一个 systemd revision
-export SSHPASS="Kaixuan2026&#*9527"
+export SSHPASS="<your-password>"
 sshpass -e ssh -p 25022 root@14.103.174.71 "systemctl stop llm-gateway-go && docker rm -f llm-gateway-go"
 ```
 

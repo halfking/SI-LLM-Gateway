@@ -227,8 +227,8 @@ DB_PASSWORD="4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg"
 echo "【5.1】最近 1 小时写入分布（验证所有写入在 default）"
 echo "-------------------------------------------"
 
-export SSHPASS=Kaixuan2025
-RESULT=$(sshpass -e ssh -p 25022 root@14.103.174.71 \
+export SSHPASS="${SSHPASS:-<your-password>}"
+RESULT=$(sshpass -e ssh -p ${SSH_PORT:-22} root@${SSH_HOST:-target-server} \
   "PGPASSWORD='$DB_PASSWORD' psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d llm_gateway -t -A -F'|' -c \"
 SELECT 
     partition_name,
@@ -274,7 +274,7 @@ echo ""
 
 echo "【5.2】分区 ATTACH/DETACH 状态"
 echo "-------------------------------------------"
-ATTACH_STATUS=$(sshpass -e ssh -p 25022 root@14.103.174.71 \
+ATTACH_STATUS=$(sshpass -e ssh -p ${SSH_PORT:-22} root@${SSH_HOST:-target-server} \
   "PGPASSWORD='$DB_PASSWORD' psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d llm_gateway -t -A -F'|' -c \"
 SELECT 
     child.relname AS partition_name,

@@ -93,7 +93,7 @@
 ## 🔄 回滚信息
 如需回滚到上一个版本：
 ```bash
-export SSHPASS=Kaixuan2025
+export SSHPASS=<your-password>
 bash ~/.agents/skills/deploy-71/scripts/rollback.sh
 ```
 历史备份: `llm-gateway-go.backup-20260702-003618` (43M, V2.3.3-bba9779f)

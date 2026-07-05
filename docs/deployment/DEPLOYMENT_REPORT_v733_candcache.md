@@ -117,7 +117,7 @@ $ tail -f /opt/llm-gateway-go/logs/gateway.log | grep "candidate cache invalidat
 如需回滚到上一版（732）：
 
 ```bash
-export SSHPASS=Kaixuan2025
+export SSHPASS=<your-password>
 bash ~/.agents/skills/deploy-71/scripts/rollback.sh
 ```
 

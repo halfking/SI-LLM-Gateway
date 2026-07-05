@@ -21,7 +21,7 @@
 set -e
 
 PROJECT_DIR="/Users/xutaohuang/workspace/llm-gateway-go-2"
-SSH_HOST="root@14.103.174.71"
+SSH_HOST="${SSH_HOST:-root@target-server}"
 SSH_PORT="25022"
 REMOTE_BINARY="/opt/llm-gateway-go/llm-gateway-go"
 REMOTE_BIN_BASE="/opt/llm-gateway-go/llm-gateway-go.v"

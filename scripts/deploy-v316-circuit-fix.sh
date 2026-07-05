@@ -5,7 +5,7 @@
 
 set -e
 
-REMOTE_HOST="root@14.103.174.71"
+REMOTE_HOST="${REMOTE_HOST:-root@target-server}"
 REMOTE_PORT="25022"
 COMMIT_HASH=$(git rev-parse --short HEAD)
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)

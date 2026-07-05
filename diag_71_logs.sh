@@ -1,6 +1,6 @@
 #!/bin/bash
-# 在 192.168.1.71 上直接跑这一段（不要脚本），把输出贴回来
-# 用法：ssh root@192.168.1.71  → 粘贴以下所有行  →  复制粘贴输出
+# 在目标服务器上直接跑这一段（不要脚本），把输出贴回来
+# 用法：ssh root@<target-server>  → 粘贴以下所有行  →  复制粘贴输出
 
 echo "=========== 1. 找 PG 容器和凭据 ==========="
 docker ps --format 'table {{.Names}}\t{{.Image}}' | grep -iE 'postgres|pg' || true
@@ -24,7 +24,7 @@ if [ -n "$PG_CTN" ]; then
   DSN=$(docker exec "$GW_CTN" sh -c 'echo $LLM_GATEWAY_DB_DSN' 2>/dev/null)
   if [ -z "$DSN" ]; then
     # fallback: 用 postgres 容器默认用户
-    docker exec -e PGPASSWORD=postgres "$PG_CTN" psql -U postgres -d llm_gateway -c "
+    docker exec "$PG_CTN" psql -U postgres -d llm_gateway -c "
       SELECT now() AS db_now,
              MAX(ts) AS latest_request_ts,
              MAX(ts) > now() - interval '5 minutes' AS has_5min_data,

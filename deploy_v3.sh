@@ -1,10 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-BUILD_NUM="20260630144338"
-VERSION="v2.3.1-routing-fix"
-SSH_HOST="root@14.103.174.71"
-SSH_PORT="25022"
+BUILD_NUM="${BUILD_NUM:-latest}"
+VERSION="${VERSION:-unknown}"
+SSH_HOST="${SSH_HOST:-root@target-server}"
+SSH_PORT="${SSH_PORT:-22}"
 REMOTE_DIR="/opt/llm-gateway-go"
 SERVICE_NAME="llm-gateway-go.service"
 

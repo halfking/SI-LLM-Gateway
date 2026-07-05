@@ -297,7 +297,7 @@ ok  	github.com/kaixuan/llm-gateway-go/transform	0.493s
 
 ### 部署详情
 
-**目标服务器**: root@14.103.174.71:25022  
+**目标服务器**: root@<target-server>:<ssh-port>  
 **服务名称**: llm-gateway-go.service  
 **部署版本**: 2.3.3-9ce06c01-20260704-789  
 **Build 序号**: 789  
@@ -306,14 +306,14 @@ ok  	github.com/kaixuan/llm-gateway-go/transform	0.493s
 ### 部署验证
 
 ```bash
-$ ssh root@14.103.174.71 -p 25022 "systemctl status llm-gateway-go.service"
+$ ssh root@<target-server> -p <ssh-port> "systemctl status llm-gateway-go.service"
 ● llm-gateway-go.service - LLM Gateway Go (llm.kxpms.cn)
    Active: active (running) since Sat 2026-07-04 17:01:14 CST
 
-$ ssh root@14.103.174.71 -p 25022 "cat /opt/llm-gateway-go/VERSION"
+$ ssh root@<target-server> -p <ssh-port> "cat /opt/llm-gateway-go/VERSION"
 2.3.3-9ce06c01-20260704-789
 
-$ ssh root@14.103.174.71 -p 25022 "netstat -tlnp | grep 8781"
+$ ssh root@<target-server> -p <ssh-port> "netstat -tlnp | grep 8781"
 LISTEN 0 4096 *:8781 *:* users:(("llm-gateway-go",pid=4180613,fd=18))
 ```
 

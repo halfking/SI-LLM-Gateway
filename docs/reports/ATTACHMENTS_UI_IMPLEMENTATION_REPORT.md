@@ -152,7 +152,7 @@ const attachmentsLoading = ref(false)
 - `deploy-frontend-attachments-20260701-2340.tar.gz` (378KB)
 
 ### 部署路径
-- 服务器：14.103.174.71
+- 服务器：<SERVER_IP>
 - 路径：`/opt/llm-gateway-go/web/dist/`
 
 ### 部署验证
@@ -305,7 +305,7 @@ ls -la /opt/llm-gateway-go/web/dist/assets/
 
 ```bash
 # 访问前端
-curl -s http://14.103.174.71:8781/ | grep -o "index-[^.]*\.js" | head -1
+curl -s http://<SERVER_IP>:8781/ | grep -o "index-[^.]*\.js" | head -1
 # 应该看到新的资源文件名：index-jdom5pDL.js
 ```
 
@@ -314,12 +314,12 @@ curl -s http://14.103.174.71:8781/ | grep -o "index-[^.]*\.js" | head -1
 ```bash
 # 测试附件API（需要登录后获取token）
 curl -H "Authorization: Bearer <token>" \
-  http://14.103.174.71:8781/api/admin/attachments?request_id=<request_id>
+  http://<SERVER_IP>:8781/api/admin/attachments?request_id=<request_id>
 ```
 
 ### 3. 浏览器验证
 
-1. 打开 http://14.103.174.71:8781
+1. 打开 http://<SERVER_IP>:8781
 2. 登录Admin账号
 3. 进入"请求日志"
 4. 查找有图片的请求（测试环境已有数据）
@@ -355,6 +355,6 @@ curl -H "Authorization: Bearer <token>" \
 
 **实施人员**: Kiro AI  
 **审核人员**: 待确认  
-**部署服务器**: 14.103.174.71  
+**部署服务器**: <SERVER_IP>  
 **部署时间**: 2026-07-01 23:41  
 **文档版本**: 1.0

@@ -19,16 +19,16 @@
 
 ```bash
 # 跳号到指定值（如 721）+ 部署到 71
-SSHPASS='Kaixuan2026&#*9527' ./scripts/bump-version.sh --seq 721 --ssh root@14.103.174.71
+SSHPASS='<your-password>' ./scripts/bump-version.sh --seq 721 --ssh root@<target-server>
 
 # 自动递增（默认 +1）
-SSHPASS='Kaixuan2026&#*9527' ./scripts/bump-version.sh --ssh root@14.103.174.71
+SSHPASS='<your-password>' ./scripts/bump-version.sh --ssh root@<target-server>
 
 # 仅修改文件，不构建不上传
 ./scripts/bump-version.sh --seq 722 --no-build --no-upload
 
 # 完整一行式部署（默认 +1 + 跳过前端构建）
-SSHPASS='Kaixuan2026&#*9527' ./scripts/deploy-71.sh
+SSHPASS='<your-password>' ./scripts/deploy-71.sh
 ```
 
 `bump-version.sh` 自动：
@@ -190,11 +190,11 @@ tar czf deploy-full-$(date +%Y%m%d)-v${BUILD_NUMBER}.tar.gz \
 
 ## 🖥️ 服务器资源清单
 
-### 71 服务器 (14.103.174.71)
+### 71 服务器
 
 **连接信息**:
-- 主机: `14.103.174.71`
-- SSH端口: `25022`
+- 主机: `<target-server-ip>`
+- SSH端口: `<ssh-port>`
 - 用户: `root`
 
 **服务架构**:
@@ -251,7 +251,7 @@ grep "$VERSION" web/dist/version.json
 ```bash
 sshpass -p '<PASSWORD>' scp -P 25022 \
   deploy-full-*.tar.gz \
-  root@14.103.174.71:/tmp/
+  root@<target-server>:/tmp/
 ```
 
 ### 🔄 执行部署
@@ -259,7 +259,7 @@ sshpass -p '<PASSWORD>' scp -P 25022 \
 **步骤1: 解压部署包**
 
 ```bash
-ssh root@14.103.174.71 -p 25022
+ssh root@<target-server> -p <ssh-port>
 cd /tmp
 tar xzf deploy-full-*.tar.gz
 ```
@@ -382,7 +382,7 @@ curl -s http://localhost:8781/ | grep "LLM Gateway"
 
 **验证方式**:
 ```
-1. 打开 http://14.103.174.71:8781
+1. 打开 http://<target-server>:8781
 2. 使用管理员账号登录
 3. 查看右上角：[用户名] · [角色] · vX.X.X · #NNN
 4. 确认格式正确

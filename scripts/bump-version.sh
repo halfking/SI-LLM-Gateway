@@ -13,7 +13,7 @@
 #   ./scripts/bump-version.sh --no-build             # skip rebuilding the binary
 #   ./scripts/bump-version.sh --no-frontend          # skip rebuilding web SPA
 #   ./scripts/bump-version.sh --no-upload            # skip upload+restart
-#   ./scripts/bump-version.sh --ssh root@14.103.174.71
+#   ./scripts/bump-version.sh --ssh root@target-server
 #
 # What it does:
 #   1. Read current build_seq from version.json (single source of truth).

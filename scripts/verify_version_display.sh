@@ -4,9 +4,9 @@
 
 set -e
 
-SERVER="14.103.174.71"
-PORT="25022"
-API_KEY="sk-k40DVd9aqFGumYcEkfkQvSgdv06uepSNDK0BqHwtwS3RzTgY"
+SERVER="${SERVER:-target-server}"
+PORT="${PORT:-22}"
+API_KEY="${API_KEY:-<your-api-key>}"
 
 echo "=========================================="
 echo "71服务器版本显示验证脚本"
@@ -83,7 +83,7 @@ echo "=========================================="
 echo ""
 echo "📱 前端验证步骤："
 echo ""
-echo "1. 打开浏览器访问: http://14.103.174.71:8781"
+echo "1. 打开浏览器访问: http://${SERVER}:8781"
 echo "2. 点击右上角「登录」按钮"
 echo "3. 输入管理员账号密码登录"
 echo "4. 检查右上角是否显示:"
