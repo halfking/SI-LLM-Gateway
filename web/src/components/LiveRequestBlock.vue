@@ -126,15 +126,41 @@ const line3Label = computed(() => {
   const mode = props.groupMode || 'vendor'
   if (mode === 'vendor') {
     // 原厂模式：显示供应商名称
-    const provider = props.request.provider_code || props.request.provider || '未知供应商'
-    return provider === '?' ? '未知供应商' : provider
+    let provider = props.request.provider_code || props.request.provider
+    
+    // 🔥 如果供应商为空，尝试从模型名称推断默认供应商
+    if (!provider || provider === '?') {
+      const model = props.request.model?.toLowerCase() || ''
+      if (model.includes('claude')) {
+        provider = 'anthropic'  // Claude 模型默认使用 Anthropic 官方
+      } else if (model.includes('gpt-') || model.includes('o1-') || model.includes('chatgpt')) {
+        provider = 'openai'  // GPT 模型默认使用 OpenAI 官方
+      } else if (model.includes('gemini')) {
+        provider = 'google'  // Gemini 模型默认使用 Google 官方
+      }
+    }
+    
+    return provider || '未知供应商'
   } else if (mode === 'provider') {
     // 供应商模式：显示模型家族名称
     return getModelFamily(props.request.model)
   } else {
     // 模型模式：显示供应商名称
-    const provider = props.request.provider_code || props.request.provider || '未知供应商'
-    return provider === '?' ? '未知供应商' : provider
+    let provider = props.request.provider_code || props.request.provider
+    
+    // 🔥 如果供应商为空，尝试从模型名称推断默认供应商
+    if (!provider || provider === '?') {
+      const model = props.request.model?.toLowerCase() || ''
+      if (model.includes('claude')) {
+        provider = 'anthropic'
+      } else if (model.includes('gpt-') || model.includes('o1-') || model.includes('chatgpt')) {
+        provider = 'openai'
+      } else if (model.includes('gemini')) {
+        provider = 'google'
+      }
+    }
+    
+    return provider || '未知供应商'
   }
 })
 
