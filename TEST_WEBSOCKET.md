@@ -41,7 +41,7 @@ go run ./cmd/gateway
 ### 2. 启动前端开发服务器
 
 ```bash
-cd /Users/xutaohuang/workspace/llm-gateway-go-2/web
+cd $PROJECT_DIR/web
 npm run dev
 ```
 

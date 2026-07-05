@@ -19,10 +19,10 @@
 
 ```bash
 # 跳号到指定值（如 721）+ 部署到 71
-SSHPASS='<your-password>' ./scripts/bump-version.sh --seq 721 --ssh root@<target-server>
+SSHPASS='<your-password>' ./scripts/bump-version.sh --seq 721 --ssh deploy@<host>
 
 # 自动递增（默认 +1）
-SSHPASS='<your-password>' ./scripts/bump-version.sh --ssh root@<target-server>
+SSHPASS='<your-password>' ./scripts/bump-version.sh --ssh deploy@<host>
 
 # 仅修改文件，不构建不上传
 ./scripts/bump-version.sh --seq 722 --no-build --no-upload
@@ -221,7 +221,7 @@ tar czf deploy-full-$(date +%Y%m%d)-v${BUILD_NUMBER}.tar.gz \
 - 主机: `127.0.0.1:5432`
 - 数据库: `llm_gateway`
 - 用户: `llm_gateway`
-- 密码: `4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg`
+- 密码: `<your-password>`
 
 ---
 
@@ -251,7 +251,7 @@ grep "$VERSION" web/dist/version.json
 ```bash
 sshpass -p '<PASSWORD>' scp -P 25022 \
   deploy-full-*.tar.gz \
-  root@<target-server>:/tmp/
+  deploy@<host>:/tmp/
 ```
 
 ### 🔄 执行部署
@@ -259,7 +259,7 @@ sshpass -p '<PASSWORD>' scp -P 25022 \
 **步骤1: 解压部署包**
 
 ```bash
-ssh root@<target-server> -p <ssh-port>
+ssh deploy@<host> -p <ssh-port>
 cd /tmp
 tar xzf deploy-full-*.tar.gz
 ```

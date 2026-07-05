@@ -341,7 +341,7 @@ bbbabea3 - fix(migration): remove ON CONFLICT from columnar table insert
 观察首次自动归档执行（2026-07-01 02:00）:
 ```bash
 # SSH到服务器
-ssh -p 25022 root@<prod-server-ip>
+ssh -p 25022 deploy@<host>
 
 # 查看Pod日志
 kubectl logs -n pms-test -f $(kubectl get pods -n pms-test | grep llm-gateway-go | grep Running | awk '{print $1}')

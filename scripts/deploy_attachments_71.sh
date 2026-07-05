@@ -1,9 +1,9 @@
 #!/bin/bash
 # 附件归档功能部署脚本 (2026-07-01)
-# 部署到 192.168.1.71 生产服务器
+# 部署到 <SERVER_IP> 生产服务器
 # 使用方法：
 #   1. 将此脚本、二进制、审计报告打包上传到 /tmp/
-#   2. ssh root@192.168.1.71
+#   2. ssh root@<SERVER_IP>
 #   3. cd /tmp && sudo bash deploy_attachments_71.sh
 
 set -euo pipefail

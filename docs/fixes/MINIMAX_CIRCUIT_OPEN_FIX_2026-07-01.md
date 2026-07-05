@@ -170,10 +170,10 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" \
   -o /tmp/llm-gateway-v$N.linux.amd64 ./cmd/gateway
 
 # 推到 71
-scp /tmp/llm-gateway-v$N.linux.amd64 root@<prod-server-ip>:/opt/llm-gateway-go/
+scp /tmp/llm-gateway-v$N.linux.amd64 deploy@<host>:/opt/llm-gateway-go/
 
 # 71 部署
-ssh root@<prod-server-ip> "
+ssh deploy@<host> "
   systemctl stop llm-gateway-go.service
   sleep 3
   docker rm -f llm-gateway-go 2>/dev/null
@@ -198,7 +198,7 @@ LLM_GATEWAY_CIRCUIT_TRANSIENT_THRESHOLD=15
 
 重启:
 ```bash
-ssh root@<prod-server-ip> "systemctl restart llm-gateway-go.service"
+ssh deploy@<host> "systemctl restart llm-gateway-go.service"
 ```
 
 ---

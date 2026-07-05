@@ -152,12 +152,7 @@ for round in $(seq 1 $TEST_ROUNDS); do
     echo -e "\n${MAGENTA}=== 第 $round/$TEST_ROUNDS 轮 ===${NC}" | tee -a "$MAIN_LOG"
     
     for req in $(seq 1 $REQUESTS_PER_ROUND); do
-        # 交替使用两个 API key
-        if [ $((req % 2)) -eq 0 ]; then
-            test_api $round $req "$API_KEY2"
-        else
-            test_api $round $req "$API_KEY1"
-        fi
+        test_api $round $req "$API_KEY"
         sleep 0.3
     done
     

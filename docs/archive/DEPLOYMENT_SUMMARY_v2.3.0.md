@@ -62,22 +62,22 @@
 
 1. **查看服务日志**:
    ```bash
-   ssh root@71 'journalctl -u llm-gateway-go -f'
+   ssh deploy@<host> 'journalctl -u llm-gateway-go -f'
    ```
 
 2. **查看容器日志**:
    ```bash
-   ssh root@71 'docker logs llm-gateway-go -f'
+   ssh deploy@<host> 'docker logs llm-gateway-go -f'
    ```
 
 3. **检查服务状态**:
    ```bash
-   ssh root@71 'systemctl status llm-gateway-go'
+   ssh deploy@<host> 'systemctl status llm-gateway-go'
    ```
 
 4. **版本验证**:
    ```bash
-   ssh root@71 'docker exec llm-gateway-go cat /opt/llm-gateway-go/VERSION'
+   ssh deploy@<host> 'docker exec llm-gateway-go cat /opt/llm-gateway-go/VERSION'
    ```
 
 ## 回滚方案
@@ -86,16 +86,16 @@
 
 ```bash
 # 停止服务
-ssh root@71 'systemctl stop llm-gateway-go'
+ssh deploy@<host> 'systemctl stop llm-gateway-go'
 
 # 恢复配置文件
-ssh root@71 'chattr -i /etc/systemd/system/llm-gateway-go.service && \
+ssh deploy@<host> 'chattr -i /etc/systemd/system/llm-gateway-go.service && \
   cp /etc/systemd/system/llm-gateway-go.service.bak-* /etc/systemd/system/llm-gateway-go.service && \
   chattr +i /etc/systemd/system/llm-gateway-go.service && \
   systemctl daemon-reload'
 
 # 启动服务
-ssh root@71 'systemctl start llm-gateway-go'
+ssh deploy@<host> 'systemctl start llm-gateway-go'
 ```
 
 ## 后续工作

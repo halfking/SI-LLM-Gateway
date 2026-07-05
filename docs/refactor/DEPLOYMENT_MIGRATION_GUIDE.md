@@ -337,6 +337,6 @@ BenchmarkEndToEndFlow-8    50000    25000 ns/op    8000 B/op    50 allocs/op
 ## 八、联系信息
 
 - **负责团队**: official-deploy / ACC
-- **技术负责人**: xutaohuang
+- **技术负责人**: <team-member>
 - **相关仓库**: llm-gateway-go-2
 - **文档路径**: `/docs/refactor/`

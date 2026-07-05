@@ -20,16 +20,16 @@
 cd $PROJECT_DIR
 
 # 上传到 71 服务器
-scp deploy-attachments-20260701.tar.gz root@<internal-server-ip>:/tmp/
+scp deploy-attachments-20260701.tar.gz deploy@<host>:/tmp/
 
 # 确认上传成功
-ssh root@<internal-server-ip> "ls -lh /tmp/deploy-attachments-20260701.tar.gz"
+ssh deploy@<host> "ls -lh /tmp/deploy-attachments-20260701.tar.gz"
 ```
 
 ### 步骤 2: SSH 登录并解压
 
 ```bash
-ssh root@<internal-server-ip>
+ssh deploy@<host>
 
 cd /tmp
 tar xzf deploy-attachments-20260701.tar.gz
@@ -97,7 +97,7 @@ bash scripts/verify_attachments.sh "$API_KEY" "${ADMIN_JWT:-}"
 在另一个终端窗口保持日志监控：
 
 ```bash
-ssh root@<internal-server-ip>
+ssh deploy@<host>
 journalctl -u llm-gateway -f
 ```
 

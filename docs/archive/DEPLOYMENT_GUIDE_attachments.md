@@ -6,13 +6,13 @@
 
 ```bash
 # 在本机执行
-scp deploy-attachments-20260701.tar.gz root@<internal-server-ip>:/tmp/
+scp deploy-attachments-20260701.tar.gz deploy@<host>:/tmp/
 ```
 
 ### 2. SSH 登录服务器并解压
 
 ```bash
-ssh root@<internal-server-ip>
+ssh deploy@<host>
 cd /tmp
 tar xzf deploy-attachments-20260701.tar.gz
 ```

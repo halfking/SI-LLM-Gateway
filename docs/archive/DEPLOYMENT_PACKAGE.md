@@ -12,9 +12,9 @@
 
 ```bash
 # 方法1: 使用scp（如果有网络访问）
-scp bin/llm-gateway root@<internal-server-ip>:/tmp/
-scp deploy_on_71.sh root@<internal-server-ip>:/tmp/
-scp scripts/test_71_complete.sh root@<internal-server-ip>:/tmp/
+scp bin/llm-gateway deploy@<host>:/tmp/
+scp deploy_on_71.sh deploy@<host>:/tmp/
+scp scripts/test_71_complete.sh deploy@<host>:/tmp/
 
 # 方法2: 使用其他传输方式
 # - 通过跳板机
@@ -25,7 +25,7 @@ scp scripts/test_71_complete.sh root@<internal-server-ip>:/tmp/
 ### 步骤2: 连接到71服务器
 
 ```bash
-ssh root@<internal-server-ip>
+ssh deploy@<host>
 # 或使用其他可用的连接方式
 ```
 

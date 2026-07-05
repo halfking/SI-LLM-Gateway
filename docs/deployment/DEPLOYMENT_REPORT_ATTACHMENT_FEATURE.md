@@ -208,7 +208,7 @@ Response: [附件数组]
 
 ### 1. 编译
 ```bash
-cd /Users/xutaohuang/workspace/llm-gateway-go-2
+cd $PROJECT_DIR
 go build -o gateway ./cmd/gateway
 # ✅ 已完成，生成42MB可执行文件
 ```
