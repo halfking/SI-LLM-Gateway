@@ -18,6 +18,10 @@ coverage/
 # Test artifacts
 *.test
 *.out
+test_logs/
+test_logs_71/
+traffic-replay
+traffic-replay-bin
 
 # Local binaries and build files
 llm-gateway-go
@@ -93,6 +97,17 @@ tests/prod_e2e/results/concurrency_tmp/
 tests/prod_e2e/results/*.jsonl
 tests/prod_e2e/results/*.summary
 tests/prod_e2e/results/*.failures.log
+
+# Deploy packages and archives
+*.tar.gz
+
+# Test reports and results (local only)
+*_REPORT*.md
+*FINAL_REPORT*.md
+*_RESULTS*.md
+TESTING_CHEATSHEET.txt
+docs/fixes/*REPORT*.md
+deploy/sql/docs/archive/*REPORT*.md
 
 # Vendored kx-design (use services/shared/kx-design instead)
 kx-design/
