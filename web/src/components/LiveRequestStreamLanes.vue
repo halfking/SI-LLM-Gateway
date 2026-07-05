@@ -613,21 +613,45 @@ watch(groupMode, () => {
   
   // 🔥 清空泳道队列，避免残留数据
   laneQueues.value.clear()
+  requestLaneIndex.clear()
   
-  // 重新初始化泳道队列（创建空队列）
-  initializeLaneQueues()
+  // 🔥 重新初始化累计统计（避免旧维度的统计数据污染）
+  cumulativeStats.value.vendor.clear()
+  cumulativeStats.value.provider.clear()
+  cumulativeStats.value.model.clear()
   
-  console.log('[LiveStreamLanes] cleared and reinitialized lanes:', Array.from(laneQueues.value.keys()))
-  
-  // 🔥 从 requests buffer 中重新处理所有已标记为已处理的请求
-  // 这样可以确保切换维度后，泳道数据与当前维度一致
+  // 🔥 从 buffer 中重新统计
   const allBufferedRequests = requests.value.filter(r => 
     r.type === 'request' && 
     r.request_id && 
     processedRequestIds.has(r.request_id)
   )
   
-  console.log('[LiveStreamLanes] re-processing', allBufferedRequests.length, 'buffered requests for new group mode')
+  console.log('[LiveStreamLanes] re-calculating stats from', allBufferedRequests.length, 'buffered requests')
+  
+  for (const req of allBufferedRequests) {
+    // 累计原厂统计
+    const vendor = identifyVendor(req.model)
+    cumulativeStats.value.vendor.set(vendor, (cumulativeStats.value.vendor.get(vendor) || 0) + 1)
+    
+    // 累计供应商统计
+    if (req.provider_code) {
+      cumulativeStats.value.provider.set(req.provider_code, (cumulativeStats.value.provider.get(req.provider_code) || 0) + 1)
+    }
+    
+    // 累计模型统计
+    if (req.model) {
+      cumulativeStats.value.model.set(req.model, (cumulativeStats.value.model.get(req.model) || 0) + 1)
+    }
+  }
+  
+  // 重新初始化泳道队列（基于新统计数据创建泳道）
+  initializeLaneQueues()
+  
+  console.log('[LiveStreamLanes] cleared and reinitialized lanes:', Array.from(laneQueues.value.keys()))
+  console.log('[LiveStreamLanes] vendor stats:', Array.from(cumulativeStats.value.vendor.entries()))
+  console.log('[LiveStreamLanes] provider stats:', Array.from(cumulativeStats.value.provider.entries()))
+  console.log('[LiveStreamLanes] model stats:', Array.from(cumulativeStats.value.model.entries()))
   
   // 重新分配到新泳道
   for (const req of allBufferedRequests) {
