@@ -361,8 +361,8 @@ const lanes = computed(() => {
       }),
     ]
     
-    // 🔥 只有在超过 TOP_N 个原厂时才添加 Other
-    if (cumulativeStats.value.vendor.size > TOP_N && otherCount > 0) {
+    // 🔥 如果有 Other 数据，或者原厂总数 > TOP_N，添加 Other 泳道
+    if (otherCount > 0 || cumulativeStats.value.vendor.size > TOP_N) {
       result.push({ 
         key: OTHER_VENDOR, 
         label: t('dashboard.liveStream.other'), 
@@ -387,8 +387,9 @@ const lanes = computed(() => {
       })),
     ]
     
-    // 🔥 只有在超过 TOP_N 个供应商时才添加 Other
-    if (cumulativeStats.value.provider.size > TOP_N && otherCount > 0) {
+    // 🔥 如果有 Other 数据，或者供应商总数 > TOP_N，添加 Other 泳道
+    // 确保即使只有 <= 6 个供应商，也有兜底的 Other 泳道
+    if (otherCount > 0 || cumulativeStats.value.provider.size > TOP_N) {
       result.push({ 
         key: OTHER_VENDOR, 
         label: t('dashboard.liveStream.other'), 
@@ -414,8 +415,8 @@ const lanes = computed(() => {
       })),
     ]
     
-    // 🔥 只有在超过 TOP_N 个模型时才添加 Other
-    if (cumulativeStats.value.model.size > TOP_N && otherCount > 0) {
+    // 🔥 如果有 Other 数据，或者模型总数 > TOP_N，添加 Other 泳道
+    if (otherCount > 0 || cumulativeStats.value.model.size > TOP_N) {
       result.push({ 
         key: OTHER_VENDOR, 
         label: t('dashboard.liveStream.other'), 
