@@ -489,18 +489,20 @@ function getLaneKey(req: LiveRequest): string {
 
   if (groupMode.value === 'vendor') {
     const vendor = identifyVendor(req.model)
-    // 🔥 修复：使用固定的知名原厂列表，不依赖 vendorStats
-    // 这样即使在 loadInitialStats 完成前，新请求也能正确分配到对应泳道
-    return KNOWN_VENDORS.includes(vendor) ? vendor : OTHER_VENDOR
+    // 检查是否在当前 lanes 中
+    const laneKeys = lanes.value.map(l => l.key)
+    return laneKeys.includes(vendor) ? vendor : OTHER_VENDOR
   } else if (groupMode.value === 'provider') {
     if (!req.provider_code) return OTHER_VENDOR
-    const topProviders = providerStats.value.slice(0, TOP_N).map(([c]) => c)
-    return topProviders.includes(req.provider_code) ? req.provider_code : OTHER_VENDOR
+    // 检查是否在当前 lanes 中
+    const laneKeys = lanes.value.map(l => l.key)
+    return laneKeys.includes(req.provider_code) ? req.provider_code : OTHER_VENDOR
   } else {
     // 按模型分组
     if (!req.model) return OTHER_VENDOR
-    const topModels = modelStats.value.slice(0, TOP_N).map(([m]) => m)
-    return topModels.includes(req.model) ? req.model : OTHER_VENDOR
+    // 检查是否在当前 lanes 中
+    const laneKeys = lanes.value.map(l => l.key)
+    return laneKeys.includes(req.model) ? req.model : OTHER_VENDOR
   }
 }
 
