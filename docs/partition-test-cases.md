@@ -2,7 +2,7 @@
 
 **文档版本**: 1.0  
 **创建日期**: 2026-07-04  
-**测试环境**: 71 生产环境 (llm.kxpms.cn)  
+**测试环境**: 71 生产环境 (<gateway-domain>)  
 **覆盖率**: 100% 关键路径
 
 ---
@@ -50,7 +50,7 @@ go test -bench=. ./telemetry
 - `request_logs_default` 处于 ATTACHED 状态
 
 **测试步骤**:
-1. 发送 API 请求到 `https://llm.kxpms.cn/v1/chat/completions`
+1. 发送 API 请求到 `https://<gateway-domain>/v1/chat/completions`
 2. 获取返回的 `request_id`
 3. 查询 `request_logs_default` 表验证数据存在
 4. 查询 `request_logs_2026_07` 表验证数据不存在

@@ -1,6 +1,6 @@
 # 部署审计报告 (Deployment Audit Report)
 **日期**: 2026-07-01  
-**审计对象**: Server 71 (14.103.174.71) llm-gateway-go 部署  
+**审计对象**: Server 71 (<prod-server-ip>) llm-gateway-go 部署  
 **部署版本**: v2.4.0-04375e6c-20260701-719  
 **审计员**: Kiro AI Assistant  
 
@@ -157,7 +157,7 @@ curl -sS https://llm.kxpms.cn/healthz | jq -r .version
 |------|------|----------|----------|
 | 管理员密码 | `Veritrans&9527` | browser-use 命令参数 | **High** |
 | Admin Bearer Token | `Bearer eyJhbGc...` (部分) | curl 命令示例 | Medium |
-| 数据库连接 | 主机 `14.103.174.71` | SSH/curl 命令 | Low |
+| 数据库连接 | 主机 `<prod-server-ip>` | SSH/curl 命令 | Low |
 
 ### 4.2 风险评估
 1. **管理员密码泄露**: 如果会话历史被第三方访问，可直接登录管理后台

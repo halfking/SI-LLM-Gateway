@@ -219,10 +219,10 @@ echo "==================================================="
 echo ""
 
 # SSH 到 71 检查实时数据
-DB_HOST="172.31.0.3"
+DB_HOST="${DB_HOST:-172.31.0.3}"
 DB_PORT="5432"
 DB_USER="llm_gateway"
-DB_PASSWORD="4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg"
+DB_PASSWORD="${DB_PASSWORD:-<your-password>}"
 
 echo "【5.1】最近 1 小时写入分布（验证所有写入在 default）"
 echo "-------------------------------------------"

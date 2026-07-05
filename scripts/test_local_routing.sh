@@ -21,7 +21,7 @@ echo ""
 
 # 清理之前的测试数据
 echo "🧹 清理之前的测试数据..."
-PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
+PGPASSWORD="${PGPASSWORD:-}" psql -U "${DB_USER:-postgres}" -h "${DB_HOST:-localhost}" -d llm_gateway -c "
 DELETE FROM request_logs_default WHERE ts > now() - interval '5 minutes';
 DELETE FROM request_wal WHERE created_at > now() - interval '5 minutes';
 DELETE FROM candidate_failure_logs WHERE ts > now() - interval '5 minutes';
@@ -170,14 +170,14 @@ echo "=========================================="
 sleep 2  # 等异步批量 flush
 echo ""
 echo "🔍 candidate_failure_logs（前 20）:"
-PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
+PGPASSWORD="${PGPASSWORD:-}" psql -U "${DB_USER:-postgres}" -h "${DB_HOST:-localhost}" -d llm_gateway -c "
 SELECT request_id, provider_id, credential_id, raw_model_name, failure_stage, failure_status_code, per_attempt_latency_ms
 FROM candidate_failure_logs
 ORDER BY ts DESC LIMIT 20;
 "
 echo ""
 echo "🔍 request_logs 失败计数（最近 5 分钟）:"
-PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
+PGPASSWORD="${PGPASSWORD:-}" psql -U "${DB_USER:-postgres}" -h "${DB_HOST:-localhost}" -d llm_gateway -c "
 SELECT client_model, request_status, success, error_kind, count(*)
 FROM request_logs
 WHERE ts > now() - interval '5 minutes'

@@ -10,7 +10,7 @@ GATEWAY_URL="http://localhost:8080"
 API_KEY="test-api-key-12345"
 
 # 清空数据
-PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
+PGPASSWORD="${PGPASSWORD:-}" psql -U "${DB_USER:-postgres}" -h "${DB_HOST:-localhost}" -d llm_gateway -c "
 DELETE FROM request_logs_default WHERE ts > now() - interval '5 minutes';
 DELETE FROM request_wal WHERE created_at > now() - interval '5 minutes';
 " > /dev/null 2>&1
@@ -97,13 +97,13 @@ echo "=========================================="
 
 echo ""
 echo "🔍 request_logs 总数（最近 5 分钟）:"
-PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
+PGPASSWORD="${PGPASSWORD:-}" psql -U "${DB_USER:-postgres}" -h "${DB_HOST:-localhost}" -d llm_gateway -c "
 SELECT count(*) AS total_logs FROM request_logs WHERE ts > now() - interval '5 minutes';
 " 2>&1
 
 echo ""
 echo "🔍 各模型请求数（最近 5 分钟）:"
-PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
+PGPASSWORD="${PGPASSWORD:-}" psql -U "${DB_USER:-postgres}" -h "${DB_HOST:-localhost}" -d llm_gateway -c "
 SELECT client_model, request_status, count(*) AS count
 FROM request_logs
 WHERE ts > now() - interval '5 minutes'
@@ -113,7 +113,7 @@ ORDER BY client_model;
 
 echo ""
 echo "🔍 错误分布:"
-PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
+PGPASSWORD="${PGPASSWORD:-}" psql -U "${DB_USER:-postgres}" -h "${DB_HOST:-localhost}" -d llm_gateway -c "
 SELECT error_kind, count(*) AS count
 FROM request_logs
 WHERE ts > now() - interval '5 minutes' AND success = false
@@ -123,7 +123,7 @@ ORDER BY count DESC;
 
 echo ""
 echo "🔍 延迟分布（ms）:"
-PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
+PGPASSWORD="${PGPASSWORD:-}" psql -U "${DB_USER:-postgres}" -h "${DB_HOST:-localhost}" -d llm_gateway -c "
 SELECT
     count(*) AS total,
     min(latency_ms) AS min_lat,
@@ -135,7 +135,7 @@ WHERE ts > now() - interval '5 minutes';
 
 echo ""
 echo "🔍 唯一 request_id 数（验证无重复）:"
-PGPASSWORD= psql -U xutaohuang -h localhost -d llm_gateway -c "
+PGPASSWORD="${PGPASSWORD:-}" psql -U "${DB_USER:-postgres}" -h "${DB_HOST:-localhost}" -d llm_gateway -c "
 SELECT
     count(*) AS total_rows,
     count(DISTINCT request_id) AS unique_requests

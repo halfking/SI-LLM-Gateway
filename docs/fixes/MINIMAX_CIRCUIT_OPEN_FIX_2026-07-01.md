@@ -164,16 +164,16 @@ DB 11:41:38 (v315 启动) - 11:43:00: 73 success, 0 circuit_open
 ### 5.1 部署
 
 ```bash
-cd /Users/xutaohuang/workspace/llm-gateway-go-2
+cd $PROJECT_DIR
 git checkout github
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" \
   -o /tmp/llm-gateway-v$N.linux.amd64 ./cmd/gateway
 
 # 推到 71
-scp /tmp/llm-gateway-v$N.linux.amd64 root@14.103.174.71:/opt/llm-gateway-go/
+scp /tmp/llm-gateway-v$N.linux.amd64 root@<prod-server-ip>:/opt/llm-gateway-go/
 
 # 71 部署
-ssh root@14.103.174.71 "
+ssh root@<prod-server-ip> "
   systemctl stop llm-gateway-go.service
   sleep 3
   docker rm -f llm-gateway-go 2>/dev/null
@@ -198,7 +198,7 @@ LLM_GATEWAY_CIRCUIT_TRANSIENT_THRESHOLD=15
 
 重启:
 ```bash
-ssh root@14.103.174.71 "systemctl restart llm-gateway-go.service"
+ssh root@<prod-server-ip> "systemctl restart llm-gateway-go.service"
 ```
 
 ---

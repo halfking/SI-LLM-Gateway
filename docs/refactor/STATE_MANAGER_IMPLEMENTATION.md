@@ -143,7 +143,7 @@ ok  	github.com/kaixuan/llm-gateway-go/routing-core/state	0.461s	coverage: 59.9%
 ### 4.3 验证命令
 
 ```bash
-cd /Users/xutaohuang/workspace/llm-gateway-go-2
+cd $PROJECT_DIR
 go build ./routing-core/state/...          # ✅ 编译通过
 go test ./routing-core/state/... -v        # ✅ 8个测试全部通过
 ```

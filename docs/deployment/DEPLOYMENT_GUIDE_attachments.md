@@ -6,13 +6,13 @@
 
 ```bash
 # 在本机执行
-scp deploy-attachments-20260701.tar.gz root@192.168.1.71:/tmp/
+scp deploy-attachments-20260701.tar.gz root@<internal-server-ip>:/tmp/
 ```
 
 ### 2. SSH 登录服务器并解压
 
 ```bash
-ssh root@192.168.1.71
+ssh root@<internal-server-ip>
 cd /tmp
 tar xzf deploy-attachments-20260701.tar.gz
 ```
@@ -106,7 +106,7 @@ ALTER TABLE request_logs
 IMG_B64="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 
 # OpenAI 格式
-curl -X POST http://192.168.1.71:8080/v1/chat/completions \
+curl -X POST http://<internal-server-ip>:8080/v1/chat/completions \
   -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -147,7 +147,7 @@ ATT_ID="<从数据库查到的 id>"
 
 # 下载
 curl -H "Authorization: Bearer <admin-jwt>" \
-  "http://192.168.1.71:8080/api/admin/attachments/${ATT_ID}" \
+  "http://<internal-server-ip>:8080/api/admin/attachments/${ATT_ID}" \
   -o /tmp/test.png
 
 # 验证

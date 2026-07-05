@@ -6,7 +6,7 @@
 - **版本**: v2.3.0-0a5a1e74-715
 - **Git Commit**: 0a5a1e74 (comprehensive sensitive info scrub)
 - **构建序列**: 715
-- **目标服务器**: 71 (14.103.174.71)
+- **目标服务器**: 71 (<prod-server-ip>)
 - **部署方式**: Docker 容器
 
 ## 部署步骤
@@ -20,7 +20,7 @@
 修复了敏感信息脱敏过程中引入的占位符问题：
 - ✅ `admin/free_pool_extra.go`: 修复 CIDR 地址占位符 `192.168.[NETWORK].[HOST]/16` → `192.168.0.0/16`
 - ✅ `admin/superadmin_test.go`: 修复测试中的 IP 占位符
-- ✅ `Dockerfile`: 修复镜像仓库占位符 `[REGISTRY_DOMAIN]` → `registry.kxpms.cn`
+- ✅ `Dockerfile`: 修复镜像仓库占位符 `[REGISTRY_DOMAIN]` → `<registry-domain>`
 - ✅ `Dockerfile`: 修复基础镜像占位符 `[KBASE]` → `kx-base`
 
 ### 3. 编译和构建

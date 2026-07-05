@@ -1,7 +1,7 @@
 # Minimax-m3 路由测试执行总结
 
 **测试时间**: 2026-06-30  
-**目标服务**: llm.kxpms.cn  
+**目标服务**: <gateway-domain>  
 **测试模型**: minimax-m3  
 **API Keys**: 
 - <API_KEY_1>

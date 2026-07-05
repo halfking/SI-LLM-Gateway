@@ -2,7 +2,7 @@
 
 ## 问题背景
 
-71服务器（llm.kxpms.cn）实时请求流数据无法正常写入，INSERT 成功但 UPDATE 失败，导致所有请求停留在 `in_progress` 状态。
+71服务器（<gateway-domain>）实时请求流数据无法正常写入，INSERT 成功但 UPDATE 失败，导致所有请求停留在 `in_progress` 状态。
 
 ## 根本原因
 

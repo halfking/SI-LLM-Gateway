@@ -10,7 +10,7 @@ echo "======================================"
 echo ""
 
 # 配置
-PROJECT_ROOT="/Users/xutaohuang/workspace/llm-gateway-go-2"
+PROJECT_ROOT="${PROJECT_ROOT:-$HOME/llm-gateway-go-2}"
 BINARY_NAME="llm-gateway-fpslot-fix-20260629-181208"
 SERVER_71="root@[PROD_DOMAIN]"
 REMOTE_DIR="/opt/llm-gateway-go"

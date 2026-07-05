@@ -113,7 +113,7 @@ in the rollout.
 **Tooling recommendation for stage 5**:
 
 ```bash
-# Run from /Users/xutaohuang/workspace/llm-gateway-go-2
+# Run from $PROJECT_DIR
 
 # 1. Field declarations: '<spaces>*pgxpool.Pool' on its own line
 #    (typically struct fields; preserve indentation)

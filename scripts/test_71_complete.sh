@@ -6,9 +6,7 @@ set -e
 
 # 配置
 GATEWAY_URL="${GATEWAY_URL:-https://llm.kxpms.cn}"
-API_KEY1="sk-1R7IBh2THq1Id2BDWOWHstpFu2oG09Qd1kgYn9hasxFcKZw7"
-API_KEY2="sk-1vH6C2I9pywyvUXaUXj4vdMZbeYVE5VB0fBYVgqA97JrltE9"
-API_KEY="${API_KEY:-$API_KEY1}"
+API_KEY="${API_KEY:-<your-api-key>}"
 MODEL="minimax-m3"
 TEST_ROUNDS=3
 REQUESTS_PER_ROUND=5

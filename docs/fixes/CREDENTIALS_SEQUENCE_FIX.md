@@ -2,11 +2,11 @@
 
 ## 问题描述
 
-在向 `https://llm.kxpms.cn/api/providers/24/credentials` 添加新凭据时出现错误：
+在向 `https://<gateway-domain>/api/providers/24/credentials` 添加新凭据时出现错误：
 
 ```
 create failed: ERROR: duplicate key value violates unique constraint "credentials_pkey" (SQLSTATE 23505)
-POST https://llm.kxpms.cn/api/providers/24/credentials 500 (Internal Server Error)
+POST https://<gateway-domain>/api/providers/24/credentials 500 (Internal Server Error)
 ```
 
 ## 根本原因

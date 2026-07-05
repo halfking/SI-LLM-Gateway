@@ -114,7 +114,7 @@ systemctl start llm-gateway
 
 ### 方法 1：前端监控面板
 
-访问 `https://llm.kxpms.cn/routing-v2/credentials`，点击凭据详情：
+访问 `https://<gateway-domain>/routing-v2/credentials`，点击凭据详情：
 
 1. 进入「模型」tab
 2. 查看「双层槽位信息」面板

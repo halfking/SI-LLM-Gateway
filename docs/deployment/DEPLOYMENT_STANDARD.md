@@ -537,7 +537,7 @@ cat /opt/llm-gateway-go/VERSION
 curl -s http://localhost:8781/version.json | jq
 
 # 数据库连接测试
-PGPASSWORD='4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg' \
+PGPASSWORD='<your-password>' \
   psql -h 127.0.0.1 -p 5432 -U llm_gateway -d llm_gateway -c '\dt'
 ```
 

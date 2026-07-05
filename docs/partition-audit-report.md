@@ -3,7 +3,7 @@
 **审计日期**: 2026-07-04  
 **审计工具**: `scripts/audit-partition-writes.sh`  
 **审计范围**: 所有对 `request_logs`, `usage_ledger`, `request_raw` 的写入操作  
-**审计环境**: 71 生产环境 (llm.kxpms.cn)  
+**审计环境**: 71 生产环境 (<gateway-domain>)  
 **审计结果**: ✅ **PASS**
 
 ---
@@ -138,7 +138,7 @@
 **测试请求**: 发送 API 请求到 71 环境
 
 **验证流程**:
-1. 发送请求: `curl -X POST https://llm.kxpms.cn/v1/chat/completions`
+1. 发送请求: `curl -X POST https://<gateway-domain>/v1/chat/completions`
 2. 获取 request_id
 3. 验证数据在 `request_logs_default`
 4. 验证月度分区无新数据

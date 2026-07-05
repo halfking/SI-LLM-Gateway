@@ -8,7 +8,7 @@ set -e
 
 # 配置参数
 GATEWAY_URL="${GATEWAY_URL:-https://llm.kxpms.cn}"
-API_KEY="${API_KEY:-sk-1vH6C2I9pywyvUXaUXj4vdMZbeYVE5VB0fBYVgqA97JrltE9}"
+API_KEY="${API_KEY:-<your-api-key>}"
 MODEL="minimax-m3"
 ROUNDS="${ROUNDS:-5}"
 REQUESTS_PER_ROUND="${REQUESTS_PER_ROUND:-10}"

@@ -118,14 +118,13 @@ $SSH "mkdir -p '\$(dirname \"$ENV_FILE\")' && {
 # brick — rotate them by editing secrets.env + re-running deploy-71-secrets.sh).
 
 # Database connection (required for routing executor, API key auth, request_logs)
-LLM_GATEWAY_DATABASE_URL=postgres://llm_gateway:4Q92cFTaYY8Z3AO07XTBBH-1g7kceaxg@172.31.0.3:5432/llm_gateway?sslmode=disable
+# WARNING: The actual password and secret keys MUST be injected via deploy-71-secrets.sh.
+# The values below are SAFE-TO-COMMIT bootstrap defaults; rotate immediately if used.
+LLM_GATEWAY_DATABASE_URL=postgres://llm_gateway:${LLM_GATEWAY_DB_PASSWORD:?}@${LLM_GATEWAY_DB_HOST:-172.31.0.3}:5432/llm_gateway?sslmode=disable
 
 # Secrets (required for API key verification and credential decryption).
-# These are bootstrap values that match the keys originally used to encrypt
-# the production DB on 2026-06-28. Rotate by editing
-# /root/.llm-gateway/secrets.env + re-running deploy-71-secrets.sh.
-LLM_GATEWAY_SECRET_KEY=kxpms-secret-2026-production-key
-LLM_GATEWAY_CREDENTIAL_ENCRYPTION_KEY=fL0ML_mt9LKy1PR686R2CRkrePdN-lXO8Dhn0IxofyE=
+LLM_GATEWAY_SECRET_KEY="${LLM_GATEWAY_SECRET_KEY:-change-me-in-secrets-env}"
+LLM_GATEWAY_CREDENTIAL_ENCRYPTION_KEY="${LLM_GATEWAY_CREDENTIAL_ENCRYPTION_KEY:-change-me-in-secrets-env}"
 
 # Attachment storage (must match the host bind-mount in override.conf)
 ATTACHMENT_ENABLED=true

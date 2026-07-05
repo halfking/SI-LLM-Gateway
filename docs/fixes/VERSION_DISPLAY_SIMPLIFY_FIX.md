@@ -91,7 +91,7 @@ GOOS=linux GOARCH=amd64 go build \
 ```
 
 ### 部署
-- **服务器**: 14.103.174.71
+- **服务器**: <prod-server-ip>
 - **部署时间**: 2026-07-01 23:46
 - **备份**: `llm-gateway-go.v321.linux.amd64.backup.version-display-*`
 
@@ -212,11 +212,11 @@ fix(admin): return simplified semantic version in /api/system/version
 **状态**: ✅ 已部署到生产环境  
 **验证**: 需要用户登录前端确认显示效果  
 
-**下一步**: 用户登录 http://14.103.174.71:8781 验证右上角版本显示为 `v2.3.2 · #717`
+**下一步**: 用户登录 http://<prod-server-ip>:8781 验证右上角版本显示为 `v2.3.2 · #717`
 
 ---
 
 **报告生成**: 2026-07-01 23:47  
 **修复人员**: Kiro AI  
-**部署服务器**: 14.103.174.71  
+**部署服务器**: <prod-server-ip>  
 **版本**: 2.3.2 (build #717)

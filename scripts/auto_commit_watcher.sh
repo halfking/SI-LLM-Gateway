@@ -20,7 +20,7 @@
 
 set -e
 
-PROJECT_DIR="/Users/xutaohuang/workspace/llm-gateway-go-2"
+PROJECT_DIR="${PROJECT_DIR:-$HOME/llm-gateway-go-2}"
 SSH_HOST="${SSH_HOST:-root@target-server}"
 SSH_PORT="25022"
 REMOTE_BINARY="/opt/llm-gateway-go/llm-gateway-go"
@@ -116,7 +116,7 @@ OVERRIDE_EOF
         # 7. 跑简单 smoke test
         log "Smoke test..."
         ssh -o StrictHostKeyChecking=no -p "$SSH_PORT" "$SSH_HOST" '
-            SK="sk-k40DVd9aqFGumYcEkfkQvSgdv06uepSNDK0BqHwtwS3RzTgY"
+            SK="${API_KEY:-<your-api-key>}"
             resp=$(docker exec llm-gateway-go wget -qO- -T 30 \
                 "http://127.0.0.1:8781/v1/chat/completions" \
                 --post-data="{\"model\":\"minimax-m3\",\"messages\":[{\"role\":\"user\",\"content\":\"watcher test\"}],\"max_tokens\":10}" \

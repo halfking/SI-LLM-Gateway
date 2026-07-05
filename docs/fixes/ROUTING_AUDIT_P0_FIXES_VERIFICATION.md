@@ -265,7 +265,7 @@ setup:
 
 ### 5.1 编译验证
 ```bash
-cd /Users/xutaohuang/workspace/llm-gateway-go-2
+cd $PROJECT_DIR
 go build ./routing
 # 输出: (无错误) ✅
 ```

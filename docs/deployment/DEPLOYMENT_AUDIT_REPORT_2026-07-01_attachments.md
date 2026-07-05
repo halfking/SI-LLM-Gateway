@@ -6,7 +6,7 @@
 |------|------|
 | **部署日期** | 2026-07-01 |
 | **版本标识** | git commit `edb6fa85` (feat: attachments archival) |
-| **部署目标** | 192.168.1.71 生产服务器 |
+| **部署目标** | <internal-server-ip> 生产服务器 |
 | **影响范围** | `/v1/chat/completions` + `/v1/messages` 图片归档 + Admin 附件下载 API |
 | **风险等级** | 🟡 中等（新增功能 + 3个严重bug修复，向后兼容） |
 | **回滚策略** | 备份旧二进制 → systemctl restart 即可回滚 |
@@ -213,7 +213,7 @@ if src, ok := parseDataURLToAnthropicSource(u); ok {
 ### 步骤 1：准备产物（本机执行）
 
 ```bash
-cd /Users/xutaohuang/workspace/llm-gateway-go-2
+cd $PROJECT_DIR
 
 # 1. 确认代码在正确的 commit
 git log -1 --oneline  # 应显示 edb6fa85 或更新
@@ -231,14 +231,14 @@ tar czf deploy-attachments-$(date +%Y%m%d).tar.gz \
 ### 步骤 2：上传到 71 服务器
 
 ```bash
-scp deploy-attachments-20260701.tar.gz root@192.168.1.71:/tmp/
+scp deploy-attachments-20260701.tar.gz root@<internal-server-ip>:/tmp/
 ```
 
 ### 步骤 3：服务器端执行部署
 
 ```bash
 # SSH 登录
-ssh root@192.168.1.71
+ssh root@<internal-server-ip>
 
 # 解压
 cd /tmp
@@ -323,7 +323,7 @@ journalctl -u llm-gateway -f
 export IMG_B64="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 
 # OpenAI 格式
-curl -X POST http://192.168.1.71:8080/v1/chat/completions \
+curl -X POST http://<internal-server-ip>:8080/v1/chat/completions \
   -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -339,7 +339,7 @@ curl -X POST http://192.168.1.71:8080/v1/chat/completions \
   }'
 
 # Anthropic 格式
-curl -X POST http://192.168.1.71:8080/v1/messages \
+curl -X POST http://<internal-server-ip>:8080/v1/messages \
   -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
@@ -389,7 +389,7 @@ export ATT_ID="<从数据库查到的 id>"
 
 # 下载图片
 curl -H "Authorization: Bearer <admin-jwt-token>" \
-  "http://192.168.1.71:8080/api/admin/attachments/${ATT_ID}" \
+  "http://<internal-server-ip>:8080/api/admin/attachments/${ATT_ID}" \
   -o /tmp/downloaded.png
 
 # 验证是原图
@@ -398,7 +398,7 @@ ls -lh /tmp/downloaded.png  # 应为 70 字节（1x1 红色 PNG）
 
 # 查看元数据
 curl -H "Authorization: Bearer <admin-jwt-token>" \
-  "http://192.168.1.71:8080/api/admin/attachments/${ATT_ID}/info"
+  "http://<internal-server-ip>:8080/api/admin/attachments/${ATT_ID}/info"
 ```
 
 ### 测试 4：按 request_id 列表
@@ -407,7 +407,7 @@ curl -H "Authorization: Bearer <admin-jwt-token>" \
 export REQ_ID="<从数据库查到的 request_id>"
 
 curl -H "Authorization: Bearer <admin-jwt-token>" \
-  "http://192.168.1.71:8080/api/admin/attachments?request_id=${REQ_ID}"
+  "http://<internal-server-ip>:8080/api/admin/attachments?request_id=${REQ_ID}"
 
 # 应返回该请求的所有附件 JSON 数组
 ```
