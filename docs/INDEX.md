@@ -8,17 +8,13 @@
 |------|------|
 | `README.md` | 项目总览（英文） |
 | `README.zh-CN.md` | 项目总览（中文） |
-| `TEST_WEBSOCKET.md` | WebSocket 测试指南 |
-| `TESTING_CHEATSHEET.txt` | 测试快捷参考 |
-| `MINIMAX_TOOL_CALL_FINAL_REPORT.md` | Minimax Tool Call 修复最终报告 |
-| `MINIMAX_M3_TOOL_ERROR_FIX_GUIDE.md` | Minimax M3 Tool 错误修复指南 |
-| `PARTITION_WRITE_FIX_FINAL_REPORT.md` | 分区写入修复最终报告 |
 
 ## docs/
 
 | 文件 | 类别 | 说明 |
 |------|------|------|
 | `README.md` | guide | 文档目录说明 |
+| `ARCHITECTURE.md` | architecture | 项目架构总览 |
 | `AUDIT_REPORT.md` | audit | 项目审计报告 |
 | `ccr-metrics.md` | metrics | CCR 指标说明 |
 | `headroom-integration-complete.md` | report | Headroom 集成完成报告 |
@@ -67,7 +63,10 @@
 | `ISSUE_FIX_DATABASE_TIMEOUT.md` | 数据库超时修复 |
 | `MINIMAX_CIRCUIT_FIX_DELIVERY_REPORT.md` | MiniMax 熔断修复交付 |
 | `MINIMAX_CIRCUIT_OPEN_FIX_2026-07-01.md` | MiniMax 熔断开启修复 |
+| `MINIMAX_M3_TOOL_ERROR_FIX_GUIDE.md` | MiniMax M3 Tool 错误修复指南 |
+| `MINIMAX_TOOL_CALL_FINAL_REPORT.md` | MiniMax Tool Call 修复最终报告 |
 | `MINIMAX_UNKNOWN_KIND_FIX_2026-07-01.md` | MiniMax unknown kind 修复 |
+| `PARTITION_WRITE_FIX_FINAL_REPORT.md` | 分区写入修复最终报告 |
 | `PROBLEM_ANALYSIS_AND_FIX.md` | 问题分析与修复 |
 | `REQUEST_LOGS_FIX_REPORT_2026-07-02.md` | 请求日志修复 |
 | `ROUTING_AUDIT_P0_FIXES_VERIFICATION.md` | 路由审计 P0 修复验证 |
@@ -91,6 +90,8 @@
 | `ROUTING_NO_CANDIDATE_INCIDENT_REPORT.md` | 无候选路由事件 |
 | `STORAGE_MANAGEMENT_IMPLEMENTATION_REPORT.md` | 存储管理实现 |
 | `TEST_EXECUTION_SUMMARY.md` | 测试执行总结 |
+| `TEST_WEBSOCKET.md` | WebSocket 测试指南 |
+| `TESTING_CHEATSHEET.txt` | 测试快捷参考 |
 | `VERIFICATION_REPORT.md` | 验证报告 |
 
 ### docs/refactor/ — 重构文档
@@ -99,6 +100,7 @@
 |------|------|
 | `ROUTING_CORE_ARCHITECTURE.md` | 路由核心架构 |
 | `STATE_MANAGER_IMPLEMENTATION.md` | StateManager 实现 |
+| `SCRIPTS_REFACTOR.md` | 脚本整理说明 |
 | `FINAL_SUMMARY.md` | 重构交付总结 |
 | `PHASE1_TASK_CHECKLIST.md` | 阶段一任务清单 |
 | `DEPLOYMENT_MIGRATION_GUIDE.md` | 部署迁移指南 |

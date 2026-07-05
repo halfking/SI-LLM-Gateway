@@ -84,7 +84,7 @@
 | **会话资产化** | 🔨 会话总结 → Memora L1 → 企业记忆 **（即将推出）** |
 | **部署** | 一键部署 + 多机热备（支持 Docker / K8s / 裸机多种部署方式） |
 
-详细架构见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+详细架构见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
 ---
 
@@ -174,7 +174,7 @@ si-llm-gateway-v1.0.0-installer.tar.gz (2GB)
 
 | 类别 | 文档 |
 |------|------|
-| **架构** | [`ARCHITECTURE.md`](ARCHITECTURE.md) — V3 架构方案 |
+| **架构** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — V3 架构方案 |
 | **产品远景** | [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md) — AI-Native 组织核心网关规划方案 |
 | **路线图** | [`docs/PRODUCT_ROADMAP.md`](docs/PRODUCT_ROADMAP.md) — 18 个月路线图 |
 | **双仓库** | [`docs/REPO-MIRROR-POLICY.md`](docs/REPO-MIRROR-POLICY.md) — codeup ⇄ github 工作流 |

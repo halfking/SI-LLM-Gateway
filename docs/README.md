@@ -30,7 +30,7 @@
 | 文档 | 说明 |
 |------|------|
 | `PARTITION_SOLUTION_FINAL.md` | 最终方案总结 |
-| `PARTITION_WRITE_FIX_FINAL_REPORT.md` | 修复过程详细报告 |
+| `fixes/PARTITION_WRITE_FIX_FINAL_REPORT.md` | 修复过程详细报告 |
 | `deploy/sql/migrations/999_columnar_backfill_and_enforce.sql` | Columnar 转换参考 |
 
 ---
