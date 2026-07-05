@@ -1306,14 +1306,14 @@ func (h *Handler) usageLiveStreamInit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 汇总供应商（provider）：JOIN providers 表获取 catalog_code
+	// 汇总供应商（provider）：优先使用 name，其次 catalog_code，最后 code
 	providerMap := make(map[string]int)
 	rows2, err := h.db.Query(ctx, `
-		SELECT p.catalog_code, COUNT(*)::int AS cnt
+		SELECT COALESCE(NULLIF(p.name, ''), NULLIF(p.catalog_code, ''), p.code, '') AS provider_code, COUNT(*)::int AS cnt
 		FROM usage_ledger ul
 		LEFT JOIN providers p ON ul.provider_id = p.id
-		WHERE `+whereClause+` AND p.catalog_code IS NOT NULL
-		GROUP BY p.catalog_code
+		WHERE `+whereClause+` AND (p.name IS NOT NULL OR p.catalog_code IS NOT NULL OR p.code IS NOT NULL)
+		GROUP BY provider_code
 		ORDER BY cnt DESC
 		LIMIT 20
 	`, args...)

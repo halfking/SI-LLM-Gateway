@@ -559,7 +559,7 @@ func (h *LiveStreamHub) replay(ctx context.Context, tenantID string, isSuper boo
 		       COALESCE(NULLIF(rl.tenant_id, ''), COALESCE(NULLIF(ak.tenant_id, ''), 'default')) AS tenant_id,
 		       COALESCE(NULLIF(rl.gw_session_id, ''), '') AS gw_session_id,
 		       COALESCE(NULLIF(rl.outbound_model, ''), rl.client_model, '') AS model,
-		       COALESCE(NULLIF(p.catalog_code, ''), '') AS provider_code,
+		       COALESCE(NULLIF(p.name, ''), NULLIF(p.catalog_code, ''), NULLIF(p.code, ''), '') AS provider_code,
 		       COALESCE(NULLIF(rl.request_status, ''), CASE WHEN rl.success THEN 'success' WHEN rl.success = FALSE THEN 'failure' ELSE 'in_progress' END) AS status,
 		       rl.latency_ms,
 		       rl.prompt_tokens,
