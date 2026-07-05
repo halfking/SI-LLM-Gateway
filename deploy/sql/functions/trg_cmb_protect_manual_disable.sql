@@ -1,0 +1,33 @@
+-- ============================================
+-- Function: trg_cmb_protect_manual_disable
+-- Generated: 2026-07-05
+-- Source: Test database
+-- ============================================
+
+CREATE FUNCTION public.trg_cmb_protect_manual_disable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.unavailable_reason = 'manual' THEN
+        -- Admin explicit re-enable (toggleModelOfferState available=true)
+        IF (NEW.available = TRUE AND NEW.unavailable_reason IS NULL)
+           OR current_setting('llmgw.admin_override', true) = '1' THEN
+            RETURN NEW;
+        END IF;
+
+        IF NEW.unavailable_reason IS DISTINCT FROM 'manual' THEN
+            NEW.unavailable_reason := 'manual';
+        END IF;
+        IF NEW.available = TRUE THEN
+            NEW.available := FALSE;
+        END IF;
+        IF NEW.unavailable_at IS NULL THEN
+            NEW.unavailable_at := OLD.unavailable_at;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+

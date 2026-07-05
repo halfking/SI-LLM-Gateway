@@ -1,4 +1,4 @@
--- 71服务器凭据状态修复脚本
+-- 测试服务器凭据状态修复脚本
 -- 使用方法: psql $LLM_GATEWAY_DATABASE_URL -f scripts/fix_credentials_state.sql
 
 BEGIN;
