@@ -288,6 +288,7 @@ const VENDOR_PATTERNS: Array<{ vendor: string; patterns: RegExp[]; color: string
   { vendor: 'Baidu',       patterns: [/ernie/i, /wenxin/i],                                      color: '#2932e1' },
   { vendor: 'Tencent',     patterns: [/hunyuan/i],                                               color: '#00a4ff' },
   { vendor: 'iFlytek',     patterns: [/spark/i, /iflytek/i],                                     color: '#00b6f3' },
+  { vendor: 'MiniMax',     patterns: [/minimax/i],                                               color: '#ff4757' },  // 🔥 新增 MiniMax
 ]
 
 const OTHER_VENDOR = 'Other'
@@ -338,12 +339,16 @@ const visibleCount = computed(() => {
 // 颜色池（用于 Top 4 之外的供应商）
 const VENDOR_COLORS = ['#10a37f', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e', '#84cc16']
 
-// 动态泳道配置：Top 6 热门原厂/供应商/模型 + Other
-const TOP_N = 5  // 改为 Top 5，符合需求
+// 动态泳道配置：Top 6 热门原厂/供应商/模型 + Other（仅在超过6个时显示）
+const TOP_N = 6  // Top 6
 const lanes = computed(() => {
   if (groupMode.value === 'vendor') {
     const topVendors = vendorStats.value.slice(0, TOP_N).map(([vendor]) => vendor)
-    return [
+    const otherCount = Array.from(cumulativeStats.value.vendor.entries())
+      .filter(([v]) => !topVendors.includes(v))
+      .reduce((sum, [, cnt]) => sum + cnt, 0)
+    
+    const result = [
       ...topVendors.map((vendor, idx) => {
         const preset = VENDOR_PATTERNS.find((v) => v.vendor === vendor)
         const count = cumulativeStats.value.vendor.get(vendor) || 0
@@ -354,52 +359,72 @@ const lanes = computed(() => {
           count,
         }
       }),
-      { 
+    ]
+    
+    // 🔥 只有在超过 TOP_N 个原厂时才添加 Other
+    if (cumulativeStats.value.vendor.size > TOP_N && otherCount > 0) {
+      result.push({ 
         key: OTHER_VENDOR, 
         label: t('dashboard.liveStream.other'), 
         color: '#6b7280',
-        count: Array.from(cumulativeStats.value.vendor.entries())
-          .filter(([v]) => !topVendors.includes(v))
-          .reduce((sum, [, cnt]) => sum + cnt, 0),
-      },
-    ]
+        count: otherCount,
+      })
+    }
+    
+    return result
   } else if (groupMode.value === 'provider') {
     const topProviders = providerStats.value.slice(0, TOP_N).map(([code]) => code)
-    return [
+    const otherCount = Array.from(cumulativeStats.value.provider.entries())
+      .filter(([p]) => !topProviders.includes(p))
+      .reduce((sum, [, cnt]) => sum + cnt, 0)
+    
+    const result = [
       ...topProviders.map((code, idx) => ({
         key: code,
         label: code,
         color: VENDOR_COLORS[idx] || '#6b7280',
         count: cumulativeStats.value.provider.get(code) || 0,
       })),
-      { 
+    ]
+    
+    // 🔥 只有在超过 TOP_N 个供应商时才添加 Other
+    if (cumulativeStats.value.provider.size > TOP_N && otherCount > 0) {
+      result.push({ 
         key: OTHER_VENDOR, 
         label: t('dashboard.liveStream.other'), 
         color: '#6b7280',
-        count: Array.from(cumulativeStats.value.provider.entries())
-          .filter(([p]) => !topProviders.includes(p))
-          .reduce((sum, [, cnt]) => sum + cnt, 0),
-      },
-    ]
+        count: otherCount,
+      })
+    }
+    
+    return result
   } else {
     // 按模型分组
     const topModels = modelStats.value.slice(0, TOP_N).map(([model]) => model)
-    return [
+    const otherCount = Array.from(cumulativeStats.value.model.entries())
+      .filter(([m]) => !topModels.includes(m))
+      .reduce((sum, [, cnt]) => sum + cnt, 0)
+    
+    const result = [
       ...topModels.map((model, idx) => ({
         key: model,
         label: model,
         color: VENDOR_COLORS[idx] || '#6b7280',
         count: cumulativeStats.value.model.get(model) || 0,
       })),
-      { 
+    ]
+    
+    // 🔥 只有在超过 TOP_N 个模型时才添加 Other
+    if (cumulativeStats.value.model.size > TOP_N && otherCount > 0) {
+      result.push({ 
         key: OTHER_VENDOR, 
         label: t('dashboard.liveStream.other'), 
         color: '#6b7280',
-        count: Array.from(cumulativeStats.value.model.entries())
-          .filter(([m]) => !topModels.includes(m))
-          .reduce((sum, [, cnt]) => sum + cnt, 0),
-      },
-    ]
+        count: otherCount,
+      })
+    }
+    
+    return result
   }
 })
 
