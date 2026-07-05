@@ -2,6 +2,62 @@
 
 > 简明变更历史。仅记录高阶业务/架构级变更，不含文件路径、内部提交哈希、命令、密钥或事件细节。
 
+## V2.3.4 — 实时请求流泳道与 MiniMax 兼容性
+
+### 实时请求流泳道 (Live Request Stream Lanes)
+- 泳道式实时请求流可视化，支持按原厂/供应商/模型三种维度分组切换
+- 上游归属自动识别（17+ LLM 原厂品牌色）、泳道去重更新动画、TransitionGroup 平滑移动
+- 冷启动初始化（后端 `/api/usage/live-stream-init` 接口）、1 分钟空闲自动插入 idle_marker
+- 图例动态切换 + 点击反选高亮 + 错误状态细分（超时/5xx/4xx/未找到/其他失败）
+- RAF 批量处理、稳定排序、O(n²)→O(n) 去重优化、每泳道上限 30 条
+- WebSocket 单例模式（refCount 引用计数），消除多组件多连接数据竞争
+- 彻底移除旧版 LiveRequestStream，DashboardView 独占泳道组件
+- 后端 SQL 修复：列名 model→raw_model_name、provider_code COALESCE(name>catalog_code>code)、p.name→p.display_name
+
+### MiniMax tool_call 完整性验证
+- 检测客户端上下文压缩导致的孤儿 tool result（assistant tool_calls 被删除但 tool result 残留）
+- IR 层 `validateToolCallIntegrity`（type switch 兼容 json.Unmarshal 的 `[]interface{}`）
+- MiniMax adapter 层 `validateMinimaxToolCallIntegrity`（OpenAI + Anthropic 双格式序列化）
+- 防止 MiniMax 返回 `tool result's tool id not found (2013)` 400 错误
+
+### Dashboard 布局重构
+- 整合新版布局：super admin 显示全局统计 + 泳道，普通租户显示 TenantDashboardView
+- 新增 StatsModal 热键统计弹窗
+- 角色路由修复：`isDefaultTenant()` → 全局 Dashboard
+
+### 国际化修复
+- 全 8 语种"中国本地化"→"核心开源"，国旗→地球图标
+- 移除路线图时间线版本号/季度承诺
+- 预加载懒加载语种（zh-TW/ja-JP/de-DE/fr-FR/es-ES/ar-SA），消除首次访问回退到 en-US
+- Playwright 8 语种浏览器实测验证
+
+### 供应商详情页增强
+- 增加 name/code/catalog_code 编辑字段
+- provider_code 显示优先级：name > catalog_code > code > 空字符串
+- 模型名推断默认供应商兜底（claude→anthropic, gpt→openai, gemini→google）
+
+### 部署脚本重构
+- 9 个分散脚本合并为统一 `deploy-71.sh` V3.0 入口
+- 新增 `deploy-71-secrets.sh` + `verify_secret_key.py`（DB-hash 守卫）
+- 修复 bind-mount 硬编码覆盖 secrets 导致的 Invalid API key 回归
+- 删除 8 个过时脚本
+
+### 分区表标准与审计
+- 分区读写标准文档（13k+ 字）、12 测试用例
+- 6 维度审计脚本全量扫描：19 合规写 / 47 ON CONFLICT 列引用全部 PASS
+- 生产流量正确路由到 `*_default`
+- 动态分区路由（基于 request_id hash）
+
+### 自动发现模型监控
+- Prometheus counter `llm_gateway_model_auto_discovered_total{model}`
+- 捕获未注册模型静默的 no_candidate 故障模式
+
+### 测试
+- 生产环境验证脚本 `test-production-live-stream.py`
+- MiniMax tool_call 验证 IR round trip 测试修复
+- `DefaultRouteNodeFailStreakLimit=5` 期望值更新（3→5）
+- Route_node 测试防御性清理残留 Redis 状态
+
 ## V2.3.3 — 附件归档与部署自动化
 
 ### 部署自动化
