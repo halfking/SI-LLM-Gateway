@@ -136,6 +136,9 @@ export function updateProvider(id: number, data: {
   egress_profile?: string
   notes?: string
   enabled?: boolean
+  name?: string
+  code?: string
+  catalog_code?: string
 }) {
   return req<{ message: string }>('PATCH', `/api/providers/${id}`, data)
 }
@@ -362,6 +365,7 @@ export async function pollTask(taskId: number, maxWaitMs = 120000, intervalMs = 
 export interface ProviderDetail {
   id: number
   code: string
+  name?: string | null
   display_name: string
   catalog_code: string | null
   kind: string

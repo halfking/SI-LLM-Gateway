@@ -33,6 +33,9 @@ const formatConversionEnabled = ref<boolean | null>(null)
 
 // Basic provider settings
 const editName = ref(props.provider.display_name)
+const editProviderName = ref(props.provider.name || '')
+const editCode = ref(props.provider.code)
+const editCatalogCode = ref(props.provider.catalog_code || '')
 const editBaseUrl = ref(props.provider.base_url)
 const editProtocol = ref(props.provider.protocol)
 const editKind = ref(props.provider.kind)
@@ -135,6 +138,9 @@ async function saveFormatConversion(enabled: boolean | null) {
 
 function syncFromProvider(p: ProviderDetail) {
   editName.value = p.display_name
+  editProviderName.value = p.name || ''
+  editCode.value = p.code
+  editCatalogCode.value = p.catalog_code || ''
   editBaseUrl.value = p.base_url
   editProtocol.value = p.protocol
   editKind.value = p.kind
@@ -157,6 +163,9 @@ async function save() {
   try {
     await updateProvider(props.provider.id, {
       display_name: editName.value || undefined,
+      name: editProviderName.value || undefined,
+      code: editCode.value || undefined,
+      catalog_code: editCatalogCode.value || undefined,
       base_url: editBaseUrl.value || undefined,
       protocol: editProtocol.value || undefined,
       kind: editKind.value || undefined,
@@ -278,6 +287,21 @@ async function runHealthCheck() {
           <div class="form-group">
             <label>{{ ps('fieldDisplayName') }}</label>
             <input v-model="editName" class="input" />
+          </div>
+          <div class="form-group">
+            <label>供应商名称 (name)</label>
+            <input v-model="editProviderName" class="input" placeholder="用于 live-stream 显示" />
+            <div class="form-hint">优先用于实时流显示，如 apiclaude</div>
+          </div>
+          <div class="form-group">
+            <label>供应商代码 (code)</label>
+            <input v-model="editCode" class="input" readonly disabled />
+            <div class="form-hint">系统生成，不可修改</div>
+          </div>
+          <div class="form-group">
+            <label>目录代码 (catalog_code)</label>
+            <input v-model="editCatalogCode" class="input" placeholder="可选" />
+            <div class="form-hint">用于目录匹配，可选</div>
           </div>
           <div class="form-group">
             <label>{{ ps('fieldBaseUrl') }}</label>
