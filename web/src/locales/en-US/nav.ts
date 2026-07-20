@@ -52,10 +52,13 @@ export default {
     promptInjection: 'Prompt Injection Detection',
     examples: 'Examples',
     chat: 'Chat',
+    opsOverview: 'Ops Overview',
     opsLicenses: 'License Management',
+    opsDownloads: 'Releases & Downloads',
     opsFaults: 'Fault Management',
     opsAutoUpdate: 'Auto Update',
     opsCenter: 'Center Operations',
     opsVibeCoding: 'VibeCoding',
+    opsProductEntry: 'Product Entry',
   },
 }

@@ -18,6 +18,11 @@ export type NavItem = {
    *  '/routing-v2' (路由全景) vs '/routing-v2/credentials' (凭据监控) —
    *  without this both highlight at once on the credentials page. */
   exact?: boolean
+  /**
+   * Same-origin path owned by ai-native-maintain SPA (`/maintain/*`).
+   * Render as a full-page `<a href>` instead of Vue RouterLink.
+   */
+  external?: boolean
 }
 
 export type NavGroup = {
@@ -107,10 +112,15 @@ export const NAV_GROUPS: NavGroup[] = [
     label: '运维平台',
     labelKey: 'nav.group.opsplatform',
     items: [
-      { path: '/ops/licenses', label: 'License管理', labelKey: 'nav.item.opsLicenses', icon: '🔑', super: true, hideForTenant: true },
-      { path: '/ops/faults', label: '故障管理', labelKey: 'nav.item.opsFaults', icon: '⚠️', super: true, hideForTenant: true },
-      { path: '/ops/autoupdate', label: '自动更新', labelKey: 'nav.item.opsAutoUpdate', icon: '🚀', super: true, hideForTenant: true },
-      { path: '/ops/center', label: '中心运维', labelKey: 'nav.item.opsCenter', icon: '🖥️', super: true, hideForTenant: true },
+      // Migrated to ai-native-maintain SPA (same-origin /maintain/*).
+      { path: '/maintain/ops/overview', label: '运维总览', labelKey: 'nav.item.opsOverview', icon: '🧭', super: true, hideForTenant: true, external: true },
+      { path: '/maintain/ops/center', label: '中心运维', labelKey: 'nav.item.opsCenter', icon: '🖥️', super: true, hideForTenant: true, external: true },
+      { path: '/maintain/ops/downloads', label: '发布与下载', labelKey: 'nav.item.opsDownloads', icon: '📦', super: true, hideForTenant: true, external: true },
+      { path: '/maintain/ops/licenses', label: 'License管理', labelKey: 'nav.item.opsLicenses', icon: '🔑', super: true, hideForTenant: true, external: true },
+      { path: '/maintain/ops/faults', label: '故障管理', labelKey: 'nav.item.opsFaults', icon: '⚠️', super: true, hideForTenant: true, external: true },
+      { path: '/maintain/ops/autoupdate', label: '自动更新', labelKey: 'nav.item.opsAutoUpdate', icon: '🚀', super: true, hideForTenant: true, external: true },
+      { path: '/maintain/download', label: '产品入口', labelKey: 'nav.item.opsProductEntry', icon: '🏠', super: true, hideForTenant: true, external: true },
+      // Not yet migrated — keep inside Gateway SPA.
       { path: '/ops/vibecoding', label: 'VibeCoding', labelKey: 'nav.item.opsVibeCoding', icon: '💻', super: true, hideForTenant: true },
     ],
   },

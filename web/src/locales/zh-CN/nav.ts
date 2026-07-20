@@ -53,10 +53,13 @@ export default {
     promptInjection: '提示词注入检测',
     examples: '接入示例',
     chat: '对话',
+    opsOverview: '运维总览',
     opsLicenses: 'License管理',
+    opsDownloads: '发布与下载',
     opsFaults: '故障管理',
     opsAutoUpdate: '自动更新',
     opsCenter: '中心运维',
     opsVibeCoding: 'VibeCoding',
+    opsProductEntry: '产品入口',
   },
 }

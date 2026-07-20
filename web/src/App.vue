@@ -183,17 +183,27 @@ function handleChangePasswordSuccess() {
 
       <nav class="sidebar-nav">
         <div v-if="navPrimaryItems.length" class="nav-primary">
-          <RouterLink
-            v-for="item in navPrimaryItems"
-            :key="item.path + item.label"
-            :to="item.path"
-            class="nav-item nav-item-primary"
-            :class="{ active: isNavItemActive(item.path, route.path, item.exact) }"
-            :title="collapsed ? (item.labelKey ? t(item.labelKey) : item.label) : undefined"
-          >
-            <span class="nav-icon">{{ item.icon }}</span>
-            <span v-show="!collapsed" class="nav-label">{{ item.labelKey ? t(item.labelKey) : item.label }}</span>
-          </RouterLink>
+          <template v-for="item in navPrimaryItems" :key="item.path + item.label">
+            <a
+              v-if="item.external"
+              :href="item.path"
+              class="nav-item nav-item-primary"
+              :title="collapsed ? (item.labelKey ? t(item.labelKey) : item.label) : undefined"
+            >
+              <span class="nav-icon">{{ item.icon }}</span>
+              <span v-show="!collapsed" class="nav-label">{{ item.labelKey ? t(item.labelKey) : item.label }}</span>
+            </a>
+            <RouterLink
+              v-else
+              :to="item.path"
+              class="nav-item nav-item-primary"
+              :class="{ active: isNavItemActive(item.path, route.path, item.exact) }"
+              :title="collapsed ? (item.labelKey ? t(item.labelKey) : item.label) : undefined"
+            >
+              <span class="nav-icon">{{ item.icon }}</span>
+              <span v-show="!collapsed" class="nav-label">{{ item.labelKey ? t(item.labelKey) : item.label }}</span>
+            </RouterLink>
+          </template>
         </div>
 
         <section v-for="group in navGroups" :key="group.id" class="nav-group">
@@ -215,17 +225,27 @@ function handleChangePasswordSuccess() {
             v-show="collapsed || isGroupExpanded(group.id)"
             class="nav-group-items"
           >
-            <RouterLink
-              v-for="item in group.items"
-              :key="item.path + item.label"
-              :to="item.path"
-              class="nav-item"
-              :class="{ active: isNavItemActive(item.path, route.path, item.exact) }"
-              :title="collapsed ? (item.labelKey ? t(item.labelKey) : item.label) : undefined"
-            >
-              <span class="nav-icon">{{ item.icon }}</span>
-              <span v-show="!collapsed" class="nav-label">{{ item.labelKey ? t(item.labelKey) : item.label }}</span>
-            </RouterLink>
+            <template v-for="item in group.items" :key="item.path + item.label">
+              <a
+                v-if="item.external"
+                :href="item.path"
+                class="nav-item"
+                :title="collapsed ? (item.labelKey ? t(item.labelKey) : item.label) : undefined"
+              >
+                <span class="nav-icon">{{ item.icon }}</span>
+                <span v-show="!collapsed" class="nav-label">{{ item.labelKey ? t(item.labelKey) : item.label }}</span>
+              </a>
+              <RouterLink
+                v-else
+                :to="item.path"
+                class="nav-item"
+                :class="{ active: isNavItemActive(item.path, route.path, item.exact) }"
+                :title="collapsed ? (item.labelKey ? t(item.labelKey) : item.label) : undefined"
+              >
+                <span class="nav-icon">{{ item.icon }}</span>
+                <span v-show="!collapsed" class="nav-label">{{ item.labelKey ? t(item.labelKey) : item.label }}</span>
+              </RouterLink>
+            </template>
           </div>
         </section>
       </nav>
