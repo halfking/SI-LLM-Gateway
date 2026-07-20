@@ -68,12 +68,23 @@ const UserProfileListView = () => import('./views/UserProfileListView.vue')
 const UserProfileView = () => import('./views/UserProfileView.vue')
 const SessionConfigView = () => import('./views/SessionConfigView.vue')
 
-// Operations Platform views (super_admin only)
-const LicenseManagementView = () => import('./views/ops/LicenseManagementView.vue')
-const FaultManagementView = () => import('./views/ops/FaultManagementView.vue')
-const AutoUpdateView = () => import('./views/ops/AutoUpdateView.vue')
-const CenterOpsView = () => import('./views/ops/CenterOpsView.vue')
+// Operations Platform — vibecoding still lives in Gateway; other /ops/*
+// pages redirect to ai-native-maintain SPA under /maintain/ops/*.
 const VibeCodingView = () => import('./views/ops/VibeCodingView.vue')
+
+/** Full-page jump to maintain SPA (nginx / maintain_static serves /maintain/* separately). */
+function externalMaintainRedirect(path: string, target: string) {
+  return {
+    path,
+    component: { render: () => null },
+    beforeEnter(to: { fullPath: string; path: string }) {
+      if (typeof window !== 'undefined') {
+        const qs = to.fullPath.slice(to.path.length) // keeps ?query and #hash
+        window.location.replace(target + qs)
+      }
+    },
+  }
+}
 
 function isAuthed(): boolean {
   if (store.jwtToken || store.apiKey || store.userInfo) return true
@@ -217,12 +228,25 @@ export const router = createRouter({
     { path: '/examples',           component: ExamplesView },
     { path: '/chat',               component: ChatView },
 
-    // Operations Platform (super_admin only)
-    { path: '/ops/licenses',       component: LicenseManagementView, meta: { requiresSuper: true } },
-    { path: '/ops/faults',         component: FaultManagementView, meta: { requiresSuper: true } },
-    { path: '/ops/autoupdate',     component: AutoUpdateView, meta: { requiresSuper: true } },
-    { path: '/ops/center',         component: CenterOpsView, meta: { requiresSuper: true } },
-    { path: '/ops/vibecoding',     component: VibeCodingView, meta: { requiresSuper: true } },
+    // Operations Platform — legacy /ops/* bookmarks → maintain SPA (full page)
+    externalMaintainRedirect('/ops/licenses', '/maintain/ops/licenses'),
+    externalMaintainRedirect('/ops/faults', '/maintain/ops/faults'),
+    externalMaintainRedirect('/ops/autoupdate', '/maintain/ops/autoupdate'),
+    externalMaintainRedirect('/ops/center', '/maintain/ops/center'),
+    externalMaintainRedirect('/ops/overview', '/maintain/ops/overview'),
+    externalMaintainRedirect('/ops/downloads', '/maintain/ops/downloads'),
+    externalMaintainRedirect('/ops', '/maintain/ops/overview'),
+    { path: '/ops/vibecoding', component: VibeCodingView, meta: { requiresSuper: true } },
+
+    // Tenant self-service + public distribution aliases → maintain SPA
+    externalMaintainRedirect('/tenant/license', '/maintain/tenant/license'),
+    externalMaintainRedirect('/tenant/autoupdate', '/maintain/tenant/autoupdate'),
+    externalMaintainRedirect('/activate', '/maintain/activate'),
+    externalMaintainRedirect('/license', '/maintain/license'),
+    externalMaintainRedirect('/upgrade', '/maintain/upgrade'),
+    externalMaintainRedirect('/download', '/maintain/download'),
+    externalMaintainRedirect('/support', '/maintain/support'),
+    externalMaintainRedirect('/offline-activation', '/maintain/offline-activation'),
 
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
